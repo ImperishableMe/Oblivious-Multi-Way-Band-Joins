@@ -71,25 +71,20 @@ Entry entry_t_to_entry(const entry_t& c_entry) {
     entry.copy_index = c_entry.copy_index;
     entry.alignment_key = c_entry.alignment_key;
     
-    // Convert attributes array to vector
-    // Count actual number of attributes (non-zero values)
-    size_t num_attrs = 0;
-    for (size_t i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (c_entry.attributes[i] != 0 || i < entry.column_names.size()) {
-            num_attrs = i + 1;
-        }
-    }
-    entry.attributes = array_to_int32(c_entry.attributes, num_attrs);
-    
-    // Convert column names 2D char array to vector
-    // Count actual number of column names
+    // Convert column names first to determine actual column count
+    // Count actual number of column names (stop at first empty)
     size_t num_cols = 0;
     for (size_t i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (strlen(c_entry.column_names[i]) > 0) {
-            num_cols = i + 1;
+        if (strlen(c_entry.column_names[i]) == 0) {
+            break;  // Stop at first empty column name
         }
+        num_cols++;
     }
     entry.column_names = char_array_2d_to_strings(c_entry.column_names, num_cols);
+    
+    // Convert attributes array to vector using column count
+    // Only copy as many attributes as we have columns
+    entry.attributes = array_to_int32(c_entry.attributes, num_cols);
     
     return entry;
 }

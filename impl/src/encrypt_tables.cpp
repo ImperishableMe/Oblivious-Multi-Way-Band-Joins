@@ -135,8 +135,8 @@ int main(int argc, char* argv[]) {
                 Table table = TableIO::load_csv(input_path);
                 std::cout << table.size() << " rows ... ";
                 
-                // Save as encrypted CSV using secure enclave key
-                TableIO::save_encrypted_csv_secure(table, output_path, global_eid);
+                // Save as encrypted CSV with nonce using secure enclave key
+                TableIO::save_encrypted_csv(table, output_path, global_eid);
                 
                 std::cout << "✓ Done" << std::endl;
                 files_processed++;
@@ -169,12 +169,14 @@ int main(int argc, char* argv[]) {
                     std::string verify_path = output_dir + "/" + filename;
                     
                     try {
-                        Table encrypted = TableIO::load_encrypted_csv(verify_path);
-                        if (encrypted.size() > 0 && encrypted.get_entry(0).is_encrypted) {
+                        // load_csv auto-detects encryption by checking for nonce column
+                        Table encrypted = TableIO::load_csv(verify_path);
+                        auto status = encrypted.get_encryption_status();
+                        if (status == Table::ENCRYPTED) {
                             std::cout << "✓ Verification successful: " << filename 
-                                     << " loaded with is_encrypted=true" << std::endl;
+                                     << " detected as encrypted (nonce column found)" << std::endl;
                         } else {
-                            std::cout << "✗ Verification failed: is_encrypted flag not set" << std::endl;
+                            std::cout << "✗ Verification failed: encryption not detected" << std::endl;
                         }
                     } catch (const std::exception& e) {
                         std::cout << "✗ Verification failed: " << e.what() << std::endl;

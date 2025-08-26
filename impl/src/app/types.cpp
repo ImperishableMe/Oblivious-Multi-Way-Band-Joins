@@ -36,6 +36,7 @@ entry_t Entry::to_entry_t() const {
     result.field_type = field_type;
     result.equality_type = equality_type;
     result.is_encrypted = is_encrypted;
+    result.nonce = nonce;  // Don't forget the nonce!
     result.join_attr = join_attr;
     result.original_index = original_index;
     result.local_mult = local_mult;
@@ -69,6 +70,7 @@ void Entry::from_entry_t(const entry_t& c_entry) {
     field_type = c_entry.field_type;
     equality_type = c_entry.equality_type;
     is_encrypted = c_entry.is_encrypted;
+    nonce = c_entry.nonce;  // Copy nonce too!
     join_attr = c_entry.join_attr;
     original_index = c_entry.original_index;
     local_mult = c_entry.local_mult;
@@ -82,38 +84,22 @@ void Entry::from_entry_t(const entry_t& c_entry) {
     copy_index = c_entry.copy_index;
     alignment_key = c_entry.alignment_key;
     
-    // Clear and copy attributes
-    attributes.clear();
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        // Stop at first zero if all remaining are zero
-        if (c_entry.attributes[i] == 0.0) {
-            bool all_zero = true;
-            for (int j = i + 1; j < MAX_ATTRIBUTES; j++) {
-                if (c_entry.attributes[j] != 0.0) {
-                    all_zero = false;
-                    break;
-                }
-            }
-            if (all_zero) break;
-        }
-        attributes.push_back(c_entry.attributes[i]);
-    }
-    
-    // Clear and copy column names
+    // Clear and copy column names first to determine actual column count
     column_names.clear();
+    int actual_columns = 0;
     for (int i = 0; i < MAX_ATTRIBUTES; i++) {
         if (strlen(c_entry.column_names[i]) == 0) {
-            // Check if all remaining are empty
-            bool all_empty = true;
-            for (int j = i + 1; j < MAX_ATTRIBUTES; j++) {
-                if (strlen(c_entry.column_names[j]) > 0) {
-                    all_empty = false;
-                    break;
-                }
-            }
-            if (all_empty) break;
+            // Stop at first empty column name
+            break;
         }
         column_names.push_back(std::string(c_entry.column_names[i]));
+        actual_columns++;
+    }
+    
+    // Clear and copy only the actual number of attributes
+    attributes.clear();
+    for (int i = 0; i < actual_columns && i < MAX_ATTRIBUTES; i++) {
+        attributes.push_back(c_entry.attributes[i]);
     }
 }
 
@@ -227,6 +213,22 @@ std::vector<Entry>::const_iterator Table::begin() const {
 
 std::vector<Entry>::const_iterator Table::end() const {
     return entries.end();
+}
+
+Table::EncryptionStatus Table::get_encryption_status() const {
+    if (entries.empty()) {
+        return UNENCRYPTED;  // Empty table is considered unencrypted
+    }
+    
+    bool first_is_encrypted = entries[0].is_encrypted;
+    
+    for (size_t i = 1; i < entries.size(); ++i) {
+        if (entries[i].is_encrypted != first_is_encrypted) {
+            return MIXED;  // Found a mismatch
+        }
+    }
+    
+    return first_is_encrypted ? ENCRYPTED : UNENCRYPTED;
 }
 
 //////////////////////////////////////////////////////////////////////////////

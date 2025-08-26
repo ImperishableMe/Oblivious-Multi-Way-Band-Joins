@@ -48,27 +48,19 @@ public:
     // Encrypted CSV Operations
     
     /**
-     * Save a table as encrypted CSV using secure enclave key
+     * Save a table as encrypted CSV with nonce column
      * The encryption key is stored securely inside the enclave
+     * Adds a "nonce" column containing the unique nonce for each entry
      * @param table Table to encrypt and save
      * @param filepath Output CSV file path
      * @param eid Enclave ID for encryption
      */
-    static void save_encrypted_csv_secure(const Table& table, 
-                                         const std::string& filepath,
-                                         sgx_enclave_id_t eid);
+    static void save_encrypted_csv(const Table& table, 
+                                   const std::string& filepath,
+                                   sgx_enclave_id_t eid);
     
-    // Legacy XOR encryption with key parameter has been removed.
-    // Use save_encrypted_csv_secure() instead.
-    
-    /**
-     * Load a table from encrypted CSV format
-     * Just loads the encrypted integer values and sets is_encrypted flag
-     * No decryption happens here - that's done later when needed
-     * @param filepath Input CSV file path
-     * @return Table with encrypted entries (is_encrypted = true)
-     */
-    static Table load_encrypted_csv(const std::string& filepath);
+    // load_encrypted_csv has been deprecated
+    // Use load_csv() instead - it auto-detects encryption by checking for nonce column
     
     // Batch Operations
     /**

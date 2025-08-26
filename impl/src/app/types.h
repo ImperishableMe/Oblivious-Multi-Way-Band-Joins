@@ -133,6 +133,14 @@ public:
     std::vector<Entry>::iterator end();
     std::vector<Entry>::const_iterator begin() const;
     std::vector<Entry>::const_iterator end() const;
+    
+    // Encryption status
+    enum EncryptionStatus {
+        UNENCRYPTED,  // All entries have is_encrypted = false
+        ENCRYPTED,    // All entries have is_encrypted = true
+        MIXED         // Entries have different encryption states
+    };
+    EncryptionStatus get_encryption_status() const;
 };
 
 /**

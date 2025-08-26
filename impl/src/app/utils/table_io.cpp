@@ -22,6 +22,7 @@ Table TableIO::load_csv(const std::string& filepath) {
     std::string line;
     std::vector<std::string> headers;
     bool first_line = true;
+    int nonce_column_index = -1;  // -1 means no nonce column
     
     while (std::getline(file, line)) {
         if (line.empty()) continue;
@@ -31,29 +32,53 @@ Table TableIO::load_csv(const std::string& filepath) {
         if (first_line) {
             // First line contains column headers
             headers = values;
-            table.set_num_columns(headers.size());
+            
+            // Check if any column is "nonce"
+            for (size_t i = 0; i < headers.size(); ++i) {
+                if (headers[i] == "nonce") {
+                    nonce_column_index = i;
+                    break;
+                }
+            }
+            
+            // Set num_columns (excluding nonce column if present)
+            size_t data_columns = (nonce_column_index >= 0) ? headers.size() - 1 : headers.size();
+            table.set_num_columns(data_columns);
             first_line = false;
         } else {
             // Data line - create Entry
             Entry entry;
-            entry.column_names = headers;
             
-            // Parse integer values
+            // Build column names (excluding nonce if present)
+            for (size_t i = 0; i < headers.size(); ++i) {
+                if (static_cast<int>(i) != nonce_column_index) {
+                    entry.column_names.push_back(headers[i]);
+                }
+            }
+            
+            // Parse values
+            uint64_t nonce_value = 0;
             for (size_t i = 0; i < values.size() && i < headers.size(); ++i) {
-                int32_t val = parse_value(values[i]);
-                entry.attributes.push_back(val);
-                
-                // Set join_attr to the first column value by default
-                if (i == 0) {
-                    entry.join_attr = val;
+                if (static_cast<int>(i) == nonce_column_index) {
+                    // This is the nonce column - parse as uint64_t
+                    nonce_value = std::stoull(values[i]);
+                } else {
+                    // Regular data column
+                    int32_t val = parse_value(values[i]);
+                    entry.attributes.push_back(val);
+                    
+                    // Set join_attr to the first data column value
+                    if (entry.attributes.size() == 1) {
+                        entry.join_attr = val;
+                    }
                 }
             }
             
             // Initialize metadata
             entry.field_type = SOURCE;  // Default type
             entry.equality_type = NONE;
-            entry.is_encrypted = false;
-            entry.nonce = 0;  // No nonce for plaintext
+            entry.is_encrypted = (nonce_column_index >= 0);  // Encrypted if nonce column exists
+            entry.nonce = nonce_value;
             entry.original_index = table.size();
             entry.local_mult = 1;  // Will be computed during algorithm
             entry.final_mult = 0;
@@ -103,23 +128,25 @@ void TableIO::save_csv(const Table& table, const std::string& filepath) {
     file.close();
 }
 
-void TableIO::save_encrypted_csv_secure(const Table& table, 
-                                       const std::string& filepath,
-                                       sgx_enclave_id_t eid) {
-    // Convert table to entry_t vector
-    std::vector<entry_t> entries = table.to_entry_t_vector();
+void TableIO::save_encrypted_csv(const Table& table, 
+                                 const std::string& filepath,
+                                 sgx_enclave_id_t eid) {
+    // Work with a copy of the table to allow encryption if needed
+    Table table_copy = table;
     
-    // Encrypt each entry individually using secure enclave key
-    // This is memory efficient for SGX (processes one at a time)
-    for (size_t i = 0; i < entries.size(); i++) {
-        sgx_status_t ret;
-        crypto_status_t crypto_ret;
-        ret = ecall_encrypt_entry(eid, &crypto_ret, &entries[i]);
-        
-        if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
-            throw std::runtime_error("Secure encryption failed at entry " + std::to_string(i));
+    // Only encrypt entries that aren't already encrypted
+    for (size_t i = 0; i < table_copy.size(); i++) {
+        Entry& entry = table_copy.get_entry(i);
+        if (!entry.is_encrypted) {
+            crypto_status_t ret = CryptoUtils::encrypt_entry(entry, eid);
+            if (ret != CRYPTO_SUCCESS) {
+                throw std::runtime_error("Encryption failed at entry " + std::to_string(i));
+            }
         }
     }
+    
+    // Now convert to entry_t vector for writing
+    std::vector<entry_t> entries = table_copy.to_entry_t_vector();
     
     // Now write as CSV with encrypted values
     std::ofstream file(filepath);
@@ -138,9 +165,10 @@ void TableIO::save_encrypted_csv_secure(const Table& table,
                 break;
             }
         }
-        file << "\n";
+        // Add nonce column header
+        file << ",nonce\n";
         
-        // Write encrypted data as integers
+        // Write encrypted data as integers with nonce
         for (const auto& entry : entries) {
             bool first = true;
             for (size_t i = 0; i < MAX_ATTRIBUTES; ++i) {
@@ -154,80 +182,16 @@ void TableIO::save_encrypted_csv_secure(const Table& table,
                     break;
                 }
             }
-            file << "\n";
+            // Add the nonce value
+            file << "," << entry.nonce << "\n";
         }
     }
     
     file.close();
 }
 
-// Legacy encryption with key parameter has been removed.
-// Use save_encrypted_csv_secure() instead.
-
-Table TableIO::load_encrypted_csv(const std::string& filepath) {
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open encrypted CSV file: " + filepath);
-    }
-    
-    Table table(extract_table_name(filepath));
-    std::string line;
-    std::vector<std::string> headers;
-    bool first_line = true;
-    
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        
-        auto values = parse_csv_line(line);
-        
-        if (first_line) {
-            // First line contains column headers (plaintext)
-            headers = values;
-            table.set_num_columns(headers.size());
-            first_line = false;
-        } else {
-            // Data line - create Entry with encrypted values
-            Entry entry;
-            entry.column_names = headers;
-            
-            // Parse encrypted integer values
-            for (size_t i = 0; i < values.size() && i < headers.size(); ++i) {
-                // These are encrypted int32_t values stored as integers
-                int32_t val = parse_value(values[i]);
-                entry.attributes.push_back(val);
-                
-                // Set join_attr to the first column value
-                if (i == 0) {
-                    entry.join_attr = val;
-                }
-            }
-            
-            // Mark as encrypted
-            entry.is_encrypted = true;  // This is the key difference
-            entry.nonce = 0;  // Will be populated from CSV if present
-            
-            // Initialize other metadata
-            entry.field_type = SOURCE;
-            entry.equality_type = NONE;
-            entry.original_index = table.size();
-            entry.local_mult = 1;
-            entry.final_mult = 0;
-            entry.foreign_sum = 0;
-            entry.local_cumsum = 0;
-            entry.local_interval = 0;
-            entry.foreign_cumsum = 0;
-            entry.foreign_interval = 0;
-            entry.local_weight = 0;
-            entry.copy_index = 0;
-            entry.alignment_key = 0;
-            
-            table.add_entry(entry);
-        }
-    }
-    
-    file.close();
-    return table;
-}
+// load_encrypted_csv has been deprecated
+// Use load_csv() instead - it auto-detects encryption by checking for nonce column
 
 std::unordered_map<std::string, Table> 
 TableIO::load_csv_directory(const std::string& dir_path) {
@@ -286,8 +250,9 @@ TableIO::load_tables_from_directory(const std::string& dir_path,
             if (stat(full_path.c_str(), &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
                 if (is_csv_file(filename)) {
                     std::string table_name = extract_table_name(filename);
-                    tables[table_name] = load_encrypted_csv(full_path);
-                    std::cout << "Loaded encrypted CSV table: " << table_name 
+                    // load_csv auto-detects encryption by checking for nonce column
+                    tables[table_name] = load_csv(full_path);
+                    std::cout << "Loaded CSV table: " << table_name 
                              << " (" << tables[table_name].size() << " rows)" << std::endl;
                 }
             }

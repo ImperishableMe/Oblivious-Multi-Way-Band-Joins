@@ -49,11 +49,9 @@ void test_encryption() {
         entry.column_names.push_back("col" + std::to_string(i));
     }
     
-    uint32_t key = 0xDEADBEEF;
-    
-    // Test encryption
+    // Test encryption (key is now stored securely in enclave)
     std::cout << "Original index: " << entry.original_index << std::endl;
-    crypto_status_t status = CryptoUtils::encrypt_entry(entry, key, global_eid);
+    crypto_status_t status = CryptoUtils::encrypt_entry(entry, global_eid);
     if (status == CRYPTO_SUCCESS) {
         std::cout << "Encryption successful. Encrypted index: " << entry.original_index << std::endl;
     } else {
@@ -61,7 +59,7 @@ void test_encryption() {
     }
     
     // Test decryption
-    status = CryptoUtils::decrypt_entry(entry, key, global_eid);
+    status = CryptoUtils::decrypt_entry(entry, global_eid);
     if (status == CRYPTO_SUCCESS) {
         std::cout << "Decryption successful. Decrypted index: " << entry.original_index << std::endl;
     } else {

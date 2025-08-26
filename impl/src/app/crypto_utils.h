@@ -14,40 +14,22 @@
 class CryptoUtils {
 public:
     /**
-     * Encrypt a single entry with safety checks
+     * Encrypt a single entry using secure AES-CTR encryption
+     * Uses encryption key stored securely inside the enclave
      * @param entry Entry to encrypt (modified in-place)
-     * @param key Encryption key
      * @param eid Enclave ID
      * @return Status code indicating success or failure
      */
-    static crypto_status_t encrypt_entry(Entry& entry, uint32_t key, sgx_enclave_id_t eid);
+    static crypto_status_t encrypt_entry(Entry& entry, sgx_enclave_id_t eid);
     
     /**
-     * Decrypt a single entry with safety checks
+     * Decrypt a single entry using secure AES-CTR encryption
+     * Uses encryption key stored securely inside the enclave
      * @param entry Entry to decrypt (modified in-place)
-     * @param key Decryption key (must match encryption key)
      * @param eid Enclave ID
      * @return Status code indicating success or failure
      */
-    static crypto_status_t decrypt_entry(Entry& entry, uint32_t key, sgx_enclave_id_t eid);
-    
-    /**
-     * Encrypt an entire table
-     * @param table Table to encrypt (modified in-place)
-     * @param key Encryption key
-     * @param eid Enclave ID
-     * @return Status code indicating success or failure
-     */
-    static crypto_status_t encrypt_table(Table& table, uint32_t key, sgx_enclave_id_t eid);
-    
-    /**
-     * Decrypt an entire table
-     * @param table Table to decrypt (modified in-place)
-     * @param key Decryption key
-     * @param eid Enclave ID
-     * @return Status code indicating success or failure
-     */
-    static crypto_status_t decrypt_table(Table& table, uint32_t key, sgx_enclave_id_t eid);
+    static crypto_status_t decrypt_entry(Entry& entry, sgx_enclave_id_t eid);
     
     /**
      * Generate a random encryption key

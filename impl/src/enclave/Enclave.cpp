@@ -9,38 +9,18 @@
 #include "secure_key.h"
 
 /**
- * Secure Encryption/Decryption Ecall Implementations
+ * AES-CTR Encryption/Decryption Ecall Implementations
  * These functions use AES-CTR with secure key stored inside the enclave
  */
 
-crypto_status_t ecall_encrypt_entry_secure(entry_t* entry) {
-    // Use AES-CTR encryption
+crypto_status_t ecall_encrypt_entry(entry_t* entry) {
+    // Use AES-CTR encryption with secure enclave key
     return aes_encrypt_entry(entry);
 }
 
-crypto_status_t ecall_decrypt_entry_secure(entry_t* entry) {
-    // Use AES-CTR decryption
+crypto_status_t ecall_decrypt_entry(entry_t* entry) {
+    // Use AES-CTR decryption with secure enclave key
     return aes_decrypt_entry(entry);
-}
-
-/**
- * Legacy Encryption/Decryption Ecall Implementations (deprecated)
- */
-
-crypto_status_t ecall_encrypt_entry(entry_t* entry, int32_t key) {
-    return encrypt_entry(entry, key);
-}
-
-crypto_status_t ecall_decrypt_entry(entry_t* entry, int32_t key) {
-    return decrypt_entry(entry, key);
-}
-
-crypto_status_t ecall_encrypt_entries(entry_t* entries, size_t count, int32_t key) {
-    return encrypt_entries(entries, count, key);
-}
-
-crypto_status_t ecall_decrypt_entries(entry_t* entries, size_t count, int32_t key) {
-    return decrypt_entries(entries, count, key);
 }
 
 /**

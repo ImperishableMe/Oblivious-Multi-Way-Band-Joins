@@ -5,7 +5,7 @@
 #include <random>
 #include <chrono>
 
-crypto_status_t CryptoUtils::encrypt_entry(Entry& entry, uint32_t key, sgx_enclave_id_t eid) {
+crypto_status_t CryptoUtils::encrypt_entry(Entry& entry, sgx_enclave_id_t eid) {
     // Check flag before calling SGX
     if (entry.is_encrypted) {
         log_crypto_error(CRYPTO_ALREADY_ENCRYPTED, "encrypt_entry");
@@ -15,9 +15,9 @@ crypto_status_t CryptoUtils::encrypt_entry(Entry& entry, uint32_t key, sgx_encla
     // Convert to entry_t
     entry_t c_entry = entry_to_entry_t(entry);
     
-    // Call SGX ecall
+    // Call SGX ecall (uses secure key inside enclave)
     crypto_status_t status;
-    sgx_status_t sgx_status = ecall_encrypt_entry(eid, &status, &c_entry, key);
+    sgx_status_t sgx_status = ecall_encrypt_entry(eid, &status, &c_entry);
     
     if (sgx_status != SGX_SUCCESS) {
         std::cerr << "SGX ecall_encrypt_entry failed with status: " << sgx_status << std::endl;
@@ -34,7 +34,7 @@ crypto_status_t CryptoUtils::encrypt_entry(Entry& entry, uint32_t key, sgx_encla
     return status;
 }
 
-crypto_status_t CryptoUtils::decrypt_entry(Entry& entry, uint32_t key, sgx_enclave_id_t eid) {
+crypto_status_t CryptoUtils::decrypt_entry(Entry& entry, sgx_enclave_id_t eid) {
     // Check flag before calling SGX
     if (!entry.is_encrypted) {
         log_crypto_error(CRYPTO_NOT_ENCRYPTED, "decrypt_entry");
@@ -44,9 +44,9 @@ crypto_status_t CryptoUtils::decrypt_entry(Entry& entry, uint32_t key, sgx_encla
     // Convert to entry_t
     entry_t c_entry = entry_to_entry_t(entry);
     
-    // Call SGX ecall
+    // Call SGX ecall (uses secure key inside enclave)
     crypto_status_t status;
-    sgx_status_t sgx_status = ecall_decrypt_entry(eid, &status, &c_entry, key);
+    sgx_status_t sgx_status = ecall_decrypt_entry(eid, &status, &c_entry);
     
     if (sgx_status != SGX_SUCCESS) {
         std::cerr << "SGX ecall_decrypt_entry failed with status: " << sgx_status << std::endl;
@@ -63,73 +63,6 @@ crypto_status_t CryptoUtils::decrypt_entry(Entry& entry, uint32_t key, sgx_encla
     return status;
 }
 
-crypto_status_t CryptoUtils::encrypt_table(Table& table, uint32_t key, sgx_enclave_id_t eid) {
-    // Check if any entries are already encrypted
-    for (size_t i = 0; i < table.size(); i++) {
-        if (table.get_entry(i).is_encrypted) {
-            log_crypto_error(CRYPTO_ALREADY_ENCRYPTED, "encrypt_table (entry " + std::to_string(i) + ")");
-            return CRYPTO_ALREADY_ENCRYPTED;
-        }
-    }
-    
-    // Convert table to entry_t array
-    std::vector<entry_t> c_entries = table_to_entry_t_vector(table);
-    
-    // Call batch encryption
-    crypto_status_t status;
-    sgx_status_t sgx_status = ecall_encrypt_entries(eid, &status, 
-                                                    c_entries.data(), 
-                                                    c_entries.size(), 
-                                                    key);
-    
-    if (sgx_status != SGX_SUCCESS) {
-        std::cerr << "SGX ecall_encrypt_entries failed with status: " << sgx_status << std::endl;
-        return CRYPTO_INVALID_PARAM;
-    }
-    
-    if (status == CRYPTO_SUCCESS) {
-        // Convert back and update table
-        table = entry_t_vector_to_table(c_entries);
-    } else {
-        log_crypto_error(status, "encrypt_table (in enclave)");
-    }
-    
-    return status;
-}
-
-crypto_status_t CryptoUtils::decrypt_table(Table& table, uint32_t key, sgx_enclave_id_t eid) {
-    // Check if any entries are not encrypted
-    for (size_t i = 0; i < table.size(); i++) {
-        if (!table.get_entry(i).is_encrypted) {
-            log_crypto_error(CRYPTO_NOT_ENCRYPTED, "decrypt_table (entry " + std::to_string(i) + ")");
-            return CRYPTO_NOT_ENCRYPTED;
-        }
-    }
-    
-    // Convert table to entry_t array
-    std::vector<entry_t> c_entries = table_to_entry_t_vector(table);
-    
-    // Call batch decryption
-    crypto_status_t status;
-    sgx_status_t sgx_status = ecall_decrypt_entries(eid, &status, 
-                                                    c_entries.data(), 
-                                                    c_entries.size(), 
-                                                    key);
-    
-    if (sgx_status != SGX_SUCCESS) {
-        std::cerr << "SGX ecall_decrypt_entries failed with status: " << sgx_status << std::endl;
-        return CRYPTO_INVALID_PARAM;
-    }
-    
-    if (status == CRYPTO_SUCCESS) {
-        // Convert back and update table
-        table = entry_t_vector_to_table(c_entries);
-    } else {
-        log_crypto_error(status, "decrypt_table (in enclave)");
-    }
-    
-    return status;
-}
 
 uint32_t CryptoUtils::generate_key() {
     // Use random device for better randomness

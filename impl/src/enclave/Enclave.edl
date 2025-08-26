@@ -48,19 +48,14 @@ enclave {
         // Sort by alignment_key field
         public void ecall_comparator_alignment_key([in,out] entry_t* e1, [in,out] entry_t* e2);
         
-        /* Secure Encryption/Decryption functions */
+        /* AES-CTR Encryption/Decryption functions */
         /* The encryption key is stored securely inside the enclave and never exposed */
+        /* Uses AES-128 in CTR mode with unique nonce for each encryption */
         
         // Encrypt/decrypt single entry using secure enclave-only key
         // Process one entry at a time for memory efficiency in SGX
-        public crypto_status_t ecall_encrypt_entry_secure([in,out] entry_t* entry);
-        public crypto_status_t ecall_decrypt_entry_secure([in,out] entry_t* entry);
-        
-        // Legacy functions (deprecated - will be removed)
-        public crypto_status_t ecall_encrypt_entry([in,out] entry_t* entry, int32_t key);
-        public crypto_status_t ecall_decrypt_entry([in,out] entry_t* entry, int32_t key);
-        public crypto_status_t ecall_encrypt_entries([in,out, count=count] entry_t* entries, size_t count, int32_t key);
-        public crypto_status_t ecall_decrypt_entries([in,out, count=count] entry_t* entries, size_t count, int32_t key);
+        public crypto_status_t ecall_encrypt_entry([in,out] entry_t* entry);
+        public crypto_status_t ecall_decrypt_entry([in,out] entry_t* entry);
     };
     
     untrusted {

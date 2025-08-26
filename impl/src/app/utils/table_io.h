@@ -58,17 +58,8 @@ public:
                                          const std::string& filepath,
                                          sgx_enclave_id_t eid);
     
-    /**
-     * Save a table as encrypted CSV (legacy - deprecated)
-     * @param table Table to encrypt and save
-     * @param filepath Output CSV file path
-     * @param key Encryption key (exposed - not secure!)
-     * @param eid Enclave ID for encryption
-     */
-    static void save_encrypted_csv(const Table& table, 
-                                  const std::string& filepath,
-                                  int32_t key,
-                                  sgx_enclave_id_t eid);
+    // Legacy XOR encryption with key parameter has been removed.
+    // Use save_encrypted_csv_secure() instead.
     
     /**
      * Load a table from encrypted CSV format

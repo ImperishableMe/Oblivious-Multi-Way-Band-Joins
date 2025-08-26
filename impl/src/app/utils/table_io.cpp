@@ -114,7 +114,7 @@ void TableIO::save_encrypted_csv_secure(const Table& table,
     for (size_t i = 0; i < entries.size(); i++) {
         sgx_status_t ret;
         crypto_status_t crypto_ret;
-        ret = ecall_encrypt_entry_secure(eid, &crypto_ret, &entries[i]);
+        ret = ecall_encrypt_entry(eid, &crypto_ret, &entries[i]);
         
         if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
             throw std::runtime_error("Secure encryption failed at entry " + std::to_string(i));
@@ -161,61 +161,8 @@ void TableIO::save_encrypted_csv_secure(const Table& table,
     file.close();
 }
 
-void TableIO::save_encrypted_csv(const Table& table, 
-                                const std::string& filepath,
-                                int32_t key,
-                                sgx_enclave_id_t eid) {
-    // First encrypt the table entries
-    std::vector<entry_t> entries = table.to_entry_t_vector();
-    
-    // Encrypt entries using SGX
-    sgx_status_t ret;
-    crypto_status_t crypto_ret;
-    ret = ecall_encrypt_entries(eid, &crypto_ret, entries.data(), entries.size(), key);
-    
-    if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
-        throw std::runtime_error("Encryption failed");
-    }
-    
-    // Now write as CSV with encrypted values
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot create encrypted CSV file: " + filepath);
-    }
-    
-    // Write headers (from first entry if available)
-    if (entries.size() > 0) {
-        // Column names are not encrypted
-        for (size_t i = 0; i < MAX_ATTRIBUTES; ++i) {
-            if (entries[0].column_names[i][0] != '\0') {
-                if (i > 0) file << ",";
-                file << entries[0].column_names[i];
-            } else {
-                break;
-            }
-        }
-        file << "\n";
-        
-        // Write encrypted data as integers
-        for (const auto& entry : entries) {
-            bool first = true;
-            for (size_t i = 0; i < MAX_ATTRIBUTES; ++i) {
-                if (entry.column_names[i][0] != '\0') {
-                    if (!first) file << ",";
-                    // Write the encrypted integer value directly
-                    // Cast to int32_t since that's what the encrypted values are
-                    file << static_cast<int32_t>(entry.attributes[i]);
-                    first = false;
-                } else {
-                    break;
-                }
-            }
-            file << "\n";
-        }
-    }
-    
-    file.close();
-}
+// Legacy encryption with key parameter has been removed.
+// Use save_encrypted_csv_secure() instead.
 
 Table TableIO::load_encrypted_csv(const std::string& filepath) {
     std::ifstream file(filepath);

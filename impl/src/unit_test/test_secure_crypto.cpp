@@ -66,7 +66,7 @@ int main() {
     // Test secure encryption
     std::cout << "\n=== Testing secure encryption ===\n";
     crypto_status_t crypto_ret;
-    ret = ecall_encrypt_entry_secure(global_eid, &crypto_ret, &encrypted);
+    ret = ecall_encrypt_entry(global_eid, &crypto_ret, &encrypted);
     
     if (ret != SGX_SUCCESS) {
         std::cerr << "ECALL failed: " << ret << std::endl;
@@ -96,7 +96,7 @@ int main() {
     std::cout << "\n=== Testing secure decryption ===\n";
     entry_t decrypted = encrypted;
     
-    ret = ecall_decrypt_entry_secure(global_eid, &crypto_ret, &decrypted);
+    ret = ecall_decrypt_entry(global_eid, &crypto_ret, &decrypted);
     
     if (ret != SGX_SUCCESS) {
         std::cerr << "ECALL failed: " << ret << std::endl;

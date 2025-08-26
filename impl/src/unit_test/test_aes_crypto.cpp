@@ -113,7 +113,7 @@ int main() {
     std::cout << "\n=== Encrypting both entries with AES-CTR ===\n";
     crypto_status_t crypto_ret;
     
-    ret = ecall_encrypt_entry_secure(global_eid, &crypto_ret, &entry1);
+    ret = ecall_encrypt_entry(global_eid, &crypto_ret, &entry1);
     if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
         std::cerr << "Encryption of entry1 failed: " << ret << ", " << crypto_ret << std::endl;
         sgx_destroy_enclave(global_eid);
@@ -121,7 +121,7 @@ int main() {
     }
     std::cout << "Entry1 encrypted successfully\n";
     
-    ret = ecall_encrypt_entry_secure(global_eid, &crypto_ret, &entry2);
+    ret = ecall_encrypt_entry(global_eid, &crypto_ret, &entry2);
     if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
         std::cerr << "Encryption of entry2 failed: " << ret << ", " << crypto_ret << std::endl;
         sgx_destroy_enclave(global_eid);
@@ -146,7 +146,7 @@ int main() {
     // Decrypt both entries
     std::cout << "\n=== Decrypting both entries ===\n";
     
-    ret = ecall_decrypt_entry_secure(global_eid, &crypto_ret, &entry1);
+    ret = ecall_decrypt_entry(global_eid, &crypto_ret, &entry1);
     if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
         std::cerr << "Decryption of entry1 failed: " << ret << ", " << crypto_ret << std::endl;
         sgx_destroy_enclave(global_eid);
@@ -154,7 +154,7 @@ int main() {
     }
     std::cout << "Entry1 decrypted successfully\n";
     
-    ret = ecall_decrypt_entry_secure(global_eid, &crypto_ret, &entry2);
+    ret = ecall_decrypt_entry(global_eid, &crypto_ret, &entry2);
     if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
         std::cerr << "Decryption of entry2 failed: " << ret << ", " << crypto_ret << std::endl;
         sgx_destroy_enclave(global_eid);
@@ -232,7 +232,7 @@ int main() {
     
     // First encryption
     std::cout << "\nCycle 1: First encryption...\n";
-    ret = ecall_encrypt_entry_secure(global_eid, &crypto_ret, &cycle_entry);
+    ret = ecall_encrypt_entry(global_eid, &crypto_ret, &cycle_entry);
     if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
         std::cerr << "First encryption failed\n";
         sgx_destroy_enclave(global_eid);
@@ -244,7 +244,7 @@ int main() {
     
     // First decryption
     std::cout << "\nCycle 1: First decryption...\n";
-    ret = ecall_decrypt_entry_secure(global_eid, &crypto_ret, &cycle_entry);
+    ret = ecall_decrypt_entry(global_eid, &crypto_ret, &cycle_entry);
     if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
         std::cerr << "First decryption failed\n";
         sgx_destroy_enclave(global_eid);
@@ -261,7 +261,7 @@ int main() {
     
     // Second encryption
     std::cout << "\nCycle 2: Second encryption...\n";
-    ret = ecall_encrypt_entry_secure(global_eid, &crypto_ret, &cycle_entry);
+    ret = ecall_encrypt_entry(global_eid, &crypto_ret, &cycle_entry);
     if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
         std::cerr << "Second encryption failed\n";
         sgx_destroy_enclave(global_eid);
@@ -277,7 +277,7 @@ int main() {
     
     // Second decryption
     std::cout << "\nCycle 2: Second decryption...\n";
-    ret = ecall_decrypt_entry_secure(global_eid, &crypto_ret, &cycle_entry);
+    ret = ecall_decrypt_entry(global_eid, &crypto_ret, &cycle_entry);
     if (ret != SGX_SUCCESS || crypto_ret != CRYPTO_SUCCESS) {
         std::cerr << "Second decryption failed\n";
         sgx_destroy_enclave(global_eid);

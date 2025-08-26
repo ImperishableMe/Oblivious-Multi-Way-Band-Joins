@@ -117,6 +117,55 @@ void Entry::decrypt() {
     is_encrypted = false;
 }
 
+int32_t Entry::get_attribute(const std::string& column_name) const {
+    // Find the column index
+    for (size_t i = 0; i < column_names.size(); i++) {
+        if (column_names[i] == column_name) {
+            if (i < attributes.size()) {
+                return attributes[i];
+            }
+            break;
+        }
+    }
+    return 0;  // Return 0 if column not found
+}
+
+void Entry::set_attribute(const std::string& column_name, int32_t value) {
+    // Find the column index
+    for (size_t i = 0; i < column_names.size(); i++) {
+        if (column_names[i] == column_name) {
+            if (i < attributes.size()) {
+                attributes[i] = value;
+            }
+            return;
+        }
+    }
+    // If column not found, add it
+    add_attribute(column_name, value);
+}
+
+bool Entry::has_column(const std::string& column_name) const {
+    for (const auto& name : column_names) {
+        if (name == column_name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Entry::add_attribute(const std::string& column_name, int32_t value) {
+    column_names.push_back(column_name);
+    attributes.push_back(value);
+}
+
+std::map<std::string, int32_t> Entry::get_attributes_map() const {
+    std::map<std::string, int32_t> result;
+    for (size_t i = 0; i < column_names.size() && i < attributes.size(); i++) {
+        result[column_names[i]] = attributes[i];
+    }
+    return result;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // Table Implementation
 //////////////////////////////////////////////////////////////////////////////
@@ -136,6 +185,20 @@ Entry& Table::get_entry(size_t index) {
 }
 
 const Entry& Table::get_entry(size_t index) const {
+    return entries[index];
+}
+
+void Table::set_entry(size_t index, const Entry& entry) {
+    if (index < entries.size()) {
+        entries[index] = entry;
+    }
+}
+
+Entry& Table::operator[](size_t index) {
+    return entries[index];
+}
+
+const Entry& Table::operator[](size_t index) const {
     return entries[index];
 }
 

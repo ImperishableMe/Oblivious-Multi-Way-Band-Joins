@@ -49,8 +49,8 @@ public:
                    const std::string& tgt_table, const std::string& tgt_col,
                    int32_t dev1, equality_type_t eq1,
                    int32_t dev2, equality_type_t eq2)
-        : source_table(src_table), source_column(src_col),
-          target_table(tgt_table), target_column(tgt_col),
+        : source_table(src_table), target_table(tgt_table),
+          source_column(src_col), target_column(tgt_col),
           deviation1(dev1), equality1(eq1),
           deviation2(dev2), equality2(eq2) {}
     

@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <map>
 #include <utility>
 #include "../common/constants.h"
 #include "../common/types_common.h"
@@ -92,6 +93,21 @@ public:
     void clear();
     void encrypt();
     void decrypt();
+    
+    // Attribute access by column name
+    int32_t get_attribute(const std::string& column_name) const;
+    void set_attribute(const std::string& column_name, int32_t value);
+    bool has_column(const std::string& column_name) const;
+    
+    // Add new attribute with column name
+    void add_attribute(const std::string& column_name, int32_t value);
+    
+    // Get all attributes as a map (for convenience)
+    std::map<std::string, int32_t> get_attributes_map() const;
+    
+    // Utility setters/getters
+    void set_is_encrypted(bool encrypted) { is_encrypted = encrypted; }
+    bool get_is_encrypted() const { return is_encrypted; }
 };
 
 // Table class for managing collections of entries
@@ -110,6 +126,9 @@ public:
     void add_entry(const Entry& entry);
     Entry& get_entry(size_t index);
     const Entry& get_entry(size_t index) const;
+    void set_entry(size_t index, const Entry& entry);
+    Entry& operator[](size_t index);
+    const Entry& operator[](size_t index) const;
     size_t size() const;
     void clear();
     

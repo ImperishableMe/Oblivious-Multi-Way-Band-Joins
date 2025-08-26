@@ -1,0 +1,143 @@
+%======================================================================
+\chapter{Background}
+%======================================================================
+
+This chapter provides the necessary background for understanding our oblivious multi-way join algorithm with band conditions. We cover fundamental database concepts, classical join algorithms including Yannakakis' algorithm, and the principles of oblivious computation and secure hardware.
+
+%----------------------------------------------------------------------
+\section{Database Joins and Query Processing}
+%----------------------------------------------------------------------
+
+\subsection{Database Join Operations}
+
+A database join is a fundamental operation that combines rows from two or more tables based on a related column between them. The most common type is the equi-join, where rows are matched when they have equal values in specified columns. For example, joining an \texttt{Orders} table with a \texttt{Customers} table on the customer ID creates a result containing order information enriched with customer details.
+
+Join operations form the backbone of relational database queries. In practice, queries often involve multiple tables that need to be joined together---these are called multi-way joins. The order and method of executing these joins significantly impacts query performance, especially as data sizes grow.
+
+\subsection{Join Trees and Query Structure}
+
+Multi-way join queries can be represented as join graphs, where each node represents a table and edges represent join conditions between tables. This tree structure captures the relationships between tables in the query. For instance, in a supply chain query joining \texttt{Suppliers}, \texttt{Parts}, and \texttt{Orders}, the join tree might have \texttt{Parts} at the center, connected to both \texttt{Suppliers} and \texttt{Orders}.
+
+The structure of the join graph determines many properties of the query. When the join graph forms a tree (no cycles), the query is called acyclic. Acyclic queries have special properties that enable more efficient processing algorithms.
+
+\subsection{Acyclic vs Cyclic Queries}
+
+Queries are classified as either acyclic or cyclic based on their join graph structure. Acyclic queries form a tree structure where there is exactly one path between any two tables. This property allows them to be decomposed hierarchically and processed efficiently. For example, a typical business query joining \texttt{Customer} → \texttt{Order} → \texttt{LineItem} → \texttt{Product} forms an acyclic chain.
+
+Cyclic queries contain cycles in their join graph. The classic example is the triangle query where three tables each join with the other two, forming a cycle. For instance, in a social network, finding groups of three people who all know each other requires joining \texttt{Person} with itself three times in a triangular pattern. These cyclic structures prevent direct application of tree-based algorithms like Yannakakis and generally require more complex processing strategies.
+
+\subsection{Handling Cyclic Queries with GHD}
+
+Generalized Hypertree Decomposition (GHD) provides a systematic way to transform cyclic queries into acyclic ones. The key idea is to group relations into ``bags'' arranged in a tree structure, where each bag may contain multiple relations. By pre-computing joins within each bag, we create an acyclic structure that can be processed with tree-based algorithms.
+
+The efficiency of this transformation depends on the Generalized Hypertree Width (GHW) of the query---the minimum number of relations needed in any bag across all possible decompositions. Acyclic queries naturally have GHW = 1 (no grouping needed), while the triangle query has GHW = 2, and a k-cycle has GHW = $\lceil k/2\rceil$. 
+
+The transformation can increase data size exponentially: from N to potentially $N^{\text{GHW}}$, as bags may contain Cartesian products. This exponential blowup makes GHD transformation impractical for queries with large GHW, especially in the oblivious setting where we cannot optimize based on actual data distributions.
+%----------------------------------------------------------------------
+\section{Band Joins and Range Queries}
+%----------------------------------------------------------------------
+
+\subsection{From Equality to Inequality Joins}
+
+While traditional database joins match tuples with exactly equal values, many real-world queries require matching based on ranges or inequalities. These band joins (also called band conditions or range joins) are essential for temporal queries, spatial proximity searches, and interval-based analytics.
+
+Consider a fraud detection query that links credit card transactions occurring within 10 minutes of each other at different locations. This requires joining transactions where the timestamp difference falls within a specified range---a band join rather than an exact match. Similarly, healthcare analytics might join patient visits with lab results taken within a week, or supply chain queries might match orders with shipments arriving within a delivery window.
+
+\subsection{Why Band Joins are Challenging}
+
+Band joins are fundamentally harder than equality joins for several reasons. In an equality join, each value in one table matches at most one group of values in another table. This relationship allows efficient processing using techniques like hash joins or B-tree indexed nested-loop joins.
+
+With band joins, a single value can match an entire range of values in the other table. The number of matches depends on the data distribution---some values might match hundreds of tuples while others match none. This variable fan-out makes it difficult to predict resource requirements and optimize query execution. In the oblivious setting, this challenge is amplified because we cannot allow the access pattern to reveal how many matches each tuple has, as this would leak information about the data distribution.
+
+%----------------------------------------------------------------------
+\section{The Yannakakis Algorithm}
+%----------------------------------------------------------------------
+
+\subsection{Optimal Processing for Acyclic Queries}
+
+The Yannakakis algorithm~\cite{yannakakis1981}, developed by Mihalis Yannakakis in 1981, provides an elegant solution for evaluating acyclic multi-way joins with optimal complexity. The algorithm achieves $\bigO{\inputsize + \outputsize}$ time, where $\inputsize$ is the total input size and $\outputsize$ is the output size---this is optimal because any algorithm must at least read the input and write the output.
+
+The key insight is to exploit the tree structure of acyclic queries through a two-phase approach. First, a bottom-up pass eliminates tuples that cannot possibly join with tuples in its own subtree. Then, a top-down pass propagates the global constraints to produce the final result. This approach avoids the exponential blowup that can occur with naive join ordering.
+
+\subsection{The Two-Phase Approach}
+
+In the bottom-up phase, the algorithm performs semi-join reductions starting from the leaves of the join tree. Each child table sends information to its parent about which values actually exist, allowing the parent to eliminate tuples that have no matching partners. This process continues up to the root, with each table keeping only tuples that can contribute to the final result based on their subtree.
+
+The top-down phase then propagates constraints from the root back to the leaves. Starting from the filtered root table containing only tuples that exist in the final result, each parent informs its children about which values remain valid in the global context. This ensures that every tuple in the final result participates in the complete join across all tables.
+
+While Yannakakis' algorithm is optimal for non-oblivious settings, it reveals information through its access patterns---which tuples are eliminated and when reveals the selectivity of different join conditions. Our work extends this algorithm to maintain its efficiency while hiding these access patterns.
+
+%----------------------------------------------------------------------
+\section{Oblivious Computation}
+%----------------------------------------------------------------------
+
+\subsection{The Need for Oblivious Algorithms}
+
+When sensitive data is processed in untrusted environments like public clouds, encryption alone is insufficient. Even with encrypted data, the pattern of memory accesses during computation can leak sensitive information. For example, a binary search reveals the approximate location of the target value through its access pattern, even if all data is encrypted.
+
+Oblivious algorithms address this by ensuring that memory access patterns are independent of the input data. The sequence of memory locations accessed depends only on public parameters like data size, query structure, or a random variable, not on the actual values being processed. This prevents an adversary who can observe all memory accesses from learning anything about the private data.
+
+\subsection{The Oblivious Security Model}
+
+In our security model, we assume an honest-but-curious adversary who can observe all memory access patterns but cannot tamper with the computation. The adversary knows certain public parameters: the sizes of input and output tables, the structure of the join query, and any constants in the join conditions. However, the actual data values, their distribution, and the selectivity of join conditions remain private.
+
+An algorithm is oblivious if two different datasets with the same public parameters produce identical access patterns. This means an adversary watching the memory accesses cannot distinguish between a dataset where two tables are selective and one where the other two tables are selective, as long as the table sizes are the same.
+
+\subsection{Building Blocks for Oblivious Algorithms}
+
+Oblivious algorithms rely on data-independent primitives that operate on tables (arrays of rows) where each row contains values for multiple columns. These primitives ensure access patterns reveal no information about the input data. Table~\ref{tab:oblivious-primitives} summarizes the key primitives used in our algorithm.
+
+\begin{table}[ht]
+\centering
+\caption{Oblivious Primitives Used in Our Algorithm}
+\label{tab:oblivious-primitives}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash}p{2.8cm}|>{\raggedright\arraybackslash}p{3cm}|}
+\hline
+\textbf{Primitive} & \textbf{Description} & \textbf{Runtime} & \textbf{Reference} \\
+\hline
+Oblivious Sorting & Sorts data using fixed comparison networks independent of input values & $\sortcomplexity$ & Batcher~\cite{batcher1968} \\
+\hline
+Oblivious Distribution & Moves rows to computed target positions without revealing data patterns & $\bigO{\tablesize \log \tablesize}$ & \odbj~\cite{krastnikov2020} \\
+\hline
+Oblivious Expansion & Creates multiple copies of rows based on precomputed multiplicities & $\bigO{\tablesize \log \tablesize}$ & \odbj~\cite{krastnikov2020} \\
+\hline
+Map & Applies an oblivious function that reads from and writes to fixed locations in each row & $\bigO{\tablesize}$ & Standard technique \\
+\hline
+Linear Scan & Applies an oblivious function to a fixed-size sliding window over a table & $\bigO{\tablesize}$ & Standard technique \\
+\hline
+Parallel Scan & Applies an oblivious function that takes two rows and operates on fixed locations & $\bigO{\tablesize}$ & Standard technique \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Oblivious Sorting} applies to a table using a sorting order function that takes two rows and returns either $-1$ (first row is ``smaller'') or $1$ (second row is ``smaller''). The algorithm uses fixed comparison networks where the sequence of row comparisons is predetermined based only on the table size, not the actual row values. This ensures that regardless of the data distribution, the same row positions are accessed in the same order, preventing information leakage through access patterns. Our implementation uses Batcher's bitonic sort with $\sortcomplexity$ comparisons for its simplicity and deterministic structure. However, this can be replaced with optimal algorithms like Zig-zag sort~\cite{goodrich2014zigzag} achieving $\bigO{\tablesize \log \tablesize}$ complexity to obtain the theoretical guarantee of $\optimalcomplexity$ for our overall algorithm, where $\inputsize$ is the input size and $\outputsize$ is the output size.
+
+\textbf{Oblivious Distribution} moves rows to computed target positions within a table without revealing information about where rows are being moved or how many rows end up in each location. This primitive is essential in the \odbj\ framework for repositioning rows according to their multiplicities before expansion. The algorithm uses a series of oblivious sorting and permutation operations to achieve the desired redistribution while ensuring that the access pattern depends only on the table size and target position computation, not on the actual row values or movement patterns.
+
+\textbf{Oblivious Expansion} creates multiple copies of rows based on precomputed multiplicities, ensuring that the duplication process reveals no information about how many copies each row requires. This primitive works in conjunction with oblivious distribution to construct join result tables where each row appears exactly as many times as required by the join semantics. The challenge lies in handling variable expansion factors obliviously---some rows may need many copies while others need few, but the algorithm must access memory in a pattern that depends only on the maximum possible expansion factor, not the actual requirements.
+
+\textbf{Map} applies an oblivious function that reads from and writes to fixed locations within each row of a table. The function operates independently on every row, maintaining data-independent access patterns by accessing predetermined fixed locations within each row. This primitive enables row transformations while preserving obliviousness, such as computing new attributes, applying selection conditions, or reformatting tuple structures. The resulting table may contain modified rows but maintains the same size as the \inputtable.
+
+\textbf{Linear Scan} takes a table and an oblivious function that operates on a fixed number of rows (the window). The function reads from and writes to fixed locations within the window. Linear scan places this fixed-size sliding window on the table and applies the function to each window position as it moves through the table. This maintains data-independent access patterns since the window size and movement are predetermined, ensuring that the memory access sequence depends only on the table size and window size, not on the actual data values encountered.
+
+\textbf{Parallel Scan} takes a table and an oblivious function that operates on two rows (one from each table). The function reads from and writes to fixed locations within these two rows. Parallel scan processes corresponding row pairs with equal indexes from two tables of the same size, applying the oblivious function to each pair sequentially. This maintains data-independent access patterns since the function operates on predetermined fixed locations, ensuring that the memory access sequence depends only on the table sizes and function structure, not on the actual data values.
+
+%----------------------------------------------------------------------
+\section{Intel SGX and Secure Hardware}
+%----------------------------------------------------------------------
+
+\subsection{Trusted Execution Environments}
+
+Intel Software Guard Extensions (SGX)~\cite{sgx2016} provides hardware-based trusted execution environments called enclaves. These enclaves protect code and data from observation or modification by any external software, including the operating system and hypervisor. When combined with oblivious algorithms, SGX provides end-to-end security for sensitive computations in untrusted environments.
+
+SGX encrypts enclave memory in hardware, ensuring that even physical memory dumps reveal only ciphertext. However, SGX does not hide memory access patterns---the sequence of addresses accessed by the enclave is visible to the OS through page faults and cache effects. This is why oblivious algorithms are essential: they ensure these visible access patterns leak no information about the protected data.
+
+\subsection{Implementing Oblivious Joins in SGX}
+
+Our implementation runs entirely within an SGX enclave, processing encrypted data obliviously. The enclave receives encrypted tables, decrypts them internally, performs the oblivious join computation, and returns encrypted results. Throughout this process, the memory access patterns visible to the untrusted host reveal nothing about the data. The combination of hardware protection and our algorithmic obliviousness provides strong security guarantees against side-channel attacks.
+
+%----------------------------------------------------------------------
+\section{Summary}
+%----------------------------------------------------------------------
+
+This background establishes the basic concepts underlying our work: the structure and challenges of multi-way band joins, the elegance and optimality of the Yannakakis algorithm for acyclic queries, the principles of oblivious computation for protecting sensitive data, and the role of secure hardware in practical deployments. Building on these foundations, we develop the first oblivious algorithm that combines all these elements---supporting multi-way joins with band conditions while maintaining data-independent access patterns throughout the computation.

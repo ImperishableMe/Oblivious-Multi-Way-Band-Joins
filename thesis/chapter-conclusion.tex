@@ -1,0 +1,52 @@
+%======================================================================
+\chapter{Conclusion}
+%======================================================================
+
+This thesis presented the first oblivious algorithm for multi-way band joins, addressing a critical gap in secure database query processing. By adapting the classical Yannakakis algorithm to the oblivious computation model and introducing novel techniques for handling inequality constraints, we achieved both theoretical elegance and practical performance improvements.
+
+\section{Summary of Contributions}
+
+Our work makes three primary contributions to the field of oblivious database algorithms:
+
+\textbf{1. Oblivious Adaptation of Yannakakis Algorithm}: We successfully transformed the classical Yannakakis algorithm for acyclic joins into a fully oblivious version. This required careful redesign of the two-phase semi-join approach, replacing data-dependent operations with oblivious primitives while preserving the algorithm's optimal complexity. Our adaptation maintains the algorithm's elegance while ensuring that memory access patterns reveal nothing about the input data.
+
+\textbf{2. Dual-Entry Technique for Band Joins}: We introduced a novel dual-entry approach that enables efficient processing of inequality constraints in an oblivious manner. By creating START and END entries for range boundaries and using window-based computation, we can handle band joins without the exponential blowup that would result from naive approaches. This technique proved particularly effective, achieving a 33.9× speedup over OJOIN for the TB1 query.
+
+\textbf{3. Rigorous Security Analysis}: We provided a comprehensive four-level security proof, demonstrating that our algorithm maintains complete data obliviousness. Starting from base components (window functions, comparators) and building up through composed operations, phases, and the complete algorithm, we proved that all memory access patterns are independent of input data values.
+
+\section{Experimental Validation}
+
+Our implementation in Intel SGX demonstrated the practicality of our approach:
+
+\begin{itemize}
+\item For band join query TB1 at scale factor 0.1, we achieved execution in 2.95 seconds compared to OJOIN's 100 seconds—a 33.9× improvement
+\item For equality join TM2 at scale factor 0.01, we achieved comparable performance to OJOIN (approximately 10 seconds)
+\end{itemize}
+
+These results validate that sophisticated algorithmic techniques can overcome the performance penalties typically associated with oblivious computation.
+
+\section{Practical Implications}
+
+This work contributes to oblivious database research in several ways:
+
+\textbf{Practical Secure Analytics}: By dramatically improving band join performance, we make secure processing of temporal and range queries practical for real applications. This is crucial for privacy-preserving analytics on sensitive data such as medical records or financial transactions.
+
+\textbf{Dual-Entry Technique}: The dual-entry approach provides a new method for handling inequality constraints obliviously, which could be useful for other researchers working on similar problems.
+
+\textbf{Implementation Experience}: Our SGX implementation provides insights into the practical challenges of deploying oblivious algorithms in secure hardware, including memory constraints and performance overheads.
+
+\section{Future Directions}
+
+Several promising avenues extend from this work:
+
+\textbf{Complete SQL Engine}: Implementing a full oblivious SQL engine that supports GROUP BY, aggregation functions, and subqueries would enable processing of more complex analytical queries beyond simple joins.
+
+\textbf{Columnar Memory Layout}: Transitioning from the current row-oriented storage to a columnar format would improve cache utilization and enable more efficient sequential access patterns, potentially providing significant performance gains.
+
+\textbf{Extending to Cyclic Queries}: While our current algorithm handles acyclic join trees, many real queries involve cycles. Extending our techniques to work with generalized hypertree decompositions would broaden applicability.
+
+\section{Closing Remarks}
+
+This thesis addressed the specific problem of performing multi-way band joins obliviously, demonstrating that adapting classical algorithms to secure computation models can yield significant performance improvements. The 33.9× speedup achieved for TB1 queries shows that oblivious computation does not necessarily require accepting poor performance.
+
+While memory constraints currently limit the size of queries we can process, the path forward is clear: selective execution of only the critical oblivious operations within SGX would enable handling of much larger datasets. Our work provides a foundation for continued research in oblivious database algorithms, contributing one piece to the larger puzzle of building practical privacy-preserving systems.

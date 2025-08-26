@@ -1,0 +1,43 @@
+%======================================================================
+\chapter{Introduction}
+%======================================================================
+
+Many applications need joins that are not exact matches but based on ranges. For example, a bank may link transfers that happen within ten minutes to detect fraud, or a hospital may connect lab results taken within a week of a diagnosis. These \emph{band joins} are common in finance, healthcare, and time-based analytics. When such queries are done on sensitive data, organizations often encrypt the data before sending it to the cloud. Encryption hides the contents, but not the way the cloud processes the query. In fact, the pattern of memory accesses itself can leak information---for example, which records are considered ``close'' or how many results are returned. To prevent this leakage, we need algorithms that run \emph{obliviously}, meaning the cloud sees only generic access patterns that reveal nothing about the private data.
+
+For acyclic multi-way joins, the classical Yannakakis algorithm~\cite{yannakakis1981} provides optimal complexity---it evaluates queries in time linear in the input size ($\inputsize$) and output size ($\outputsize$), avoiding the exponential blowup that plagues naive approaches. Recent work has successfully adapted Yannakakis to secure settings, such as the Secure Yannakakis protocol for two-party computation~\cite{wang2021secure}. However, these adaptations handle only equality joins where tuples match on exact values. Band joins present a fundamental new challenge: when matching ranges of values, even the number of matches becomes sensitive information. Consider joining employees with meetings that occurred within their work hours---the access pattern would reveal how many meetings each employee attended, leaking information about their activity level. While generic approaches like Oblivious RAM (ORAM)~\cite{goldreich1996} could hide these patterns, they introduce logarithmic overhead per memory access, with large constant factors that make them impractical for large-scale data processing.
+
+In this thesis, we present the first efficient oblivious algorithm for multi-way band joins. Our approach extends the oblivious Yannakakis framework to handle inequality predicates through a novel dual-entry technique that transforms range matching into cumulative sum computations. We achieve $\optimalcomplexity$ complexity for acyclic queries, where $\inputsize$ is the input size and $\outputsize$ is the actual output size. This matches the complexity of oblivious equality joins while supporting the full generality of band conditions. We implement our algorithm in Intel SGX~\cite{sgx2016} and demonstrate its practicality on real-world datasets from TPC-H and Twitter.
+
+%----------------------------------------------------------------------
+\section{Problem Statement}
+%----------------------------------------------------------------------
+
+Our goal is to design an efficient algorithm for evaluating acyclic multi-way joins with band conditions in the oblivious setting. We focus on acyclic queries, which form a large and practical class of queries that can be represented as join trees. Cyclic queries can be transformed to acyclic ones using Generalized Hypertree Decomposition (GHD) obliviously at a cost that becomes impractical for queries with large GHW. In the equality-condition case, the problem is manageable: tuples can be partitioned into \emph{groups} based on the join key, and each group in one table matches exactly one group in another table. This makes it possible to assign the same multiplicity to all tuples in a group without revealing anything sensitive, and also enables techniques like hash joins and oblivious B-trees. Band joins, however, are fundamentally harder. A single group may match to an \emph{entire range} of groups in the other table, and the number of matching groups itself depends on the data. This number is sensitive, so naively accumulating multiplicities across groups would leak information through the access pattern. The challenge is therefore to extend oblivious multi-way join processing beyond equality to support inequality predicates such as $<, >, \leq, \geq$ without leaking information.
+
+%----------------------------------------------------------------------
+\section{Contributions}
+%----------------------------------------------------------------------
+
+This thesis presents the first oblivious algorithm for acyclic multi-way joins that supports band conditions, extending the classical Yannakakis algorithm to handle inequality predicates ($>, <, \geq, \leq$) while maintaining oblivious access patterns. Our algorithm achieves $\optimalcomplexity$ complexity for acyclic queries in the oblivious setting, matching the complexity of existing oblivious equality join algorithms while supporting the full generality of range constraints.
+
+At the core of our approach is a novel dual-entry technique for encoding range constraints obliviously. Unlike equality joins where each tuple matches a single group, band joins require matching against ranges of values. Our dual-entry technique transforms this range matching problem into cumulative sum computations that can be performed with data-independent access patterns. We develop a variant of the Yannakakis algorithm that computes actual tuple multiplicities rather than just existence, enabling precise output size determination without leaking information.
+
+To integrate with existing oblivious join frameworks, we design modified bottom-up and top-down passes that are compatible with the \odbj\ framework~\cite{krastnikov2020} while extending its multiplicity computation to support band join conditions. This includes new oblivious expansion and alignment algorithms specifically designed for range-based joins, ensuring that variable-sized outputs from range queries do not reveal sensitive information through access patterns.
+
+We implement our algorithm in Intel SGX and provide a comprehensive experimental evaluation on real-world datasets from TPC-H and Twitter. Our security analysis formally proves that all access patterns remain oblivious throughout the band join processing, ensuring that an adversary observing memory accesses learns nothing about the actual data values or result sizes beyond what is revealed by the public parameters.
+
+%----------------------------------------------------------------------
+\section{Thesis Organization}
+%----------------------------------------------------------------------
+
+The remainder of this thesis is organized as follows:
+
+\begin{itemize}
+\item \textbf{Chapter 2} reviews related work on oblivious joins and identifies the gap our work addresses.
+\item \textbf{Chapter 3} provides background on database joins, Yannakakis algorithm, oblivious computation, and secure hardware.
+\item \textbf{Chapter 4} presents an overview of our algorithm, developing the approach from binary to multi-way joins.
+\item \textbf{Chapter 5} provides the formal algorithm specification with detailed pseudocode and proofs.
+\item \textbf{Chapter 6} analyzes the security properties and proves obliviousness.
+\item \textbf{Chapter 7} evaluates performance on TPC-H and Twitter datasets.
+\item \textbf{Chapter 8} concludes and discusses future work.
+\end{itemize}

@@ -1,0 +1,46 @@
+This is BibTeX, Version 0.99d (TeX Live 2022)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: uw-ethesis.aux
+The style file: plain.bst
+Database file #1: uw-ethesis.bib
+You've used 11 entries,
+            2118 wiz_defined-function locations,
+            563 strings with 5748 characters,
+and the built_in function-call counts, 4088 in all, are:
+= -- 425
+> -- 155
+< -- 6
++ -- 61
+- -- 50
+* -- 255
+:= -- 643
+add.period$ -- 34
+call.type$ -- 11
+change.case$ -- 58
+chr.to.int$ -- 0
+cite$ -- 11
+duplicate$ -- 173
+empty$ -- 323
+format.name$ -- 50
+if$ -- 888
+int.to.chr$ -- 0
+int.to.str$ -- 11
+missing$ -- 10
+newline$ -- 58
+num.names$ -- 22
+pop$ -- 60
+preamble$ -- 1
+purify$ -- 47
+quote$ -- 0
+skip$ -- 143
+stack$ -- 0
+substring$ -- 304
+swap$ -- 61
+text.length$ -- 6
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 44
+warning$ -- 0
+while$ -- 43
+width$ -- 13
+write$ -- 122

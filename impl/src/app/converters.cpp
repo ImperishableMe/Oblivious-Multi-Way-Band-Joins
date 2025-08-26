@@ -10,6 +10,7 @@ entry_t entry_to_entry_t(const Entry& entry) {
     c_entry.field_type = entry.field_type;
     c_entry.equality_type = entry.equality_type;
     c_entry.is_encrypted = entry.is_encrypted;
+    c_entry.nonce = entry.nonce;
     
     // Copy join attribute
     c_entry.join_attr = entry.join_attr;
@@ -32,7 +33,7 @@ entry_t entry_to_entry_t(const Entry& entry) {
     c_entry.alignment_key = entry.alignment_key;
     
     // Convert attributes vector to array
-    doubles_to_array(entry.attributes, c_entry.attributes, MAX_ATTRIBUTES);
+    int32_to_array(entry.attributes, c_entry.attributes, MAX_ATTRIBUTES);
     
     // Convert column names vector to 2D char array
     strings_to_char_array_2d(entry.column_names, c_entry.column_names, MAX_ATTRIBUTES);
@@ -48,6 +49,7 @@ Entry entry_t_to_entry(const entry_t& c_entry) {
     entry.field_type = c_entry.field_type;
     entry.equality_type = c_entry.equality_type;
     entry.is_encrypted = c_entry.is_encrypted;
+    entry.nonce = c_entry.nonce;
     
     // Copy join attribute
     entry.join_attr = c_entry.join_attr;
@@ -73,11 +75,11 @@ Entry entry_t_to_entry(const entry_t& c_entry) {
     // Count actual number of attributes (non-zero values)
     size_t num_attrs = 0;
     for (size_t i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (c_entry.attributes[i] != 0.0 || i < entry.column_names.size()) {
+        if (c_entry.attributes[i] != 0 || i < entry.column_names.size()) {
             num_attrs = i + 1;
         }
     }
-    entry.attributes = array_to_doubles(c_entry.attributes, num_attrs);
+    entry.attributes = array_to_int32(c_entry.attributes, num_attrs);
     
     // Convert column names 2D char array to vector
     // Count actual number of column names
@@ -159,10 +161,10 @@ std::vector<std::string> char_array_2d_to_strings(const char arr[][MAX_COLUMN_NA
     return strings;
 }
 
-// Convert vector of doubles to fixed array
-void doubles_to_array(const std::vector<double>& vec, double* arr, size_t max_size) {
+// Convert vector of int32_t to fixed array
+void int32_to_array(const std::vector<int32_t>& vec, int32_t* arr, size_t max_size) {
     // Clear the array first
-    memset(arr, 0, max_size * sizeof(double));
+    memset(arr, 0, max_size * sizeof(int32_t));
     
     size_t num_to_copy = std::min(vec.size(), max_size);
     for (size_t i = 0; i < num_to_copy; i++) {
@@ -170,9 +172,9 @@ void doubles_to_array(const std::vector<double>& vec, double* arr, size_t max_si
     }
 }
 
-// Convert fixed array to vector of doubles
-std::vector<double> array_to_doubles(const double* arr, size_t size) {
-    std::vector<double> vec;
+// Convert fixed array to vector of int32_t
+std::vector<int32_t> array_to_int32(const int32_t* arr, size_t size) {
+    std::vector<int32_t> vec;
     vec.reserve(size);
     
     for (size_t i = 0; i < size; i++) {

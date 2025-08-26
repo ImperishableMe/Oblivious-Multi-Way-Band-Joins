@@ -53,8 +53,11 @@ public:
     equality_type_t equality_type;
     bool is_encrypted;
     
+    // Encryption nonce for AES-CTR mode
+    uint64_t nonce;
+    
     // Join attribute
-    double join_attr;
+    int32_t join_attr;
     
     // Persistent metadata
     uint32_t original_index;
@@ -73,8 +76,8 @@ public:
     uint32_t copy_index;
     uint32_t alignment_key;
     
-    // Data attributes (using vector for flexibility)
-    std::vector<double> attributes;
+    // Data attributes (all integers - using vector for flexibility)
+    std::vector<int32_t> attributes;
     std::vector<std::string> column_names;
     
     // Constructors

@@ -1,10 +1,30 @@
 #include "Enclave_t.h"
 #include "enclave_types.h"
 #include "crypto/entry_crypto.h"
+#include "crypto/aes_crypto.h"
 #include "core/core.h"
 
+// Define ENCLAVE_BUILD so secure_key.h knows we're in the enclave
+#define ENCLAVE_BUILD
+#include "secure_key.h"
+
 /**
- * Encryption/Decryption Ecall Implementations
+ * Secure Encryption/Decryption Ecall Implementations
+ * These functions use AES-CTR with secure key stored inside the enclave
+ */
+
+crypto_status_t ecall_encrypt_entry_secure(entry_t* entry) {
+    // Use AES-CTR encryption
+    return aes_encrypt_entry(entry);
+}
+
+crypto_status_t ecall_decrypt_entry_secure(entry_t* entry) {
+    // Use AES-CTR decryption
+    return aes_decrypt_entry(entry);
+}
+
+/**
+ * Legacy Encryption/Decryption Ecall Implementations (deprecated)
  */
 
 crypto_status_t ecall_encrypt_entry(entry_t* entry, int32_t key) {

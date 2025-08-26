@@ -38,3 +38,16 @@ core
 # Temporary files
 *.tmp
 .tmp/
+
+# Data files
+*.csv
+*.tbl
+*.dat
+
+# Raw data directories
+raw_data/
+plaintext/data*/
+encrypted/data*/
+
+# But keep query files
+!queries/*.sql

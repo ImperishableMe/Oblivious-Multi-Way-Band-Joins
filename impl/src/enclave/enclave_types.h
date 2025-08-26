@@ -26,6 +26,9 @@ typedef struct {
     equality_type_t equality_type; // EQ, NEQ, NONE
     uint8_t is_encrypted;         // Whether data is encrypted (0 or 1)
     
+    // Encryption nonce for AES-CTR mode
+    uint64_t nonce;               // Unique nonce for each encryption
+    
     // Join attribute (using int32_t for signed arithmetic)
     int32_t join_attr;
     
@@ -46,8 +49,8 @@ typedef struct {
     int32_t copy_index;          // Which copy of the tuple (0 to final_mult-1)
     int32_t alignment_key;       // Key for alignment phase
     
-    // Data attributes
-    double attributes[MAX_ATTRIBUTES];
+    // Data attributes (all integers for our use case)
+    int32_t attributes[MAX_ATTRIBUTES];
     char column_names[MAX_ATTRIBUTES][MAX_COLUMN_NAME_LEN];
 } entry_t;
 

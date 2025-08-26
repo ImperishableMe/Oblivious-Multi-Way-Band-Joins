@@ -16,7 +16,8 @@ typedef enum {
     CRYPTO_SUCCESS = 0,           // Operation successful
     CRYPTO_ALREADY_ENCRYPTED = 1, // Attempted to encrypt already encrypted entry
     CRYPTO_NOT_ENCRYPTED = 2,     // Attempted to decrypt non-encrypted entry
-    CRYPTO_INVALID_PARAM = 3      // Invalid parameter (e.g., NULL pointer)
+    CRYPTO_INVALID_PARAM = 3,     // Invalid parameter (e.g., NULL pointer)
+    CRYPTO_OPERATION_FAILED = 4   // Encryption/decryption operation failed
 } crypto_status_t;
 
 /**

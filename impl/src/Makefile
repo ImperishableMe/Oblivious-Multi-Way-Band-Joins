@@ -89,6 +89,7 @@ Gen_Untrusted_Object := app/Enclave_u.o
 App_Objects := $(App_Cpp_Files:.cpp=.o) $(Gen_Untrusted_Object)
 
 App_Name := sgx_app
+Encrypt_Tool := encrypt_tables
 
 ######## Enclave Settings ########
 
@@ -104,6 +105,7 @@ Crypto_Library_Name := sgx_tcrypto
 # Enclave source files
 Enclave_Cpp_Files := enclave/Enclave.cpp
 Enclave_C_Files := enclave/crypto/entry_crypto.c \
+                   enclave/crypto/aes_crypto.c \
                    enclave/core/window_functions.c \
                    enclave/core/comparators.c
 
@@ -119,7 +121,8 @@ else
 endif
 
 Enclave_Compile_CFlags += -nostdinc -ffreestanding -fvisibility=hidden -fpie \
-                          -ffunction-sections -fdata-sections $(Enclave_Include_Paths)
+                          -ffunction-sections -fdata-sections $(Enclave_Include_Paths) \
+                          -DENCLAVE_BUILD
 Enclave_Compile_CXXFlags := -nostdinc++ -std=c++11 $(Enclave_Compile_CFlags)
 
 # Security flags
@@ -173,13 +176,14 @@ all: .config_$(Build_Mode)_$(SGX_ARCH)
 	@$(MAKE) target
 
 ifeq ($(Build_Mode), HW_RELEASE)
-target: $(App_Name) $(Enclave_Name)
+target: $(App_Name) $(Enclave_Name) $(Encrypt_Tool)
 	@echo "The project has been built in release hardware mode."
 	@echo "Please sign the enclave first with your signing key."
 else
-target: $(App_Name) $(Signed_Enclave_Name)
+target: $(App_Name) $(Signed_Enclave_Name) $(Encrypt_Tool)
 	@echo "Build complete: $(Build_Mode) mode"
 	@echo "Run with: ./$(App_Name)"
+	@echo "Encrypt tables with: ./$(Encrypt_Tool)"
 endif
 
 .config_$(Build_Mode)_$(SGX_ARCH):
@@ -205,6 +209,18 @@ app/%.o: app/%.cpp $(Gen_Untrusted_Source)
 
 $(App_Name): $(App_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
+# Build encrypt_tables utility
+Encrypt_Tool_Objects := encrypt_tables.o app/utils/table_io.o app/utils/join_constraint.o \
+                       app/converters.o app/crypto_utils.o app/types.o $(Gen_Untrusted_Object)
+
+encrypt_tables.o: encrypt_tables.cpp $(Gen_Untrusted_Source)
+	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -std=c++17 -c $< -o $@
+	@echo "CXX  <=  $<"
+
+$(Encrypt_Tool): $(Encrypt_Tool_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags) -lstdc++fs
 	@echo "LINK =>  $@"
 
 ######## Enclave Build ########
@@ -250,10 +266,10 @@ $(Signed_Enclave_Name): $(Enclave_Name) $(Enclave_Config_File) $(Enclave_Test_Ke
 ######## Clean ########
 
 clean:
-	@rm -f .config_* $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name)
-	@rm -f $(App_Objects) $(Enclave_Objects)
+	@rm -f .config_* $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(Encrypt_Tool)
+	@rm -f $(App_Objects) $(Enclave_Objects) $(Encrypt_Tool_Objects)
 	@rm -f app/Enclave_u.* enclave/Enclave_t.*
-	@rm -f enclave/*.o enclave/crypto/*.o app/*.o
+	@rm -f enclave/*.o enclave/crypto/*.o enclave/core/*.o app/*.o app/utils/*.o *.o
 
 ######## Help ########
 

@@ -63,15 +63,15 @@ std::vector<std::string> char_array_2d_to_strings(const char arr[][MAX_COLUMN_NA
                                                   size_t num_strings);
 
 /**
- * Convert vector of doubles to fixed array
+ * Convert vector of int32_t to fixed array
  * Used for attributes conversion
  */
-void doubles_to_array(const std::vector<double>& vec, double* arr, size_t max_size);
+void int32_to_array(const std::vector<int32_t>& vec, int32_t* arr, size_t max_size);
 
 /**
- * Convert fixed array to vector of doubles
+ * Convert fixed array to vector of int32_t
  * Used for attributes conversion
  */
-std::vector<double> array_to_doubles(const double* arr, size_t size);
+std::vector<int32_t> array_to_int32(const int32_t* arr, size_t size);
 
 #endif // CONVERTERS_H

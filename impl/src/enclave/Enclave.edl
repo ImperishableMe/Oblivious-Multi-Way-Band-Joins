@@ -1,5 +1,6 @@
 enclave {
     include "enclave_types.h"
+    include "crypto/entry_crypto.h"
     
     from "sgx_tstdc.edl" import *;
     
@@ -46,6 +47,16 @@ enclave {
         
         // Sort by alignment_key field
         public void ecall_comparator_alignment_key([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        /* Encryption/Decryption functions */
+        
+        // Encrypt/decrypt single entry with safety checks
+        public crypto_status_t ecall_encrypt_entry([in,out] entry_t* entry, int32_t key);
+        public crypto_status_t ecall_decrypt_entry([in,out] entry_t* entry, int32_t key);
+        
+        // Batch encryption/decryption
+        public crypto_status_t ecall_encrypt_entries([in,out, count=count] entry_t* entries, size_t count, int32_t key);
+        public crypto_status_t ecall_decrypt_entries([in,out, count=count] entry_t* entries, size_t count, int32_t key);
     };
     
     untrusted {

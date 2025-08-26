@@ -1,0 +1,40 @@
+# Build artifacts
+*.o
+*.so
+*.a
+.config_*
+
+# SGX generated files
+*_u.c
+*_u.h
+*_t.c
+*_t.h
+*.signed.so
+
+# Test results
+test/bin/
+test/results/
+*.log
+
+# Editor files
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Encryption keys (except enclave signing key)
+*.pem
+!Enclave_private.pem
+
+# Executables
+sgx_app
+unit_tests
+integration_tests
+
+# Core dumps
+core
+*.core
+
+# Temporary files
+*.tmp
+.tmp/

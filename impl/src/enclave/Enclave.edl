@@ -1,0 +1,54 @@
+enclave {
+    include "enclave_types.h"
+    
+    from "sgx_tstdc.edl" import *;
+    
+    trusted {
+        /* Window functions for multiplicity computation */
+        
+        // Assign sequential indices during initialization
+        public void ecall_window_set_original_index([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Bottom-up phase: accumulate local multiplicities
+        public void ecall_window_compute_local_sum([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Bottom-up phase: compute difference between START/END pairs
+        public void ecall_window_compute_local_interval([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Top-down phase: track foreign and local weight counters
+        public void ecall_window_compute_foreign_sum([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Top-down phase: compute foreign multiplicity from cumulative sums
+        public void ecall_window_compute_foreign_interval([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Bottom-up parallel: multiply local_mult by computed interval
+        public void ecall_update_target_multiplicity([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Top-down parallel: set final_mult and foreign_sum
+        public void ecall_update_target_final_multiplicity([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        /* Comparator functions for oblivious sorting */
+        
+        // Sort by join attribute, then precedence
+        public void ecall_comparator_join_attr([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Group TARGET entries, then by original_index
+        public void ecall_comparator_pairwise([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // END entries first, then by original_index
+        public void ecall_comparator_end_first([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Sort by join attribute, then original_index
+        public void ecall_comparator_join_then_other([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Sort by original_index only
+        public void ecall_comparator_original_index([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Sort by alignment_key field
+        public void ecall_comparator_alignment_key([in,out] entry_t* e1, [in,out] entry_t* e2);
+    };
+    
+    untrusted {
+        /* No OCALLs needed for this implementation */
+    };
+};

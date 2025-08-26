@@ -1,0 +1,1 @@
+- We are manipulating encrypted data obliviously outside of enclave using standard c++ stl, and operating on non-encrypted data obliviously inside enclave using native c.

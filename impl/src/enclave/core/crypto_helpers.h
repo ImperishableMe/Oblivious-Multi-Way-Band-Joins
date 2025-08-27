@@ -3,6 +3,7 @@
 
 #include "../enclave_types.h"
 #include "../crypto/entry_crypto.h"
+#include "../crypto/aes_crypto.h"
 
 /**
  * Crypto Helper Functions

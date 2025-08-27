@@ -122,8 +122,7 @@ Crypto_Library_Name := sgx_tcrypto
 
 # Enclave source files
 Enclave_Cpp_Files := enclave/Enclave.cpp
-Enclave_C_Files := enclave/crypto/entry_crypto.c \
-                   enclave/crypto/aes_crypto.c \
+Enclave_C_Files := enclave/crypto/aes_crypto.c \
                    enclave/core/crypto_helpers.c \
                    enclave/core/window_functions.c \
                    enclave/core/comparators.c \

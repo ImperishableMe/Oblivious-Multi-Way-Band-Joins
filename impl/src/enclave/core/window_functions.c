@@ -1,45 +1,56 @@
 #include "../enclave_types.h"
+#include "../crypto/aes_crypto.h"
+#include "crypto_helpers.h"
 #include <stdint.h>
 
 /**
  * Window functions for oblivious processing
+ * Using crypto helpers to handle decrypt-modify-encrypt pattern
  * All functions are implemented with oblivious (branchless) operations
  * to prevent information leakage through memory access patterns
  */
+
+// Operation functions for window operations
+static void set_original_index_op(entry_t* e1, entry_t* e2) {
+    e2->original_index = e1->original_index + 1;
+}
 
 /**
  * Set original index for window processing
  * Sets consecutive indices as the window slides through the table
  */
 void window_set_original_index(entry_t* e1, entry_t* e2) {
-    e2->original_index = e1->original_index + 1;
+    apply_to_decrypted_pair(e1, e2, set_original_index_op);
+}
+
+static void update_target_multiplicity_op(entry_t* target, entry_t* source) {
+    // Multiply target's local_mult by computed interval from combined table
+    target->local_mult = target->local_mult * source->local_interval;
 }
 
 /**
  * Update target multiplicity (Algorithm 503)
  * Pure arithmetic - already oblivious
  */
-void update_target_multiplicity(entry_t* target, const entry_t* source) {
-    // Multiply target's local_mult by computed interval from combined table
-    target->local_mult = target->local_mult * source->local_interval;
+void update_target_multiplicity(entry_t* target, entry_t* source) {
+    apply_to_decrypted_pair(target, source, update_target_multiplicity_op);
 }
 
-/**
- * Update target final multiplicity (Algorithm 623)
- * Pure arithmetic - already oblivious
- */
-void update_target_final_multiplicity(entry_t* target, const entry_t* source) {
+static void update_target_final_multiplicity_op(entry_t* target, entry_t* source) {
     // Propagate foreign intervals to compute final multiplicities
     target->final_mult = source->foreign_interval * target->local_mult;
     target->foreign_sum = source->foreign_sum;  // For alignment
 }
 
 /**
- * Window compute local sum (Algorithm 424)
- * Oblivious conversion: use arithmetic instead of branching
- * e1 is window[0], e2 is window[1] in the sliding window
+ * Update target final multiplicity (Algorithm 623)
+ * Pure arithmetic - already oblivious
  */
-void window_compute_local_sum(entry_t* e1, entry_t* e2) {
+void update_target_final_multiplicity(entry_t* target, entry_t* source) {
+    apply_to_decrypted_pair(target, source, update_target_final_multiplicity_op);
+}
+
+static void compute_local_sum_op(entry_t* e1, entry_t* e2) {
     // Check if e2 (window[1]) is SOURCE type (obliviously)
     int32_t is_source = (e2->field_type == SOURCE);
     
@@ -48,11 +59,15 @@ void window_compute_local_sum(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Window compute local interval (Algorithm 467)
- * Oblivious conversion: use conditional arithmetic
+ * Window compute local sum (Algorithm 424)
+ * Oblivious conversion: use arithmetic instead of branching
  * e1 is window[0], e2 is window[1] in the sliding window
  */
-void window_compute_local_interval(entry_t* e1, entry_t* e2) {
+void window_compute_local_sum(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, compute_local_sum_op);
+}
+
+static void compute_local_interval_op(entry_t* e1, entry_t* e2) {
     // Check if we have a START/END pair (obliviously)
     int32_t is_start = (e1->field_type == START);
     int32_t is_end = (e2->field_type == END);
@@ -66,11 +81,15 @@ void window_compute_local_interval(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Window compute foreign sum (Algorithm 590)
- * Oblivious conversion: convert 3-way branch to arithmetic
+ * Window compute local interval (Algorithm 467)
+ * Oblivious conversion: use conditional arithmetic
  * e1 is window[0], e2 is window[1] in the sliding window
  */
-void window_compute_foreign_sum(entry_t* e1, entry_t* e2) {
+void window_compute_local_interval(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, compute_local_interval_op);
+}
+
+static void compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
     // Determine entry type (obliviously)
     int32_t is_start = (e2->field_type == START);
     int32_t is_end = (e2->field_type == END);
@@ -93,11 +112,15 @@ void window_compute_foreign_sum(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Window compute foreign interval (Algorithm 609)
- * Oblivious conversion: use conditional arithmetic
+ * Window compute foreign sum (Algorithm 590)
+ * Oblivious conversion: convert 3-way branch to arithmetic
  * e1 is window[0], e2 is window[1] in the sliding window
  */
-void window_compute_foreign_interval(entry_t* e1, entry_t* e2) {
+void window_compute_foreign_sum(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, compute_foreign_sum_op);
+}
+
+static void compute_foreign_interval_op(entry_t* e1, entry_t* e2) {
     // Check if we have a START/END pair (obliviously)
     int32_t is_start = (e1->field_type == START);
     int32_t is_end = (e2->field_type == END);
@@ -111,4 +134,13 @@ void window_compute_foreign_interval(entry_t* e1, entry_t* e2) {
                           ((1 - is_pair) * e2->foreign_interval);
     e2->foreign_sum = (is_pair * e1->foreign_cumsum) + 
                      ((1 - is_pair) * e2->foreign_sum);
+}
+
+/**
+ * Window compute foreign interval (Algorithm 609)
+ * Oblivious conversion: use conditional arithmetic
+ * e1 is window[0], e2 is window[1] in the sliding window
+ */
+void window_compute_foreign_interval(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, compute_foreign_interval_op);
 }

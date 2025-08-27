@@ -5,9 +5,11 @@
 #include <string>
 #include <map>
 #include <utility>
+#include <functional>
 #include "../common/constants.h"
 #include "../common/types_common.h"
 #include "../enclave/enclave_types.h"
+#include "sgx_urts.h"
 
 /**
  * Table Type Definitions and Schema Evolution
@@ -57,7 +59,7 @@ public:
     // Encryption nonce for AES-CTR mode
     uint64_t nonce;
     
-    // Join attribute
+    // Join attribute  
     int32_t join_attr;
     
     // Persistent metadata
@@ -160,6 +162,61 @@ public:
         MIXED         // Entries have different encryption states
     };
     EncryptionStatus get_encryption_status() const;
+    
+    // Oblivious operations (from thesis Section 4.1.4)
+    // These maintain fixed access patterns for security
+    
+    /**
+     * Map: Apply transformation to each entry independently
+     * @param eid SGX enclave ID
+     * @param transform_func Ecall that transforms one entry
+     * @return New table with transformed entries
+     */
+    Table map(sgx_enclave_id_t eid,
+             std::function<sgx_status_t(sgx_enclave_id_t, entry_t*)> transform_func) const;
+    
+    /**
+     * LinearPass: Apply window function to sliding window of size 2
+     * @param eid SGX enclave ID
+     * @param window_func Ecall that processes window of 2 entries
+     */
+    void linear_pass(sgx_enclave_id_t eid,
+                    std::function<sgx_status_t(sgx_enclave_id_t, entry_t*, entry_t*)> window_func);
+    
+    /**
+     * ParallelPass: Apply function to aligned pairs from two tables
+     * @param other Second table (must have same size)
+     * @param eid SGX enclave ID
+     * @param pair_func Ecall that processes aligned pair
+     */
+    void parallel_pass(Table& other, sgx_enclave_id_t eid,
+                      std::function<sgx_status_t(sgx_enclave_id_t, entry_t*, entry_t*)> pair_func);
+    
+    /**
+     * ObliviousSort: Sort using bitonic sorting network
+     * @param eid SGX enclave ID
+     * @param compare_swap_func Ecall that obliviously swaps if needed
+     */
+    void oblivious_sort(sgx_enclave_id_t eid,
+                       std::function<sgx_status_t(sgx_enclave_id_t, entry_t*, entry_t*)> compare_swap_func);
+    
+    /**
+     * ObliviousExpand: Duplicate tuples by multiplicity
+     * @param eid SGX enclave ID
+     * @return Expanded table
+     */
+    Table oblivious_expand(sgx_enclave_id_t eid) const;
+    
+    // Static utility methods
+    static Table horizontal_concatenate(const Table& left, const Table& right);
+    
+private:
+    // Helper methods for oblivious operations
+    static void check_sgx_status(sgx_status_t status, const std::string& operation);
+    void compare_and_swap(size_t i, size_t j, sgx_enclave_id_t eid,
+                         std::function<sgx_status_t(sgx_enclave_id_t, entry_t*, entry_t*)> compare_swap_func);
+    static bool is_power_of_two(size_t n);
+    static size_t next_power_of_two(size_t n);
 };
 
 /**

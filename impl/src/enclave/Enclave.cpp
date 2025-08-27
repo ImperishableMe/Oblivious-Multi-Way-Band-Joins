@@ -24,6 +24,42 @@ crypto_status_t ecall_decrypt_entry(entry_t* entry) {
 }
 
 /**
+ * Transform Function Ecall Implementations
+ */
+
+void ecall_transform_initialize_leaf(entry_t* entry) {
+    transform_initialize_leaf(entry);
+}
+
+void ecall_transform_add_metadata(entry_t* entry) {
+    transform_add_metadata(entry);
+}
+
+void ecall_transform_set_index(entry_t* entry, uint32_t index) {
+    transform_set_index(entry, index);
+}
+
+void ecall_transform_init_local_temps(entry_t* entry) {
+    transform_init_local_temps(entry);
+}
+
+void ecall_transform_to_source(entry_t* entry) {
+    transform_to_source(entry);
+}
+
+void ecall_transform_to_start(entry_t* entry, int32_t deviation, equality_type_t equality) {
+    transform_to_start(entry, deviation, equality);
+}
+
+void ecall_transform_to_end(entry_t* entry, int32_t deviation, equality_type_t equality) {
+    transform_to_end(entry, deviation, equality);
+}
+
+void ecall_transform_set_empty(entry_t* entry) {
+    transform_set_empty(entry);
+}
+
+/**
  * Window Function Ecall Implementations
  */
 

@@ -23,7 +23,7 @@ endif
 
 # Compiler settings
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra
+CXXFLAGS = -std=c++17 -Wall -Wextra -DDEBUG_LEVEL=3
 INCLUDES = -I$(ENCLAVE_PATH) \
            -I$(ENCLAVE_PATH)/app \
            -I$(ENCLAVE_PATH)/enclave \
@@ -38,7 +38,8 @@ INFRA_SRCS = $(ENCLAVE_PATH)/app/utils/join_constraint.cpp \
              $(ENCLAVE_PATH)/app/utils/table_io.cpp \
              $(ENCLAVE_PATH)/app/converters.cpp \
              $(ENCLAVE_PATH)/app/crypto_utils.cpp \
-             $(ENCLAVE_PATH)/app/types.cpp
+             $(ENCLAVE_PATH)/app/types.cpp \
+             $(ENCLAVE_PATH)/app/debug_util.cpp
 
 # Test source files
 TEST_SRCS = test_main.cpp \
@@ -52,6 +53,29 @@ TABLE_IO_TEST_SRCS = test_table_io.cpp
 # AES crypto test
 AES_TEST_SRCS = test_aes_crypto.cpp
 
+# Join correctness test
+JOIN_TEST_SRCS = test_join_correctness.cpp \
+                 test_utils/simple_join_executor.cpp \
+                 test_utils/sqlite_ground_truth.cpp \
+                 test_utils/join_result_comparator.cpp \
+                 $(ENCLAVE_PATH)/app/utils/query_parser.cpp \
+                 $(ENCLAVE_PATH)/app/utils/query_tokenizer.cpp \
+                 $(ENCLAVE_PATH)/app/utils/inequality_parser.cpp \
+                 $(ENCLAVE_PATH)/app/utils/condition_merger.cpp \
+                 $(ENCLAVE_PATH)/app/utils/join_tree_builder.cpp
+
+# Bottom-up phase test
+BOTTOM_UP_TEST_SRCS = test_bottom_up.cpp \
+                      test_utils/subtree_verifier.cpp \
+                      test_utils/simple_join_executor.cpp \
+                      $(ENCLAVE_PATH)/app/algorithms/bottom_up_phase.cpp \
+                      $(ENCLAVE_PATH)/app/utils/query_parser.cpp \
+                      $(ENCLAVE_PATH)/app/utils/query_tokenizer.cpp \
+                      $(ENCLAVE_PATH)/app/utils/inequality_parser.cpp \
+                      $(ENCLAVE_PATH)/app/utils/condition_merger.cpp \
+                      $(ENCLAVE_PATH)/app/utils/join_tree_builder.cpp \
+                      $(ENCLAVE_PATH)/app/utils/join_attribute_setter.cpp
+
 # Object files needed from main build
 MAIN_OBJS = $(ENCLAVE_U_O)
 
@@ -59,9 +83,11 @@ MAIN_OBJS = $(ENCLAVE_U_O)
 TEST_TARGET = sgx_test
 TABLE_IO_TEST_TARGET = test_table_io
 AES_TEST_TARGET = test_aes_crypto
+JOIN_TEST_TARGET = test_join_correctness
+BOTTOM_UP_TEST_TARGET = test_bottom_up
 
 # Default target
-all: check-enclave $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET)
+all: check-enclave $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET)
 
 # Check if enclave is built and create symlink for testing
 check-enclave:
@@ -94,6 +120,18 @@ $(AES_TEST_TARGET): check-enclave $(AES_TEST_SRCS)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(AES_TEST_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
 	@echo "Build complete. Run with: ./$(AES_TEST_TARGET)"
 
+# Build join correctness test executable
+$(JOIN_TEST_TARGET): check-enclave $(JOIN_TEST_SRCS) $(INFRA_SRCS)
+	@echo "Building join correctness tests..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(JOIN_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -lsqlite3 -o $@
+	@echo "Build complete. Run with: ./$(JOIN_TEST_TARGET)"
+
+# Build bottom-up phase test executable
+$(BOTTOM_UP_TEST_TARGET): check-enclave $(BOTTOM_UP_TEST_SRCS) $(INFRA_SRCS)
+	@echo "Building bottom-up phase tests..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(BOTTOM_UP_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
+	@echo "Build complete. Run with: ./$(BOTTOM_UP_TEST_TARGET)"
+
 # Run tests
 run: $(TEST_TARGET)
 	@echo "==================================="
@@ -123,10 +161,22 @@ run-aes: $(AES_TEST_TARGET)
 	@echo "==================================="
 	./$(AES_TEST_TARGET)
 
+run-join: $(JOIN_TEST_TARGET)
+	@echo "==================================="
+	@echo "Running Join Correctness Tests"
+	@echo "==================================="
+	./$(JOIN_TEST_TARGET)
+
+run-bottom-up: $(BOTTOM_UP_TEST_TARGET)
+	@echo "==================================="
+	@echo "Running Bottom-Up Phase Tests"
+	@echo "==================================="
+	./$(BOTTOM_UP_TEST_TARGET)
+
 # Clean test files only (not the main build)
 clean:
 	@echo "Cleaning unit test files..."
-	rm -f $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) *.o
+	rm -f $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET) *.o
 	rm -f enclave.signed.so  # Remove symlink
 	@echo "Note: Main enclave files are preserved"
 
@@ -146,6 +196,7 @@ help:
 	@echo "  run-window       - Run window function tests only"
 	@echo "  run-comparators  - Run comparator tests only"
 	@echo "  run-table-io     - Run table I/O and infrastructure tests"
+	@echo "  run-join         - Run join correctness tests with SQLite"
 	@echo "  clean            - Clean test files only"
 	@echo "  clean-all        - Clean everything including main build"
 	@echo "  help             - Show this help"

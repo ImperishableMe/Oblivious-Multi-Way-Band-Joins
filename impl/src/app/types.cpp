@@ -1,6 +1,7 @@
 #include "types.h"
 #include <cstring>
 #include <algorithm>
+#include "../common/debug_util.h"
 
 //////////////////////////////////////////////////////////////////////////////
 // Entry Implementation
@@ -29,6 +30,10 @@ Entry::Entry(const entry_t& c_entry) {
 }
 
 entry_t Entry::to_entry_t() const {
+    DEBUG_TRACE("Entry::to_entry_t() - Converting Entry to entry_t");
+    DEBUG_TRACE("  field_type=%d, is_encrypted=%d, join_attr=%d", 
+                field_type, is_encrypted, join_attr);
+    
     entry_t result;
     memset(&result, 0, sizeof(entry_t));
     
@@ -67,6 +72,10 @@ entry_t Entry::to_entry_t() const {
 }
 
 void Entry::from_entry_t(const entry_t& c_entry) {
+    DEBUG_TRACE("Entry::from_entry_t() - Converting entry_t to Entry");
+    DEBUG_TRACE("  field_type=%d, is_encrypted=%d, join_attr=%d", 
+                c_entry.field_type, c_entry.is_encrypted, c_entry.join_attr);
+    
     field_type = c_entry.field_type;
     equality_type = c_entry.equality_type;
     is_encrypted = c_entry.is_encrypted;
@@ -341,4 +350,237 @@ std::pair<Entry, Entry> JoinCondition::create_boundary_entries(const Entry& targ
     end_entry.equality_type = upper_bound.equality;
     
     return std::make_pair(start_entry, end_entry);
+}
+
+// ============================================================================
+// Oblivious Operations Implementation
+// ============================================================================
+
+#include <stdexcept>
+#include <climits>
+#include "../common/debug_util.h"
+#include "Enclave_u.h"
+
+void Table::check_sgx_status(sgx_status_t status, const std::string& operation) {
+    if (status != SGX_SUCCESS) {
+        throw std::runtime_error("SGX error in " + operation + ": " + std::to_string(status));
+    }
+}
+
+Table Table::map(sgx_enclave_id_t eid,
+                std::function<sgx_status_t(sgx_enclave_id_t, entry_t*)> transform_func) const {
+    DEBUG_DEBUG("Map: Processing %zu entries", size());
+    Table output = *this;  // Copy structure and data
+    
+    // Apply transform to each entry independently
+    for (size_t i = 0; i < output.size(); i++) {
+        DEBUG_DEBUG("Map: Processing entry %zu/%zu", i, output.size());
+        entry_t entry = output.entries[i].to_entry_t();
+        
+        // Apply the transform ecall
+        sgx_status_t status = transform_func(eid, &entry);
+        check_sgx_status(status, "Map transform");
+        
+        // Store back the transformed entry
+        output.entries[i].from_entry_t(entry);
+    }
+    
+    return output;
+}
+
+void Table::linear_pass(sgx_enclave_id_t eid,
+                       std::function<sgx_status_t(sgx_enclave_id_t, entry_t*, entry_t*)> window_func) {
+    // Process sliding window of size 2
+    for (size_t i = 0; i < size() - 1; i++) {
+        entry_t e1 = entries[i].to_entry_t();
+        entry_t e2 = entries[i + 1].to_entry_t();
+        
+        // Apply window function
+        sgx_status_t status = window_func(eid, &e1, &e2);
+        check_sgx_status(status, "LinearPass window");
+        
+        // Store back modified entries
+        entries[i].from_entry_t(e1);
+        entries[i + 1].from_entry_t(e2);
+    }
+}
+
+void Table::parallel_pass(Table& other, sgx_enclave_id_t eid,
+                         std::function<sgx_status_t(sgx_enclave_id_t, entry_t*, entry_t*)> pair_func) {
+    if (size() != other.size()) {
+        throw std::runtime_error("ParallelPass: Tables must have same size");
+    }
+    
+    // Process aligned pairs
+    for (size_t i = 0; i < size(); i++) {
+        entry_t e1 = entries[i].to_entry_t();
+        entry_t e2 = other.entries[i].to_entry_t();
+        
+        // Apply pair function
+        sgx_status_t status = pair_func(eid, &e1, &e2);
+        check_sgx_status(status, "ParallelPass pair");
+        
+        // Store back modified entries
+        entries[i].from_entry_t(e1);
+        other.entries[i].from_entry_t(e2);
+    }
+}
+
+void Table::compare_and_swap(size_t i, size_t j, sgx_enclave_id_t eid,
+                            std::function<sgx_status_t(sgx_enclave_id_t, entry_t*, entry_t*)> compare_swap_func) {
+    // Convert to entry_t
+    entry_t e1 = entries[i].to_entry_t();
+    entry_t e2 = entries[j].to_entry_t();
+    
+    // Call the comparator which performs oblivious swap if needed
+    sgx_status_t status = compare_swap_func(eid, &e1, &e2);
+    check_sgx_status(status, "CompareAndSwap");
+    
+    // Convert back to Entry
+    entries[i].from_entry_t(e1);
+    entries[j].from_entry_t(e2);
+}
+
+bool Table::is_power_of_two(size_t n) {
+    return n > 0 && (n & (n - 1)) == 0;
+}
+
+size_t Table::next_power_of_two(size_t n) {
+    if (n == 0) return 1;
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    if (sizeof(size_t) > 4) n |= n >> 32;
+    return n + 1;
+}
+
+void Table::oblivious_sort(sgx_enclave_id_t eid,
+                          std::function<sgx_status_t(sgx_enclave_id_t, entry_t*, entry_t*)> compare_swap_func) {
+    size_t n = size();
+    DEBUG_INFO("ObliviousSort: Starting bitonic sort of %zu entries", n);
+    
+    // Check for empty or single element
+    if (n <= 1) {
+        DEBUG_INFO("ObliviousSort: Table has %zu entries, nothing to sort", n);
+        return;
+    }
+    
+    // For bitonic sort to work correctly, we need power of 2 size
+    // Pad with EMPTY entries if needed
+    size_t padded_size = next_power_of_two(n);
+    size_t padding_needed = 0;
+    if (padded_size != n) {
+        DEBUG_INFO("ObliviousSort: Padding from %zu to %zu entries", n, padded_size);
+        padding_needed = padded_size - n;
+        
+        // Add padding EMPTY entries using ecall
+        for (size_t i = 0; i < padding_needed; i++) {
+            Entry dummy;
+            entry_t dummy_entry = dummy.to_entry_t();
+            ecall_transform_set_empty(eid, &dummy_entry);
+            dummy.from_entry_t(dummy_entry);
+            add_entry(dummy);
+        }
+    }
+    
+    // Bitonic sort implementation
+    // This creates a bitonic sequence then sorts it
+    for (size_t k = 2; k <= padded_size; k *= 2) {
+        // Build bitonic sequences of size k
+        for (size_t j = k/2; j > 0; j /= 2) {
+            // Compare and swap with distance j
+            for (size_t i = 0; i < padded_size; i++) {
+                size_t ixj = i ^ j;  // XOR gives us the paired index
+                
+                // Only process each pair once (when i < ixj)
+                if (ixj > i) {
+                    // Determine sort direction based on bitonic pattern
+                    // (i & k) == 0 means we're in an ascending part
+                    if ((i & k) == 0) {
+                        // Ascending: normal compare and swap
+                        compare_and_swap(i, ixj, eid, compare_swap_func);
+                    } else {
+                        // Descending: reverse compare and swap
+                        // We swap the positions to reverse the comparison
+                        compare_and_swap(ixj, i, eid, compare_swap_func);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Remove padding entries if we added any
+    if (padding_needed > 0) {
+        DEBUG_INFO("ObliviousSort: Removing %zu padding entries", padding_needed);
+        
+        // Remove EMPTY entries from the end
+        // They should be sorted to the end due to EMPTY having max values
+        for (size_t i = 0; i < padding_needed; i++) {
+            entries.pop_back();
+        }
+    }
+    
+    DEBUG_INFO("ObliviousSort: Bitonic sort completed");
+}
+
+Table Table::oblivious_expand(sgx_enclave_id_t eid) const {
+    // Calculate total size after expansion
+    size_t total_size = 0;
+    std::vector<uint32_t> multiplicities;
+    
+    // We need to get final_mult from each entry
+    // For now, we'll use a special ecall to read it
+    // TODO: Add ecall_get_final_mult to read multiplicity securely
+    
+    for (size_t i = 0; i < size(); i++) {
+        // For testing, assume final_mult is accessible
+        // In production, this would use an ecall
+        uint32_t mult = entries[i].final_mult;
+        multiplicities.push_back(mult);
+        total_size += mult;
+    }
+    
+    // Create expanded table
+    Table expanded;
+    expanded.set_table_name(table_name + "_expanded");
+    
+    // Expand each entry according to its multiplicity
+    for (size_t i = 0; i < size(); i++) {
+        uint32_t mult = multiplicities[i];
+        
+        for (uint32_t j = 0; j < mult; j++) {
+            Entry copy = entries[i];
+            copy.copy_index = j;  // Track which copy this is
+            expanded.add_entry(copy);
+        }
+    }
+    
+    return expanded;
+}
+
+Table Table::horizontal_concatenate(const Table& left, const Table& right) {
+    if (left.size() != right.size()) {
+        throw std::runtime_error("HorizontalConcatenate: Tables must have same number of rows");
+    }
+    
+    Table result;
+    result.set_table_name(left.get_table_name() + "_" + right.get_table_name());
+    
+    // Concatenate each row
+    for (size_t i = 0; i < left.size(); i++) {
+        Entry combined = left.entries[i];
+        
+        // Add all attributes from right table
+        auto right_attrs = right.entries[i].get_attributes_map();
+        for (const auto& [col_name, value] : right_attrs) {
+            combined.add_attribute(col_name, value);
+        }
+        
+        result.add_entry(combined);
+    }
+    
+    return result;
 }

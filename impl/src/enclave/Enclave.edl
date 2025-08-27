@@ -5,6 +5,36 @@ enclave {
     from "sgx_tstdc.edl" import *;
     
     trusted {
+        /* Transform functions for Map operations */
+        
+        // Initialize leaf multiplicities (set local_mult = 1)
+        public void ecall_transform_initialize_leaf([in,out] entry_t* entry);
+        
+        // Add metadata columns with null placeholders
+        public void ecall_transform_add_metadata([in,out] entry_t* entry);
+        
+        // Set original index (used with sequential counter)
+        public void ecall_transform_set_index([in,out] entry_t* entry, uint32_t index);
+        
+        // Initialize temporary fields for bottom-up computation
+        public void ecall_transform_init_local_temps([in,out] entry_t* entry);
+        
+        // Create SOURCE entry from source table tuple
+        public void ecall_transform_to_source([in,out] entry_t* entry);
+        
+        // Create START entry from target table tuple
+        public void ecall_transform_to_start([in,out] entry_t* entry, 
+                                             int32_t deviation, 
+                                             equality_type_t equality);
+        
+        // Create END entry from target table tuple
+        public void ecall_transform_to_end([in,out] entry_t* entry,
+                                           int32_t deviation,
+                                           equality_type_t equality);
+        
+        // Set entry as EMPTY (for padding in oblivious operations)
+        public void ecall_transform_set_empty([in,out] entry_t* entry);
+        
         /* Window functions for multiplicity computation */
         
         // Assign sequential indices during initialization
@@ -59,6 +89,8 @@ enclave {
     };
     
     untrusted {
-        /* No OCALLs needed for this implementation */
+        /* Debug output ocall for enclave debugging */
+        void ocall_debug_print(uint32_t level, [in, string] const char* file, 
+                              int line, [in, string] const char* message);
     };
 };

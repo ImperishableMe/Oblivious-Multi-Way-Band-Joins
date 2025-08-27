@@ -7,6 +7,8 @@
 #include "../../app/types.h"
 #include "../../app/utils/join_tree_node.h"
 #include "../../app/utils/join_constraint.h"
+#include "../../app/crypto_utils.h"
+#include "sgx_urts.h"
 
 /**
  * SimpleJoinExecutor - Non-oblivious join executor for testing
@@ -79,7 +81,14 @@ private:
      */
     Entry decrypt_if_needed(const Entry& entry);
     
+    sgx_enclave_id_t enclave_id;  // SGX enclave ID for decryption
+    
 public:
+    /**
+     * Constructor with optional enclave ID
+     */
+    SimpleJoinExecutor(sgx_enclave_id_t eid = 0) : enclave_id(eid), should_decrypt(true) {}
+    
     /**
      * Execute join tree and return result table
      * 
@@ -102,8 +111,13 @@ public:
      */
     void set_decrypt_mode(bool decrypt) { should_decrypt = decrypt; }
     
+    /**
+     * Set enclave ID for decryption
+     */
+    void set_enclave_id(sgx_enclave_id_t eid) { enclave_id = eid; }
+    
 private:
-    bool should_decrypt = true;  // Decrypt by default for testing
+    bool should_decrypt;  // Decrypt by default for testing (set in constructor)
 };
 
 #endif // SIMPLE_JOIN_EXECUTOR_H

@@ -135,20 +135,18 @@ Entry SimpleJoinExecutor::concatenate_entries(
     
     Entry result;
     
-    // Copy attributes from left entry (with table prefix if needed)
+    // Copy ALL attributes from left entry (preserving original names)
     auto left_attrs = left.get_attributes_map();
     for (const auto& [col_name, value] : left_attrs) {
-        // Add with table prefix to avoid column name conflicts
-        std::string prefixed_name = left_table_name + "." + col_name;
-        result.add_attribute(prefixed_name, value);
+        // Just use the column name as-is (SQLite style)
+        result.add_attribute(col_name, value);
     }
     
-    // Copy attributes from right entry (with table prefix if needed)
+    // Copy ALL attributes from right entry (preserving original names)
+    // All TPC-H column names are unique, so no duplicates to worry about
     auto right_attrs = right.get_attributes_map();
     for (const auto& [col_name, value] : right_attrs) {
-        // Add with table prefix to avoid column name conflicts
-        std::string prefixed_name = right_table_name + "." + col_name;
-        result.add_attribute(prefixed_name, value);
+        result.add_attribute(col_name, value);
     }
     
     // Set other properties
@@ -184,13 +182,19 @@ Entry SimpleJoinExecutor::decrypt_if_needed(const Entry& entry) {
         return entry;  // Already decrypted
     }
     
-    // For testing purposes, we'll just mark as decrypted
-    // In a real implementation, we would use SGX ecall to decrypt
     Entry decrypted = entry;
-    decrypted.set_is_encrypted(false);
     
-    // Note: The actual values remain the same for testing
-    // since we're comparing structure, not encrypted values
+    // Use real decryption if enclave is available
+    if (enclave_id != 0) {
+        crypto_status_t status = CryptoUtils::decrypt_entry(decrypted, enclave_id);
+        if (status != CRYPTO_SUCCESS) {
+            std::cerr << "Warning: Decryption failed with status " << status 
+                      << ", using entry as-is" << std::endl;
+        }
+    } else {
+        // Fallback: just mark as decrypted for testing without SGX
+        decrypted.set_is_encrypted(false);
+    }
     
     return decrypted;
 }

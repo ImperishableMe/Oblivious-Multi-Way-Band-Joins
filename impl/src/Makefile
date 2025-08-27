@@ -60,7 +60,7 @@ else
 endif
 
 # App source files
-App_Cpp_Files := app/main.cpp app/crypto_utils.cpp app/converters.cpp app/types.cpp
+App_Cpp_Files := app/main.cpp app/crypto_utils.cpp app/converters.cpp app/types.cpp app/debug_util.cpp
 App_Include_Paths := -I$(SGX_SDK)/include -Iapp -Ienclave -Icommon
 
 App_Compile_CFlags := -fPIC -Wno-attributes $(App_Include_Paths)
@@ -106,8 +106,11 @@ Crypto_Library_Name := sgx_tcrypto
 Enclave_Cpp_Files := enclave/Enclave.cpp
 Enclave_C_Files := enclave/crypto/entry_crypto.c \
                    enclave/crypto/aes_crypto.c \
+                   enclave/core/crypto_helpers.c \
                    enclave/core/window_functions.c \
-                   enclave/core/comparators.c
+                   enclave/core/comparators.c \
+                   enclave/core/transform_functions.c \
+                   enclave/debug_wrapper.c
 
 Enclave_Include_Paths := -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc \
                          -I$(SGX_SDK)/include/libcxx -Ienclave -Icommon
@@ -213,7 +216,7 @@ $(App_Name): $(App_Objects)
 
 # Build encrypt_tables utility
 Encrypt_Tool_Objects := encrypt_tables.o app/utils/table_io.o app/utils/join_constraint.o \
-                       app/converters.o app/crypto_utils.o app/types.o $(Gen_Untrusted_Object)
+                       app/converters.o app/crypto_utils.o app/types.o app/debug_util.o $(Gen_Untrusted_Object)
 
 encrypt_tables.o: encrypt_tables.cpp $(Gen_Untrusted_Source)
 	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -std=c++17 -c $< -o $@

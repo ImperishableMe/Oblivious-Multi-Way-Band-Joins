@@ -13,8 +13,31 @@
 #include "test_utils/sqlite_ground_truth.h"
 #include "test_utils/join_result_comparator.h"
 #include "../app/utils/table_io.h"
+#include "../app/crypto_utils.h"
+#include "../app/Enclave_u.h"
+#include "sgx_urts.h"
 
 namespace fs = std::filesystem;
+
+sgx_enclave_id_t global_eid = 0;
+
+int initialize_enclave() {
+    sgx_status_t ret = sgx_create_enclave("../enclave.signed.so", SGX_DEBUG_FLAG, 
+                                          NULL, NULL, &global_eid, NULL);
+    if (ret != SGX_SUCCESS) {
+        std::cerr << "Failed to create enclave, error code: " << ret << std::endl;
+        return -1;
+    }
+    std::cout << "SGX Enclave initialized successfully (ID: " << global_eid << ")" << std::endl;
+    return 0;
+}
+
+void destroy_enclave() {
+    if (global_eid != 0) {
+        sgx_destroy_enclave(global_eid);
+        std::cout << "SGX Enclave destroyed" << std::endl;
+    }
+}
 
 class JoinCorrectnessTest {
 private:
@@ -35,15 +58,19 @@ private:
         
         Table table = TableIO::load_csv(filepath);
         
-        // Decrypt if needed - for testing, we'll decrypt inline
+        // Decrypt if needed using real SGX decryption
         if (table.get_encryption_status() == Table::ENCRYPTED) {
+            if (global_eid == 0) {
+                throw std::runtime_error("Enclave not initialized for encrypted table");
+            }
+            
             for (size_t i = 0; i < table.size(); i++) {
                 Entry& entry = table[i];
                 if (entry.get_is_encrypted()) {
-                    // For testing, manually decrypt using the entry's nonce
-                    entry.set_is_encrypted(false);
-                    // Note: In real usage, we'd use SGX ecall to decrypt
-                    // For now, we'll leave as-is since SimpleJoinExecutor handles decryption
+                    crypto_status_t status = CryptoUtils::decrypt_entry(entry, global_eid);
+                    if (status != CRYPTO_SUCCESS) {
+                        throw std::runtime_error("Failed to decrypt entry " + std::to_string(i));
+                    }
                 }
             }
         }
@@ -112,7 +139,7 @@ public:
             }
             
             // 4. Execute with SimpleJoinExecutor
-            SimpleJoinExecutor executor;
+            SimpleJoinExecutor executor(global_eid);
             Table our_result = executor.execute_join_tree(join_tree);
             
             std::cout << "\n  Our result: " << our_result.size() << " rows" << std::endl;
@@ -241,13 +268,23 @@ int main(int argc, char** argv) {
         }
     }
     
+    // Initialize SGX enclave
+    if (initialize_enclave() < 0) {
+        std::cerr << "Failed to initialize SGX enclave" << std::endl;
+        return 1;
+    }
+    
+    int result = 0;
     try {
         JoinCorrectnessTest tester(data_dir, query_dir, verbose);
         tester.run_all_tests();
     } catch (const std::exception& e) {
         std::cerr << "Fatal error: " << e.what() << std::endl;
-        return 1;
+        result = 1;
     }
     
-    return 0;
+    // Destroy enclave
+    destroy_enclave();
+    
+    return result;
 }

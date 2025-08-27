@@ -34,19 +34,13 @@
 \newcommand{\finalmult}{\alpha_{\text{final}}} % Final multiplicity
 \newcommand{\foreignmult}{\alpha_{\text{foreign}}} % Foreign multiplicity
 \newcommand{\cumsum}{C} % Cumulative sum counter
-\newcommand{\localval}{\text{local\_value}} % Local value
-\newcommand{\finalval}{\text{final\_value}} % Final value
 
 % ------------------------------------------------------------------------------
 % Algorithm Variables
 % ------------------------------------------------------------------------------
 \newcommand{\foreigncumsum}{C_{\text{foreign}}} % Foreign cumulative sum
 \newcommand{\localweight}{w_{\text{local}}} % Local weight counter
-\newcommand{\localcumsum}{C_{\text{local}}} % Local cumulative sum  
-\newcommand{\startcumsum}{C_{\text{start}}} % Start cumulative sum
-\newcommand{\stopcumsum}{C_{\text{end}}} % End cumulative sum
-\newcommand{\startforeign}{F_{\text{start}}} % Start foreign multiplicity
-\newcommand{\stopforeign}{F_{\text{end}}} % End foreign multiplicity
+\newcommand{\localcumsum}{C_{\text{local}}} % Local cumulative sum
 \newcommand{\entry}{e} % General entry variable
 \newcommand{\startentry}{e_s} % Start entry variable (avoid conflict with constants)
 \newcommand{\stopentry}{e_t} % End/terminal entry variable (avoid conflict with constants)
@@ -63,8 +57,6 @@
 % ------------------------------------------------------------------------------
 % Counter Variables  
 % ------------------------------------------------------------------------------
-\newcommand{\counter}{C} % Generic counter (replaces counter)
-\newcommand{\copycount}{C_{\text{copy}}} % Copy counter
 \newcommand{\foreignsum}{F_{\text{sum}}} % Foreign sum
 
 % ------------------------------------------------------------------------------
@@ -76,7 +68,6 @@
 % Predefined Complexity Expressions
 % ------------------------------------------------------------------------------
 \newcommand{\sortcomplexity}{\bigO{\tablesize \log^2 \tablesize}} % Oblivious sorting complexity
-\newcommand{\optimalcomplexity}{\bigO{\inputsize \log \inputsize + \outputsize}} % Optimal algorithm complexity
 
 % ------------------------------------------------------------------------------
 % Algorithm Names and Formatting
@@ -90,10 +81,6 @@
 \newcommand{\typestart}{\text{START}} % TARGET_START entry type constant
 \newcommand{\typeend}{\text{END}} % TARGET_END entry type constant
 
-% Legacy aliases for backward compatibility (to be phased out)
-\newcommand{\entrysource}{\typesource} % Source entry type
-\newcommand{\entrystart}{\typestart} % Target start entry type
-\newcommand{\entryend}{\typeend} % Target end entry type
 
 % ------------------------------------------------------------------------------
 % Equality Type Constants

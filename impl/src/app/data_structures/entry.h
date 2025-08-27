@@ -45,6 +45,10 @@ public:
     uint32_t copy_index;
     uint32_t alignment_key;
     
+    // Distribution fields
+    int32_t dst_idx;
+    int32_t index;
+    
     // Data attributes (all integers - using vector for flexibility)
     std::vector<int32_t> attributes;
     std::vector<std::string> column_names;

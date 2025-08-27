@@ -63,7 +63,21 @@ endif
 App_Cpp_Files := app/main.cpp \
                  app/crypto/crypto_utils.cpp \
                  app/io/converters.cpp \
-                 app/data_structures/types.cpp \
+                 app/io/table_io.cpp \
+                 app/data_structures/entry.cpp \
+                 app/data_structures/table.cpp \
+                 app/data_structures/join_condition.cpp \
+                 app/data_structures/join_constraint.cpp \
+                 app/data_structures/join_tree_builder.cpp \
+                 app/query/query_tokenizer.cpp \
+                 app/query/query_parser.cpp \
+                 app/query/inequality_parser.cpp \
+                 app/query/condition_merger.cpp \
+                 app/algorithms/bottom_up_phase.cpp \
+                 app/algorithms/top_down_phase.cpp \
+                 app/algorithms/distribute_expand.cpp \
+                 app/algorithms/align_concat.cpp \
+                 app/algorithms/oblivious_join.cpp \
                  app/debug_util.cpp
 App_Include_Paths := -I$(SGX_SDK)/include -Iapp -Ienclave -Icommon
 
@@ -114,6 +128,7 @@ Enclave_C_Files := enclave/crypto/entry_crypto.c \
                    enclave/core/window_functions.c \
                    enclave/core/comparators.c \
                    enclave/core/transform_functions.c \
+                   enclave/core/distribute_functions.c \
                    enclave/debug_wrapper.c
 
 Enclave_Include_Paths := -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc \
@@ -129,7 +144,7 @@ endif
 
 Enclave_Compile_CFlags += -nostdinc -ffreestanding -fvisibility=hidden -fpie \
                           -ffunction-sections -fdata-sections $(Enclave_Include_Paths) \
-                          -DENCLAVE_BUILD
+                          -DENCLAVE_BUILD -DDEBUG_LEVEL=5
 Enclave_Compile_CXXFlags := -nostdinc++ -std=c++11 $(Enclave_Compile_CFlags)
 
 # Security flags
@@ -220,7 +235,8 @@ $(App_Name): $(App_Objects)
 
 # Build encrypt_tables utility
 Encrypt_Tool_Objects := app/tools/encrypt_tables.o app/io/table_io.o app/data_structures/join_constraint.o \
-                       app/io/converters.o app/crypto/crypto_utils.o app/data_structures/types.o app/debug_util.o $(Gen_Untrusted_Object)
+                       app/io/converters.o app/crypto/crypto_utils.o app/data_structures/entry.o \
+                       app/data_structures/table.o app/data_structures/join_condition.o app/debug_util.o $(Gen_Untrusted_Object)
 
 app/tools/encrypt_tables.o: app/tools/encrypt_tables.cpp $(Gen_Untrusted_Source)
 	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -std=c++17 -c $< -o $@

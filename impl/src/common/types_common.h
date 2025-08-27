@@ -6,11 +6,12 @@
 
 // Entry type enumeration
 typedef enum {
-    EMPTY = 0,      // Uninitialized entry
-    SOURCE = 1,     // Source table entry
-    START = 2,      // Target start boundary
-    END = 3,        // Target end boundary
-    TARGET = 4      // Target table entry
+    SORT_PADDING = 0,   // Padding for bitonic sort (always sorts to end)
+    SOURCE = 1,         // Source table entry
+    START = 2,          // Target start boundary
+    END = 3,            // Target end boundary
+    TARGET = 4,         // Target table entry
+    DIST_PADDING = 5    // Padding for distribution (Phase 3)
 } entry_type_t;
 
 // Equality type for boundary conditions

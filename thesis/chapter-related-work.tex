@@ -49,7 +49,7 @@ Recent work by Hu and Wu~\cite{hu2025optimal} has made significant progress in d
 
 Worst-case optimal algorithms optimize for the theoretical upper bound on output size for a given query structure, assuming maximal matches between tuples regardless of actual data content. This ``worst-case'' bound represents the maximum possible output size that could occur for any instance with the given query and input sizes. In contrast, Yannakakis' algorithm---and our approach building upon it---optimizes for the actual output size of the specific data instance. This output-sensitive approach is particularly beneficial when tuples do not exhibit maximal matching patterns.
 
-Our work thus follows a complementary direction to Hu and Wu's approach. Their worst-case optimal algorithm is particularly valuable for cyclic queries where there is no known efficient method to compute the exact output size. In contrast, for acyclic queries, the exact output size can be efficiently computed, allowing our oblivious Yannakakis-based approach to achieve $\optimalcomplexity$ complexity on acyclic queries, where $\outputsize$ is the actual output size.
+Our work thus follows a complementary direction to Hu and Wu's approach. Their worst-case optimal algorithm is particularly valuable for cyclic queries where there is no known efficient method to compute the exact output size. In contrast, for acyclic queries, the exact output size can be efficiently computed, allowing our oblivious Yannakakis-based approach to achieve $\bigO{\inputsize \log \inputsize \log \outputsize}$ complexity on acyclic queries, where $\outputsize$ is the actual output size.
 
 %----------------------------------------------------------------------
 \section{Critical Gap in the Literature}
@@ -97,7 +97,7 @@ Our work bridges this gap by implementing an \textbf{oblivious Yannakakis algori
 
 \item Extending oblivious Yannakakis to support \textbf{inequality predicates} through a novel dual-entry technique
 
-\item Achieving $\optimalcomplexity$ complexity for acyclic queries with full band join support
+\item Achieving $\bigO{\inputsize \log \inputsize \log \outputsize}$ complexity for acyclic queries with full band join support
 
 \item Being the \textbf{first algorithm} to combine efficient oblivious multi-way processing with general range constraints
 \end{itemize}

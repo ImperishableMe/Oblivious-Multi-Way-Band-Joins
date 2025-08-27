@@ -3,9 +3,9 @@
 
 #include <map>
 #include <memory>
-#include "../../app/types.h"
-#include "../../app/utils/join_tree_node.h"
-#include "../../app/crypto_utils.h"
+#include "../../app/data_structures/types.h"
+#include "../../app/data_structures/join_tree_node.h"
+#include "../../app/crypto/crypto_utils.h"
 #include "simple_join_executor.h"
 #include "sgx_urts.h"
 

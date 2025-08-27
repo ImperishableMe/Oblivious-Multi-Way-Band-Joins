@@ -1,0 +1,238 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <set>
+#include <algorithm>
+#include <chrono>
+#include <cstdlib>
+#include <dirent.h>
+#include <sys/stat.h>
+#include "../../app/data_structures/types.h"
+#include "../../app/io/table_io.h"
+#include "../../app/crypto/crypto_utils.h"
+#include "sgx_urts.h"
+#include "../../app/Enclave_u.h"
+
+/* Global enclave ID for decryption */
+sgx_enclave_id_t global_eid = 0;
+
+/* Initialize the enclave */
+int initialize_enclave() {
+    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
+    
+    ret = sgx_create_enclave("../../enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
+    if (ret != SGX_SUCCESS) {
+        std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
+        return -1;
+    }
+    
+    std::cout << "SGX Enclave initialized for result comparison" << std::endl;
+    return 0;
+}
+
+/* Destroy the enclave */
+void destroy_enclave() {
+    if (global_eid != 0) {
+        sgx_destroy_enclave(global_eid);
+    }
+}
+
+/* Decrypt a table */
+Table decrypt_table(const Table& encrypted_table) {
+    Table decrypted = encrypted_table;
+    
+    for (size_t i = 0; i < decrypted.size(); i++) {
+        Entry& entry = decrypted[i];
+        if (entry.is_encrypted) {
+            CryptoUtils::decrypt_entry(entry, global_eid);
+        }
+    }
+    
+    return decrypted;
+}
+
+/* Convert table to comparable format (sorted rows as strings) */
+std::multiset<std::string> table_to_multiset(const Table& table) {
+    std::multiset<std::string> result;
+    
+    for (const auto& entry : table) {
+        std::string row;
+        for (size_t i = 0; i < entry.attributes.size(); i++) {
+            if (i > 0) row += ",";
+            row += std::to_string(entry.attributes[i]);
+        }
+        result.insert(row);
+    }
+    
+    return result;
+}
+
+/* Compare two tables for equivalence */
+struct ComparisonResult {
+    bool are_equivalent;
+    size_t sgx_rows;
+    size_t sqlite_rows;
+    size_t matching_rows;
+    std::vector<std::string> sgx_only;
+    std::vector<std::string> sqlite_only;
+};
+
+ComparisonResult compare_tables(const Table& sgx_table, const Table& sqlite_table) {
+    ComparisonResult result;
+    result.sgx_rows = sgx_table.size();
+    result.sqlite_rows = sqlite_table.size();
+    
+    // Convert to multisets for comparison
+    auto sgx_set = table_to_multiset(sgx_table);
+    auto sqlite_set = table_to_multiset(sqlite_table);
+    
+    // Find differences
+    std::set_difference(sgx_set.begin(), sgx_set.end(),
+                        sqlite_set.begin(), sqlite_set.end(),
+                        std::back_inserter(result.sgx_only));
+    
+    std::set_difference(sqlite_set.begin(), sqlite_set.end(),
+                        sgx_set.begin(), sgx_set.end(),
+                        std::back_inserter(result.sqlite_only));
+    
+    // Count matching rows
+    result.matching_rows = sgx_set.size() - result.sgx_only.size();
+    
+    // Check equivalence
+    result.are_equivalent = (result.sgx_only.empty() && result.sqlite_only.empty());
+    
+    return result;
+}
+
+/* Run a command and measure time */
+double run_timed_command(const std::string& command) {
+    std::cout << "Executing: " << command << std::endl;
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    int ret = std::system(command.c_str());
+    auto end = std::chrono::high_resolution_clock::now();
+    
+    if (ret != 0) {
+        throw std::runtime_error("Command failed: " + command);
+    }
+    
+    std::chrono::duration<double> diff = end - start;
+    return diff.count();
+}
+
+/* Print usage information */
+void print_usage(const char* program_name) {
+    std::cout << "Usage: " << program_name << " <test_case_dir>" << std::endl;
+    std::cout << "  test_case_dir : Directory containing test case (input tables and join spec)" << std::endl;
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        print_usage(argv[0]);
+        return 1;
+    }
+    
+    std::string test_dir = argv[1];
+    
+    std::cout << "\n=== Join Test Comparator ===" << std::endl;
+    std::cout << "Test directory: " << test_dir << std::endl;
+    
+    try {
+        // Initialize enclave for decryption
+        if (initialize_enclave() < 0) {
+            std::cerr << "Enclave initialization failed!" << std::endl;
+            return -1;
+        }
+        
+        // Create output directory for results
+        std::string output_dir = test_dir + "/output";
+        mkdir(output_dir.c_str(), 0755);
+        
+        // Define output files
+        std::string sgx_output = output_dir + "/sgx_result.csv";
+        std::string sqlite_output = output_dir + "/sqlite_result.csv";
+        std::string join_spec = test_dir + "/join_spec.txt";
+        
+        // Check if join spec exists
+        struct stat buffer;
+        if (stat(join_spec.c_str(), &buffer) != 0) {
+            std::cerr << "Join specification not found: " << join_spec << std::endl;
+            return 1;
+        }
+        
+        // Run SGX oblivious join
+        std::cout << "\n--- Running SGX Oblivious Join ---" << std::endl;
+        std::string sgx_cmd = "../../sgx_app " + test_dir + " " + join_spec + " " + sgx_output;
+        double sgx_time = run_timed_command(sgx_cmd);
+        std::cout << "SGX join completed in " << sgx_time << " seconds" << std::endl;
+        
+        // Run SQLite baseline
+        std::cout << "\n--- Running SQLite Baseline ---" << std::endl;
+        std::string sqlite_cmd = "../baseline/sqlite_baseline " + test_dir + " " + join_spec + " " + sqlite_output;
+        double sqlite_time = run_timed_command(sqlite_cmd);
+        std::cout << "SQLite join completed in " << sqlite_time << " seconds" << std::endl;
+        
+        // Load and decrypt results
+        std::cout << "\n--- Comparing Results ---" << std::endl;
+        
+        std::cout << "Loading SGX result..." << std::endl;
+        Table sgx_encrypted = TableIO::load_csv(sgx_output);
+        Table sgx_result = decrypt_table(sgx_encrypted);
+        
+        std::cout << "Loading SQLite result..." << std::endl;
+        Table sqlite_encrypted = TableIO::load_csv(sqlite_output);
+        Table sqlite_result = decrypt_table(sqlite_encrypted);
+        
+        // Compare results
+        ComparisonResult comparison = compare_tables(sgx_result, sqlite_result);
+        
+        // Print comparison results
+        std::cout << "\n=== Comparison Results ===" << std::endl;
+        std::cout << "SGX rows: " << comparison.sgx_rows << std::endl;
+        std::cout << "SQLite rows: " << comparison.sqlite_rows << std::endl;
+        std::cout << "Matching rows: " << comparison.matching_rows << std::endl;
+        
+        if (comparison.are_equivalent) {
+            std::cout << "\n✓ PASS: Results are equivalent!" << std::endl;
+        } else {
+            std::cout << "\n✗ FAIL: Results differ!" << std::endl;
+            
+            if (!comparison.sgx_only.empty()) {
+                std::cout << "\nRows only in SGX result (" << comparison.sgx_only.size() << "):" << std::endl;
+                for (size_t i = 0; i < std::min(size_t(10), comparison.sgx_only.size()); i++) {
+                    std::cout << "  " << comparison.sgx_only[i] << std::endl;
+                }
+                if (comparison.sgx_only.size() > 10) {
+                    std::cout << "  ... and " << (comparison.sgx_only.size() - 10) << " more" << std::endl;
+                }
+            }
+            
+            if (!comparison.sqlite_only.empty()) {
+                std::cout << "\nRows only in SQLite result (" << comparison.sqlite_only.size() << "):" << std::endl;
+                for (size_t i = 0; i < std::min(size_t(10), comparison.sqlite_only.size()); i++) {
+                    std::cout << "  " << comparison.sqlite_only[i] << std::endl;
+                }
+                if (comparison.sqlite_only.size() > 10) {
+                    std::cout << "  ... and " << (comparison.sqlite_only.size() - 10) << " more" << std::endl;
+                }
+            }
+        }
+        
+        // Performance comparison
+        std::cout << "\n=== Performance ===" << std::endl;
+        std::cout << "SGX time: " << sgx_time << " seconds" << std::endl;
+        std::cout << "SQLite time: " << sqlite_time << " seconds" << std::endl;
+        std::cout << "Overhead: " << (sgx_time / sqlite_time) << "x" << std::endl;
+        
+        // Cleanup
+        destroy_enclave();
+        
+        return comparison.are_equivalent ? 0 : 1;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        destroy_enclave();
+        return 1;
+    }
+}

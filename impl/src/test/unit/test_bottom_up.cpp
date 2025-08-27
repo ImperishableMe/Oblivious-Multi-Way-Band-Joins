@@ -12,14 +12,15 @@
 #include <chrono>
 #include <map>
 #include <cassert>
-#include "../app/algorithms/bottom_up_phase.h"
-#include "../app/utils/query_parser.h"
-#include "../app/utils/join_tree_builder.h"
-#include "../app/utils/join_attribute_setter.h"
-#include "../app/utils/table_io.h"
-#include "../app/crypto_utils.h"
-#include "../app/Enclave_u.h"
-#include "test_utils/subtree_verifier.h"
+#include "../../app/algorithms/bottom_up_phase.h"
+#include "../../app/query/query_parser.h"
+#include "../../app/data_structures/join_tree_builder.h"
+#include "../../app/data_structures/join_attribute_setter.h"
+#include "../../app/io/table_io.h"
+#include "../../app/crypto/crypto_utils.h"
+#include "../../app/Enclave_u.h"
+#include "../utils/subtree_verifier.h"
+#include "../../common/debug_util.h"
 #include "sgx_urts.h"
 
 sgx_enclave_id_t global_eid = 0;
@@ -90,12 +91,89 @@ public:
         query_dir = "/home/r33wei/omwj/memory_const/queries";
     }
     
+    BottomUpTest(const std::string& query_path, const std::string& data_path)
+        : use_encrypted(false), query_dir(query_path), data_dir(data_path) {
+    }
+    
+    /**
+     * Test custom query and data
+     */
+    bool TestCustom(const std::string& query_file, const std::string& data_path) {
+        std::cout << "\n=== Testing Custom Query ===" << std::endl;
+        std::cout << "Query file: " << query_file << std::endl;
+        std::cout << "Data path: " << data_path << std::endl;
+        
+        // Extract test name from query file for debug session
+        size_t last_slash = query_file.find_last_of("/");
+        size_t last_dot = query_file.find_last_of(".");
+        std::string test_name = "custom_test";
+        if (last_slash != std::string::npos && last_dot != std::string::npos) {
+            test_name = query_file.substr(last_slash + 1, last_dot - last_slash - 1);
+        }
+        
+        // Initialize debug session
+        debug_init_session(test_name.c_str());
+        
+        try {
+            // Load the query directly (it's already a full path)
+            std::ifstream file(query_file);
+            if (!file.is_open()) {
+                throw std::runtime_error("Cannot open query file: " + query_file);
+            }
+            std::string query((std::istreambuf_iterator<char>(file)),
+                            std::istreambuf_iterator<char>());
+            
+            // Parse query to build join tree
+            QueryParser parser;
+            ParsedQuery parsed = parser.parse(query);
+            
+            // Load tables based on query
+            std::map<std::string, Table> tables;
+            data_dir = data_path; // Update data_dir for LoadTable
+            for (const auto& table_name : parsed.tables) {
+                tables[table_name] = LoadTable(table_name);
+            }
+            
+            // Build the join tree
+            JoinTreeBuilder builder;
+            auto root = builder.build_from_query(parsed, tables);
+            
+            // Set join attributes
+            JoinAttributeSetter::SetJoinAttributesForTree(root);
+            
+            // Run bottom-up phase
+            BottomUpPhase::Execute(root, global_eid);
+            
+            // Verify results
+            bool success = SubtreeVerifier::VerifyFullTree(root, global_eid);
+            
+            if (success) {
+                std::cout << "✓ Test passed" << std::endl;
+            } else {
+                std::cout << "✗ Test failed: multiplicities don't match ground truth" << std::endl;
+            }
+            
+            // Close debug session
+            debug_close_session();
+            
+            return success;
+            
+        } catch (const std::exception& e) {
+            std::cout << "✗ Test failed: " << e.what() << std::endl;
+            debug_close_session();
+            return false;
+        }
+    }
+    
     /**
      * Test TB1: 2-table band join (simplest case)
      */
     bool TestTB1() {
         std::cout << "\n=== Testing TB1: 2-Table Band Join ===" << std::endl;
         std::cout << "Query: supplier1 JOIN supplier2 ON balance range" << std::endl;
+        
+        // Initialize debug session for this test
+        debug_init_session("TB1_test");
         
         try {
             // Load tables
@@ -136,10 +214,15 @@ public:
             bool success = SubtreeVerifier::VerifyFullTree(root, global_eid);
             
             std::cout << "\nTB1 Result: " << (success ? "PASSED ✓" : "FAILED ✗") << std::endl;
+            
+            // Close debug session
+            debug_close_session();
+            
             return success;
             
         } catch (const std::exception& e) {
             std::cerr << "TB1 test failed: " << e.what() << std::endl;
+            debug_close_session();
             return false;
         }
     }
@@ -235,6 +318,9 @@ public:
         for (const auto& test : test_cases) {
             std::cout << "\n=== " << test.name << ": " << test.description << " ===" << std::endl;
             
+            // Initialize debug session for this test
+            debug_init_session(test.name.c_str());
+            
             try {
                 // Load tables
                 std::map<std::string, Table> tables;
@@ -272,8 +358,12 @@ public:
                     std::cout << test.name << ": FAILED ✗" << std::endl;
                 }
                 
+                // Close debug session
+                debug_close_session();
+                
             } catch (const std::exception& e) {
                 std::cerr << test.name << " failed with error: " << e.what() << std::endl;
+                debug_close_session();
             }
         }
         
@@ -294,21 +384,34 @@ public:
 void print_usage(const char* program) {
     std::cout << "Usage: " << program << " [options]" << std::endl;
     std::cout << "Options:" << std::endl;
-    std::cout << "  -e        Use encrypted data" << std::endl;
-    std::cout << "  -q        Quick test (TB1 only)" << std::endl;
-    std::cout << "  -h        Show this help" << std::endl;
+    std::cout << "  -e                Use encrypted data" << std::endl;
+    std::cout << "  -q <query_file>   Run specific query file" << std::endl;
+    std::cout << "  -d <data_dir>     Data directory (use with -q)" << std::endl;
+    std::cout << "  --quick           Quick test (TB1 only)" << std::endl;
+    std::cout << "  -h                Show this help" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << program << "                    # Run full TPC-H test suite" << std::endl;
+    std::cout << "  " << program << " --quick             # Run TB1 only" << std::endl;
+    std::cout << "  " << program << " -q query.sql -d data/  # Run custom query with data" << std::endl;
 }
 
 int main(int argc, char** argv) {
     bool use_encrypted = false;
     bool quick_test = false;
+    std::string query_file;
+    std::string data_dir;
     
     // Parse arguments
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
         if (arg == "-e") {
             use_encrypted = true;
-        } else if (arg == "-q") {
+        } else if (arg == "-q" && i + 1 < argc) {
+            query_file = argv[++i];
+        } else if (arg == "-d" && i + 1 < argc) {
+            data_dir = argv[++i];
+        } else if (arg == "--quick") {
             quick_test = true;
         } else if (arg == "-h" || arg == "--help") {
             print_usage(argv[0]);
@@ -323,6 +426,22 @@ int main(int argc, char** argv) {
     }
     
     try {
+        // Custom query mode
+        if (!query_file.empty()) {
+            if (data_dir.empty()) {
+                std::cerr << "Error: -d <data_dir> required when using -q <query_file>" << std::endl;
+                print_usage(argv[0]);
+                destroy_enclave();
+                return 1;
+            }
+            
+            BottomUpTest test("", ""); // Dummy constructor, will be overridden
+            bool success = test.TestCustom(query_file, data_dir);
+            destroy_enclave();
+            return success ? 0 : 1;
+        }
+        
+        // Standard TPC-H test mode
         BottomUpTest test(use_encrypted);
         
         if (quick_test) {

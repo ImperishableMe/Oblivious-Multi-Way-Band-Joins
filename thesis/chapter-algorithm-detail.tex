@@ -90,13 +90,9 @@ $\entry$ & General entry variable \\
 \hline
 $e_s, e_t$ & Start and end entry variables \\
 \hline
-$\counter$ & Generic counter variable ($C$) \\
-\hline
 $\foreigncumsum$ & Foreign cumulative sum (temporary): intermediate values during dual-counter computation \\
 \hline
 $\localweight$ & Local weight counter ($w_{\text{local}}$) \\
-\hline
-$\copycount$ & Copy counter ($C_{\text{copy}}$) \\
 \hline
 $\localcumsum$ & Local cumulative sum (temporary): intermediate values during bottom-up computation \\
 \hline
@@ -642,7 +638,7 @@ Each tuple must be replicated according to its final multiplicity $\finalmult$. 
 \label{sec:align-concat}
 %----------------------------------------------------------------------
 
-After expansion, tables must be aligned so that matching tuples appear in the same rows. The parent table is sorted by join attributes (and secondarily by other attributes for deterministic ordering), creating groups of identical tuples. Each group represents a distinct combination from the parent table that will be matched with corresponding child tuples.
+After expansion, tables must be aligned so that matching tuples appear in the same rows. The parent table is sorted by join attributes (and secondarily by other attributes), creating groups of identical tuples. Each group represents a distinct combination from the parent table that will be matched with corresponding child tuples.
 
 The child table alignment uses the formula $\foreignsum + (\copyindex \div \localmult)$, where:
 \begin{itemize}
@@ -703,8 +699,8 @@ This formula ensures that every $\localmult$ copies of a child tuple increment t
     \ElsIf{$t_1.\joinattr > t_2.\joinattr$}
         \Return 1
     \Else
-        \Comment{Compare by parent's original index (maintained in $R_{accumulator}$)}
-        \Return \Call{CompareOriginalIndex}{$t_1$, $t_2$}
+        \Comment{Compare all other attributes}
+        \Return \Call{CompareOtherAttr}{$t_1$, $t_2$}
     \EndIf
 \EndFunction
 \end{algorithmic}

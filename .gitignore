@@ -31,8 +31,8 @@ sgx_app
 unit_tests
 integration_tests
 
-# Core dumps
-core
+# Core dumps (but not the enclave/core directory)
+/core
 *.core
 
 # Temporary files

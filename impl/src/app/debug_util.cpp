@@ -4,9 +4,23 @@
 #include <ctime>
 #include <mutex>
 #include <cstring>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include "data_structures/types.h"
+#include "crypto/crypto_utils.h"
+#include "Enclave_u.h"
 
 // Thread-safe output mutex
 static std::mutex debug_mutex;
+
+// Debug session state
+static std::string debug_session_name;
+static std::string debug_session_dir;
+static std::ofstream debug_log_file;
+static bool debug_session_active = false;
 
 // ANSI color codes for terminal output
 #define COLOR_RED     "\033[31m"
@@ -46,30 +60,223 @@ extern "C" void debug_print(uint32_t level, const char* file, int line, const ch
     char time_str[20];
     strftime(time_str, sizeof(time_str), "%H:%M:%S", tm_info);
     
-    // Output stream based on level
-    FILE* stream = (level <= DEBUG_LEVEL_ERROR) ? stderr : stdout;
-    
-    // Print header with color
-    fprintf(stream, "%s[%s][%s][%s:%d] ", 
-            get_level_color(level),
-            time_str,
-            debug_level_str(level),
-            get_short_filename(file),
-            line);
-    
-    // Print the actual message
+    // Format the message
+    char message[4096];
     va_list args;
     va_start(args, fmt);
-    vfprintf(stream, fmt, args);
+    vsnprintf(message, sizeof(message), fmt, args);
     va_end(args);
     
-    // Reset color and newline
-    fprintf(stream, "%s\n", COLOR_RESET);
-    fflush(stream);
+    // Output to file if in file mode
+    if ((DEBUG_OUTPUT_MODE == DEBUG_OUTPUT_FILE || DEBUG_OUTPUT_MODE == DEBUG_OUTPUT_BOTH) 
+        && debug_session_active && debug_log_file.is_open()) {
+        debug_log_file << "[" << time_str << "]"
+                      << "[" << debug_level_str(level) << "]"
+                      << "[" << get_short_filename(file) << ":" << line << "] "
+                      << message << std::endl;
+        debug_log_file.flush();
+    }
+    
+    // Output to console if in console or both mode
+    if (DEBUG_OUTPUT_MODE == DEBUG_OUTPUT_CONSOLE || DEBUG_OUTPUT_MODE == DEBUG_OUTPUT_BOTH) {
+        FILE* stream = (level <= DEBUG_LEVEL_ERROR) ? stderr : stdout;
+        
+        // Print header with color
+        fprintf(stream, "%s[%s][%s][%s:%d] ", 
+                get_level_color(level),
+                time_str,
+                debug_level_str(level),
+                get_short_filename(file),
+                line);
+        
+        // Print the message
+        fprintf(stream, "%s", message);
+        
+        // Reset color and newline
+        fprintf(stream, "%s\n", COLOR_RESET);
+        fflush(stream);
+    }
 }
 
 // OCALL handler for enclave debug output
 extern "C" void ocall_debug_print(uint32_t level, const char* file, int line, const char* message) {
     // Just forward to the main debug_print with the pre-formatted message
     debug_print(level, file, line, "%s", message);
+}
+
+// Debug session management
+void debug_init_session(const char* session_name) {
+    std::lock_guard<std::mutex> lock(debug_mutex);
+    
+    if (debug_session_active) {
+        debug_close_session();
+    }
+    
+    // Create timestamp for session
+    time_t now = time(nullptr);
+    struct tm* tm_info = localtime(&now);
+    char timestamp[32];
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
+    
+    // Set up session directory with timestamp first for easier sorting
+    debug_session_name = session_name;
+    debug_session_dir = std::string("/home/r33wei/omwj/memory_const/debug/") + timestamp + "_" + session_name;
+    
+    // Create session directory using POSIX mkdir
+    mkdir(debug_session_dir.c_str(), 0777);
+    
+    // Open main log file
+    std::string log_path = debug_session_dir + "/debug.log";
+    debug_log_file.open(log_path, std::ios::out);
+    
+    if (debug_log_file.is_open()) {
+        debug_session_active = true;
+        debug_log_file << "=== Debug Session Started ===" << std::endl;
+        debug_log_file << "Session: " << session_name << std::endl;
+        debug_log_file << "Time: " << timestamp << std::endl;
+        debug_log_file << "===========================" << std::endl;
+        debug_log_file.flush();
+    }
+}
+
+void debug_close_session() {
+    std::lock_guard<std::mutex> lock(debug_mutex);
+    
+    if (debug_session_active && debug_log_file.is_open()) {
+        debug_log_file << "=== Debug Session Ended ===" << std::endl;
+        debug_log_file.close();
+    }
+    
+    debug_session_active = false;
+    debug_session_name.clear();
+    debug_session_dir.clear();
+}
+
+// File output functions
+void debug_to_file(const char* filename, const char* content) {
+    if (!debug_session_active) return;
+    
+    std::lock_guard<std::mutex> lock(debug_mutex);
+    std::string filepath = debug_session_dir + "/" + filename;
+    std::ofstream file(filepath, std::ios::out);
+    if (file.is_open()) {
+        file << content;
+        file.close();
+    }
+}
+
+void debug_append_to_file(const char* filename, const char* content) {
+    if (!debug_session_active) return;
+    
+    std::lock_guard<std::mutex> lock(debug_mutex);
+    std::string filepath = debug_session_dir + "/" + filename;
+    std::ofstream file(filepath, std::ios::app);
+    if (file.is_open()) {
+        file << content;
+        file.close();
+    }
+}
+
+// Helper function to decrypt an entry for debugging
+static Entry decrypt_entry_for_debug(const Entry& entry, uint32_t eid) {
+    if (!entry.is_encrypted || eid == 0) {
+        return entry;
+    }
+    
+    Entry decrypted = entry;
+    CryptoUtils::decrypt_entry(decrypted, eid);
+    return decrypted;
+}
+
+// Table dumping functions
+void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid) {
+    if (!debug_session_active || !DEBUG_DUMP_TABLES) return;
+    
+    std::string filename_str;
+    {
+        std::lock_guard<std::mutex> lock(debug_mutex);
+        
+        // Generate filename
+        std::stringstream filename;
+        filename << step_name << "_" << label << ".csv";
+        filename_str = filename.str();
+        
+        // Open file
+        std::string filepath = debug_session_dir + "/" + filename_str;
+        std::ofstream file(filepath, std::ios::out);
+        
+        if (!file.is_open()) return;
+        
+        // Write header
+        file << "Index,OrigIdx,LocalMult,FinalMult,LocalCumsum,LocalInterval,ForeignSum,ForeignCumsum,ForeignInterval,LocalWeight,DstIdx,TableIdx,JoinAttr,FieldType,EqType,Encrypted";
+        
+        // Add data columns if any
+        if (table.size() > 0) {
+            const Entry& first = table[0];
+            for (const auto& col_name : first.column_names) {
+                file << "," << col_name;
+            }
+        }
+        file << std::endl;
+        
+        // Write data rows
+        for (size_t i = 0; i < table.size(); i++) {
+            Entry entry = decrypt_entry_for_debug(table[i], eid);
+            
+            file << i << ","
+                 << entry.original_index << ","
+                 << entry.local_mult << ","
+                 << entry.final_mult << ","
+                 << entry.local_cumsum << ","
+                 << entry.local_interval << ","
+                 << entry.foreign_sum << ","
+                 << entry.foreign_cumsum << ","
+                 << entry.foreign_interval << ","
+                 << entry.local_weight << ","
+                 << entry.dst_idx << ","
+                 << entry.index << ","
+                 << entry.join_attr << ","
+                 << static_cast<int>(entry.field_type) << ","
+                 << static_cast<int>(entry.equality_type) << ","
+                 << (entry.is_encrypted ? "Y" : "N");
+            
+            // Add data values
+            for (int32_t val : entry.attributes) {
+                file << "," << val;
+            }
+            
+            file << std::endl;
+        }
+        
+        file.close();
+    } // Lock released here
+    
+    // Also log to main debug log (no longer holding the lock)
+    DEBUG_INFO("Dumped table '%s' at step '%s': %zu entries to %s", 
+               label, step_name, table.size(), filename_str.c_str());
+}
+
+void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid) {
+    if (!debug_session_active) return;
+    
+    Entry decrypted = decrypt_entry_for_debug(entry, eid);
+    
+    std::stringstream ss;
+    ss << "Entry " << label << ": ";
+    ss << "orig_idx=" << decrypted.original_index;
+    ss << ", local_mult=" << decrypted.local_mult;
+    ss << ", join_attr=" << decrypted.join_attr;
+    ss << ", type=" << static_cast<int>(decrypted.field_type);
+    ss << ", eq=" << static_cast<int>(decrypted.equality_type);
+    
+    if (!decrypted.attributes.empty()) {
+        ss << ", data=[";
+        for (size_t i = 0; i < decrypted.attributes.size(); i++) {
+            if (i > 0) ss << ",";
+            ss << decrypted.attributes[i];
+        }
+        ss << "]";
+    }
+    
+    DEBUG_DEBUG("%s", ss.str().c_str());
 }

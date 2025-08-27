@@ -246,3 +246,31 @@ static void create_dist_padding_op(entry_t* entry) {
 void transform_create_dist_padding(entry_t* entry) {
     apply_to_decrypted_entry(entry, create_dist_padding_op);
 }
+
+// ============================================================================
+// Align-Concat Transform Functions
+// ============================================================================
+
+/**
+ * Initialize copy index to 0
+ */
+static void init_copy_index_op(entry_t* entry) {
+    entry->copy_index = 0;
+}
+
+void transform_init_copy_index(entry_t* entry) {
+    apply_to_decrypted_entry(entry, init_copy_index_op);
+}
+
+/**
+ * Compute alignment key = foreign_sum + (copy_index / local_mult)
+ */
+static void compute_alignment_key_op(entry_t* entry) {
+    // Avoid division by zero obliviously
+    int32_t safe_local_mult = entry->local_mult + (entry->local_mult == 0);
+    entry->alignment_key = entry->foreign_sum + (entry->copy_index / safe_local_mult);
+}
+
+void transform_compute_alignment_key(entry_t* entry) {
+    apply_to_decrypted_entry(entry, compute_alignment_key_op);
+}

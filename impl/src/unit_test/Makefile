@@ -23,7 +23,7 @@ endif
 
 # Compiler settings
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -DDEBUG_LEVEL=3
+CXXFLAGS = -std=c++17 -Wall -Wextra -DDEBUG_LEVEL=5
 INCLUDES = -I$(ENCLAVE_PATH) \
            -I$(ENCLAVE_PATH)/app \
            -I$(ENCLAVE_PATH)/enclave \
@@ -34,11 +34,13 @@ INCLUDES = -I$(ENCLAVE_PATH) \
 LDFLAGS = -L$(SGX_LIB_PATH) -l$(URTS_LIB) -lpthread -lstdc++fs
 
 # Infrastructure source files from main project
-INFRA_SRCS = $(ENCLAVE_PATH)/app/utils/join_constraint.cpp \
-             $(ENCLAVE_PATH)/app/utils/table_io.cpp \
-             $(ENCLAVE_PATH)/app/converters.cpp \
-             $(ENCLAVE_PATH)/app/crypto_utils.cpp \
-             $(ENCLAVE_PATH)/app/types.cpp \
+INFRA_SRCS = $(ENCLAVE_PATH)/app/data_structures/join_constraint.cpp \
+             $(ENCLAVE_PATH)/app/io/table_io.cpp \
+             $(ENCLAVE_PATH)/app/io/converters.cpp \
+             $(ENCLAVE_PATH)/app/crypto/crypto_utils.cpp \
+             $(ENCLAVE_PATH)/app/data_structures/entry.cpp \
+             $(ENCLAVE_PATH)/app/data_structures/table.cpp \
+             $(ENCLAVE_PATH)/app/data_structures/join_condition.cpp \
              $(ENCLAVE_PATH)/app/debug_util.cpp
 
 # Test source files
@@ -65,16 +67,42 @@ JOIN_TEST_SRCS = test_join_correctness.cpp \
                  $(ENCLAVE_PATH)/app/utils/join_tree_builder.cpp
 
 # Bottom-up phase test
-BOTTOM_UP_TEST_SRCS = test_bottom_up.cpp \
-                      test_utils/subtree_verifier.cpp \
-                      test_utils/simple_join_executor.cpp \
+BOTTOM_UP_TEST_SRCS = ../test/unit/test_bottom_up.cpp \
+                      ../test/utils/subtree_verifier.cpp \
+                      ../test/utils/simple_join_executor.cpp \
                       $(ENCLAVE_PATH)/app/algorithms/bottom_up_phase.cpp \
-                      $(ENCLAVE_PATH)/app/utils/query_parser.cpp \
-                      $(ENCLAVE_PATH)/app/utils/query_tokenizer.cpp \
-                      $(ENCLAVE_PATH)/app/utils/inequality_parser.cpp \
-                      $(ENCLAVE_PATH)/app/utils/condition_merger.cpp \
-                      $(ENCLAVE_PATH)/app/utils/join_tree_builder.cpp \
-                      $(ENCLAVE_PATH)/app/utils/join_attribute_setter.cpp
+                      $(ENCLAVE_PATH)/app/query/query_parser.cpp \
+                      $(ENCLAVE_PATH)/app/query/query_tokenizer.cpp \
+                      $(ENCLAVE_PATH)/app/query/inequality_parser.cpp \
+                      $(ENCLAVE_PATH)/app/query/condition_merger.cpp \
+                      $(ENCLAVE_PATH)/app/data_structures/join_tree_builder.cpp \
+                      $(ENCLAVE_PATH)/app/data_structures/join_attribute_setter.cpp
+
+# Top-down phase test
+TOP_DOWN_TEST_SRCS = ../test/unit/test_top_down.cpp \
+                     $(ENCLAVE_PATH)/app/algorithms/bottom_up_phase.cpp \
+                     $(ENCLAVE_PATH)/app/algorithms/top_down_phase.cpp \
+                     $(ENCLAVE_PATH)/app/query/query_parser.cpp \
+                     $(ENCLAVE_PATH)/app/query/query_tokenizer.cpp \
+                     $(ENCLAVE_PATH)/app/query/inequality_parser.cpp \
+                     $(ENCLAVE_PATH)/app/query/condition_merger.cpp \
+                     $(ENCLAVE_PATH)/app/data_structures/join_tree_builder.cpp \
+                     $(ENCLAVE_PATH)/app/data_structures/join_attribute_setter.cpp
+
+# Full join test (includes top-down phase)
+FULL_JOIN_TEST_SRCS = ../test/unit/test_full_join.cpp \
+                      ../test/utils/simple_join_executor.cpp \
+                      $(ENCLAVE_PATH)/app/algorithms/bottom_up_phase.cpp \
+                      $(ENCLAVE_PATH)/app/algorithms/top_down_phase.cpp \
+                      $(ENCLAVE_PATH)/app/query/query_parser.cpp \
+                      $(ENCLAVE_PATH)/app/query/query_tokenizer.cpp \
+                      $(ENCLAVE_PATH)/app/query/inequality_parser.cpp \
+                      $(ENCLAVE_PATH)/app/query/condition_merger.cpp \
+                      $(ENCLAVE_PATH)/app/data_structures/join_tree_builder.cpp \
+                      $(ENCLAVE_PATH)/app/data_structures/join_attribute_setter.cpp
+
+DISTRIBUTE_TEST_SRCS = ../test/unit/test_distribute_expand.cpp \
+                       $(ENCLAVE_PATH)/app/algorithms/distribute_expand.cpp
 
 # Object files needed from main build
 MAIN_OBJS = $(ENCLAVE_U_O)
@@ -85,9 +113,12 @@ TABLE_IO_TEST_TARGET = test_table_io
 AES_TEST_TARGET = test_aes_crypto
 JOIN_TEST_TARGET = test_join_correctness
 BOTTOM_UP_TEST_TARGET = test_bottom_up
+TOP_DOWN_TEST_TARGET = test_top_down
+FULL_JOIN_TEST_TARGET = test_full_join
+DISTRIBUTE_TEST_TARGET = test_distribute_expand
 
 # Default target
-all: check-enclave $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET)
+all: check-enclave $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET) $(TOP_DOWN_TEST_TARGET) $(FULL_JOIN_TEST_TARGET) $(DISTRIBUTE_TEST_TARGET)
 
 # Check if enclave is built and create symlink for testing
 check-enclave:
@@ -131,6 +162,24 @@ $(BOTTOM_UP_TEST_TARGET): check-enclave $(BOTTOM_UP_TEST_SRCS) $(INFRA_SRCS)
 	@echo "Building bottom-up phase tests..."
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(BOTTOM_UP_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
 	@echo "Build complete. Run with: ./$(BOTTOM_UP_TEST_TARGET)"
+
+# Build top-down phase test executable
+$(TOP_DOWN_TEST_TARGET): check-enclave $(TOP_DOWN_TEST_SRCS) $(INFRA_SRCS)
+	@echo "Building top-down phase tests..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(TOP_DOWN_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
+	@echo "Build complete. Run with: ./$(TOP_DOWN_TEST_TARGET)"
+
+# Build full join test executable
+$(FULL_JOIN_TEST_TARGET): check-enclave $(FULL_JOIN_TEST_SRCS) $(INFRA_SRCS)
+	@echo "Building full join tests..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(FULL_JOIN_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
+	@echo "Build complete. Run with: ./$(FULL_JOIN_TEST_TARGET)"
+
+# Build distribute-expand test executable
+$(DISTRIBUTE_TEST_TARGET): check-enclave $(DISTRIBUTE_TEST_SRCS) $(INFRA_SRCS)
+	@echo "Building distribute-expand tests..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(DISTRIBUTE_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
+	@echo "Build complete. Run with: ./$(DISTRIBUTE_TEST_TARGET)"
 
 # Run tests
 run: $(TEST_TARGET)
@@ -176,7 +225,7 @@ run-bottom-up: $(BOTTOM_UP_TEST_TARGET)
 # Clean test files only (not the main build)
 clean:
 	@echo "Cleaning unit test files..."
-	rm -f $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET) *.o
+	rm -f $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET) $(TOP_DOWN_TEST_TARGET) $(FULL_JOIN_TEST_TARGET) $(DISTRIBUTE_TEST_TARGET) *.o
 	rm -f enclave.signed.so  # Remove symlink
 	@echo "Note: Main enclave files are preserved"
 

@@ -12,18 +12,13 @@ void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     // Step 2: Post-order traversal
     auto nodes = PostOrderTraversal(root);
     
-    // Step 3: Process each node
+    // Step 3: Process each node (all tables already have local_mult = 1)
     for (auto& node : nodes) {
         if (node->is_leaf()) {
-            // Initialize leaf multiplicities
-            std::cout << "  Initializing leaf node: " << node->get_table_name() << std::endl;
-            
-            node->set_table(node->get_table().map(eid,
-                [](sgx_enclave_id_t eid, entry_t* e) {
-                    return ecall_transform_initialize_leaf(eid, e);
-                }));
+            // Leaf nodes keep their initial local_mult = 1
+            std::cout << "  Leaf node ready: " << node->get_table_name() << std::endl;
         } else {
-            // Process each child
+            // Process internal nodes - multiply their local_mult by child contributions
             std::cout << "  Processing internal node: " << node->get_table_name() << std::endl;
             
             for (auto& child : node->get_children()) {
@@ -42,10 +37,15 @@ void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
 }
 
 void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node, sgx_enclave_id_t eid) {
-    // Add metadata columns to current node's table
+    // Add metadata columns and initialize multiplicities to 1 for all tables
     node->set_table(node->get_table().map(eid,
         [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_add_metadata(eid, e);
+            sgx_status_t status = ecall_transform_add_metadata(eid, e);
+            if (status == SGX_SUCCESS) {
+                // Set local_mult to 1 for all tables (both leaf and non-leaf)
+                status = ecall_transform_set_local_mult_one(eid, e);
+            }
+            return status;
         }));
     
     // Set original indices using LinearPass with window function
@@ -151,6 +151,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
                parent.size(), child.size());
     Table combined = CombineTable(parent, child, constraint, eid);
     DEBUG_INFO("Combined table has %zu entries", combined.size());
+    debug_dump_table(combined, "combined", "step1_combined", eid);
     
     // Step 2: Initialize temporary fields (local_cumsum = local_mult, local_interval = 0)
     DEBUG_INFO("Initializing temporary fields");
@@ -159,6 +160,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
             return ecall_transform_init_local_temps(eid, e);
         });
     DEBUG_INFO("Temporary fields initialized");
+    debug_dump_table(combined, "combined", "step2_init_temps", eid);
     
     // Step 3: Sort by join attribute and precedence
     DEBUG_INFO("Sorting combined table by join attribute");
@@ -167,6 +169,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
             return ecall_comparator_join_attr(eid, e1, e2);
         });
     DEBUG_INFO("Sort completed");
+    debug_dump_table(combined, "combined", "step3_sorted", eid);
     
     // Step 4: Compute local cumulative sums
     DEBUG_INFO("Computing local cumulative sums");
@@ -174,6 +177,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_window_compute_local_sum(eid, e1, e2);
         });
+    debug_dump_table(combined, "combined", "step4_cumsum", eid);
     
     // Step 5: Sort for pairwise processing (group START/END pairs)
     DEBUG_INFO("Sorting for pairwise processing");
@@ -181,6 +185,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_pairwise(eid, e1, e2);
         });
+    debug_dump_table(combined, "combined", "step5_pairwise", eid);
     
     // Step 6: Compute intervals between START/END pairs
     DEBUG_INFO("Computing intervals between START/END pairs");
@@ -188,6 +193,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_window_compute_local_interval(eid, e1, e2);
         });
+    debug_dump_table(combined, "combined", "step6_intervals", eid);
     
     // Step 7: Sort END entries first for final update
     DEBUG_INFO("Sorting END entries first");
@@ -195,6 +201,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_end_first(eid, e1, e2);
         });
+    debug_dump_table(combined, "combined", "step7_end_first", eid);
     
     // Step 8: Truncate to parent size - now we have END entries with computed intervals
     // The first parent.size() entries are now the END entries with computed intervals
@@ -205,15 +212,19 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     for (size_t i = 0; i < parent.size() && i < combined.size(); i++) {
         truncated.add_entry(combined[i]);
     }
+    debug_dump_table(truncated, "truncated", "step8_truncated", eid);
     
     // Step 9: Update parent multiplicities using parallel pass
     // This multiplies parent's local_mult by the computed interval from END entries
     DEBUG_INFO("Updating parent multiplicities");
+    debug_dump_table(parent, "parent_before", "step9a_parent_before", eid);
     truncated.parallel_pass(parent, eid,
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_update_target_multiplicity(eid, e1, e2);
+            // e1 is from truncated (source with intervals), e2 is from parent (target to update)
+            return ecall_update_target_multiplicity(eid, e2, e1);
         });
     DEBUG_INFO("Parent multiplicities updated");
+    debug_dump_table(parent, "parent_after", "step9b_parent_after", eid);
 }
 
 std::vector<JoinTreeNodePtr> BottomUpPhase::PostOrderTraversal(JoinTreeNodePtr root) {

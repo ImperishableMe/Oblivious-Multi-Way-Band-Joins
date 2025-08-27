@@ -40,6 +40,25 @@ static inline int32_t oblivious_sign(int32_t val) {
 }
 
 /**
+ * Helper: Adjust comparison result for SORT_PADDING entries
+ * SORT_PADDING entries always sort to the end (are "larger")
+ * Returns the final comparison result accounting for padding
+ */
+static inline int32_t adjust_for_padding(entry_t* e1, entry_t* e2, int32_t normal_result) {
+    // Check if entries are SORT_PADDING
+    int32_t is_padding1 = (e1->field_type == SORT_PADDING);
+    int32_t is_padding2 = (e2->field_type == SORT_PADDING);
+    
+    // If both are padding or both are not, use normal result
+    // If e1 is padding and e2 is not, e1 > e2 (return 1)
+    // If e2 is padding and e1 is not, e1 < e2 (return -1)
+    int32_t both_not_padding = (1 - is_padding1) & (1 - is_padding2);
+    
+    return both_not_padding * normal_result + 
+           (1 - both_not_padding) * (is_padding1 - is_padding2);
+}
+
+/**
  * Helper: Get precedence for entry type combination (Algorithm 513)
  * Precedence ordering ensures correct join semantics
  */
@@ -99,7 +118,10 @@ void comparator_join_attr(entry_t* e1, entry_t* e2) {
     int32_t prec_cmp = oblivious_sign(p1 - p2);
     
     // Combine: use join_attr comparison if not equal, else use precedence
-    int32_t result = (1 - is_equal) * cmp + is_equal * prec_cmp;
+    int32_t normal_result = (1 - is_equal) * cmp + is_equal * prec_cmp;
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
     
     // Swap if e1 > e2
     oblivious_swap(e1, e2, result > 0);
@@ -123,16 +145,19 @@ void comparator_pairwise(entry_t* e1, entry_t* e2) {
     // Priority 3: START before END for same index
     int32_t is_start1 = (e1->field_type == START);
     int32_t is_start2 = (e2->field_type == START);
-    int32_t start_first = is_start1 - is_start2;  // Negative if e1 is START (follows thesis exactly)
+    int32_t start_first = is_start2 - is_start1;  // Positive if e1 is START and e2 is END (need swap to put START first)
     
     // Check if priorities are equal at each level
     int32_t same_priority = (type_priority == 0);
     int32_t same_index = (idx_cmp == 0);
     
     // Combine priorities hierarchically
-    int32_t result = (1 - same_priority) * type_priority +
-                     same_priority * (1 - same_index) * idx_cmp +
-                     same_priority * same_index * start_first;
+    int32_t normal_result = (1 - same_priority) * type_priority +
+                           same_priority * (1 - same_index) * idx_cmp +
+                           same_priority * same_index * start_first;
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
     
     // Swap if e1 > e2
     oblivious_swap(e1, e2, result > 0);
@@ -157,7 +182,10 @@ void comparator_end_first(entry_t* e1, entry_t* e2) {
     int32_t same_type = (type_priority == 0);
     
     // Combine priorities
-    int32_t result = (1 - same_type) * type_priority + same_type * idx_cmp;
+    int32_t normal_result = (1 - same_type) * type_priority + same_type * idx_cmp;
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
     
     // Swap if e1 > e2
     oblivious_swap(e1, e2, result > 0);
@@ -179,7 +207,10 @@ void comparator_join_then_other(entry_t* e1, entry_t* e2) {
     int32_t idx_cmp = oblivious_sign(e1->original_index - e2->original_index);
     
     // Combine: use join_attr comparison if not equal, else use index
-    int32_t result = (1 - is_equal) * cmp + is_equal * idx_cmp;
+    int32_t normal_result = (1 - is_equal) * cmp + is_equal * idx_cmp;
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
     
     // Swap if e1 > e2
     oblivious_swap(e1, e2, result > 0);
@@ -191,7 +222,10 @@ void comparator_join_then_other(entry_t* e1, entry_t* e2) {
  */
 void comparator_original_index(entry_t* e1, entry_t* e2) {
     // Compare original indices
-    int32_t result = oblivious_sign(e1->original_index - e2->original_index);
+    int32_t normal_result = oblivious_sign(e1->original_index - e2->original_index);
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
     
     // Swap if e1 > e2
     oblivious_swap(e1, e2, result > 0);
@@ -203,8 +237,64 @@ void comparator_original_index(entry_t* e1, entry_t* e2) {
  */
 void comparator_alignment_key(entry_t* e1, entry_t* e2) {
     // Compare alignment keys
-    int32_t result = oblivious_sign(e1->alignment_key - e2->alignment_key);
+    int32_t normal_result = oblivious_sign(e1->alignment_key - e2->alignment_key);
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
     
     // Swap if e1 > e2
     oblivious_swap(e1, e2, result > 0);
 }
+
+/**
+ * Comparator to put DIST_PADDING entries last
+ * Sorts non-padding entries before padding entries
+ */
+void comparator_padding_last(entry_t* e1, entry_t* e2) {
+    // Check if entries are DIST_PADDING
+    int32_t is_padding1 = (e1->field_type == DIST_PADDING);
+    int32_t is_padding2 = (e2->field_type == DIST_PADDING);
+    
+    // Priority 1: Non-padding before padding
+    int32_t type_priority = is_padding1 - is_padding2;  // Positive if e1 is padding
+    
+    // Priority 2: By original index
+    int32_t idx_cmp = oblivious_sign(e1->original_index - e2->original_index);
+    
+    // Check if type priority is equal
+    int32_t same_type = (type_priority == 0);
+    
+    // Combine priorities
+    int32_t normal_result = (1 - same_type) * type_priority + same_type * idx_cmp;
+    
+    // Adjust for SORT_PADDING entries (different from DIST_PADDING)
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
+    
+    // Swap if e1 > e2
+    oblivious_swap(e1, e2, result > 0);
+}
+
+/**
+ * Comparator for distribution phase
+ * Checks if e1's dst_idx >= e2's index AND e1 is not DIST_PADDING
+ * Swaps content while preserving index
+ */
+void comparator_distribute(entry_t* e1, entry_t* e2, int32_t distance) {
+    // Check if we should swap: e1.dst_idx >= e2.index AND e1 is not DIST_PADDING
+    int32_t dst_condition = (e1->dst_idx >= e2->index);
+    int32_t not_padding = (e1->field_type != DIST_PADDING);
+    int32_t should_swap = dst_condition & not_padding;
+    
+    // Perform oblivious swap of content while preserving index field
+    // Save original indices
+    int32_t idx1 = e1->index;
+    int32_t idx2 = e2->index;
+    
+    // Swap entire entries
+    oblivious_swap(e1, e2, should_swap);
+    
+    // Restore original indices (always, obliviously)
+    e1->index = idx1;
+    e2->index = idx2;
+}
+

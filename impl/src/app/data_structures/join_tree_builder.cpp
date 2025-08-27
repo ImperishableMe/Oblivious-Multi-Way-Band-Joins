@@ -73,16 +73,16 @@ void JoinTreeBuilder::build_tree_recursive(
         }
         
         // Find constraint between current node and connected table
-        auto constraint_opt = find_constraint_between(
+        JoinConstraint constraint;
+        bool found = find_constraint_between(
             node->get_table_name(), 
             connected_table, 
-            constraints);
+            constraints,
+            constraint);
         
-        if (!constraint_opt.has_value()) {
+        if (!found) {
             continue;  // No direct constraint found
         }
-        
-        JoinConstraint constraint = constraint_opt.value();
         
         // Ensure constraint is from child's perspective (child is source)
         // If current node's table is the source, reverse the constraint
@@ -115,20 +115,22 @@ void JoinTreeBuilder::build_tree_recursive(
     }
 }
 
-std::optional<JoinConstraint> JoinTreeBuilder::find_constraint_between(
+bool JoinTreeBuilder::find_constraint_between(
     const std::string& table1,
     const std::string& table2,
-    const std::vector<JoinConstraint>& constraints) {
+    const std::vector<JoinConstraint>& constraints,
+    JoinConstraint& result) {
     
     for (const auto& constraint : constraints) {
         // Check if this constraint connects the two tables
         if ((constraint.get_source_table() == table1 && constraint.get_target_table() == table2) ||
             (constraint.get_source_table() == table2 && constraint.get_target_table() == table1)) {
-            return constraint;
+            result = constraint;
+            return true;
         }
     }
     
-    return std::nullopt;
+    return false;
 }
 
 std::vector<std::string> JoinTreeBuilder::get_connected_tables(

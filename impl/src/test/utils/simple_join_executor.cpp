@@ -150,7 +150,7 @@ Entry SimpleJoinExecutor::concatenate_entries(
     }
     
     // Set other properties
-    result.set_is_encrypted(false);  // Result is decrypted
+    result.is_encrypted = false;  // Result is decrypted
     
     return result;
 }
@@ -178,7 +178,7 @@ int32_t SimpleJoinExecutor::get_column_value(const Entry& entry, const std::stri
 }
 
 Entry SimpleJoinExecutor::decrypt_if_needed(const Entry& entry) {
-    if (!entry.get_is_encrypted()) {
+    if (!entry.is_encrypted) {
         return entry;  // Already decrypted
     }
     
@@ -193,7 +193,7 @@ Entry SimpleJoinExecutor::decrypt_if_needed(const Entry& entry) {
         }
     } else {
         // Fallback: just mark as decrypted for testing without SGX
-        decrypted.set_is_encrypted(false);
+        decrypted.is_encrypted = false;
     }
     
     return decrypted;

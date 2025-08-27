@@ -7,6 +7,7 @@
 #include "../../app/data_structures/join_tree_node.h"
 #include "../../app/io/table_io.h"
 #include "../../common/constants.h"
+#include "../../common/debug_util.h"
 #include "sgx_urts.h"
 
 #define ENCLAVE_FILENAME "enclave.signed.so"
@@ -15,6 +16,9 @@ class DistributeExpandTest {
 public:
     bool RunStandaloneTest(sgx_enclave_id_t eid) {
         std::cout << "\n=== Testing Distribute-Expand Phase ===" << std::endl;
+        
+        // Initialize debug session
+        debug_init_session("distribute_expand_test");
         
         // Create a test table with known multiplicities
         Table test_table;
@@ -76,6 +80,7 @@ public:
         if (expanded.size() != expected_size) {
             std::cerr << "ERROR: Expected size " << expected_size 
                      << " but got " << expanded.size() << std::endl;
+            debug_close_session();
             return false;
         }
         
@@ -120,15 +125,25 @@ public:
             std::cout << "\n✗ Distribute-expand test failed!" << std::endl;
         }
         
+        debug_close_session();
         return success;
     }
     
     bool RunIntegrationTest(const std::string& query_file, 
                            const std::string& data_dir,
                            sgx_enclave_id_t eid) {
+        // Initialize debug session with query file name
+        size_t last_slash = query_file.find_last_of("/");
+        std::string test_name = (last_slash != std::string::npos) 
+                                ? query_file.substr(last_slash + 1) 
+                                : query_file;
+        debug_init_session(("distribute_expand_" + test_name).c_str());
+        
         // This would run the full pipeline including distribute-expand
         // For now, just return true as placeholder
         std::cout << "\nIntegration test not yet implemented" << std::endl;
+        
+        debug_close_session();
         return true;
     }
 };

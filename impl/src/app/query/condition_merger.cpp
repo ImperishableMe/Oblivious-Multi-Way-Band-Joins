@@ -1,13 +1,14 @@
 #include "condition_merger.h"
 #include <algorithm>
 
-std::optional<JoinConstraint> ConditionMerger::merge(
+bool ConditionMerger::merge(
     const JoinConstraint& c1,
-    const JoinConstraint& c2) {
+    const JoinConstraint& c2,
+    JoinConstraint& result) {
     
     // Check if conditions can be merged
     if (!can_merge(c1, c2)) {
-        return std::nullopt;
+        return false;
     }
     
     // Extract bounds from both conditions
@@ -48,11 +49,11 @@ std::optional<JoinConstraint> ConditionMerger::merge(
     
     // Check if resulting range is valid
     if (!is_valid_range(new_dev1, new_eq1, new_dev2, new_eq2)) {
-        return std::nullopt;  // Empty intersection
+        return false;  // Empty intersection
     }
     
     // Create merged constraint
-    return JoinConstraint(
+    result = JoinConstraint(
         c1.get_source_table(),
         c1.get_source_column(),
         c1.get_target_table(),
@@ -60,6 +61,8 @@ std::optional<JoinConstraint> ConditionMerger::merge(
         new_dev1, new_eq1,
         new_dev2, new_eq2
     );
+    
+    return true;
 }
 
 bool ConditionMerger::can_merge(const JoinConstraint& c1, const JoinConstraint& c2) {

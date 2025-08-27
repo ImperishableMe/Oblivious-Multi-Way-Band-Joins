@@ -20,7 +20,9 @@ Entry::Entry()
       foreign_interval(0), 
       local_weight(0),
       copy_index(0), 
-      alignment_key(0) {
+      alignment_key(0),
+      dst_idx(0),
+      index(0) {
 }
 
 Entry::Entry(const entry_t& c_entry) {
@@ -52,6 +54,8 @@ entry_t Entry::to_entry_t() const {
     result.local_weight = local_weight;
     result.copy_index = copy_index;
     result.alignment_key = alignment_key;
+    result.dst_idx = dst_idx;
+    result.index = index;
     
     // Copy attributes (up to MAX_ATTRIBUTES)
     size_t attr_count = std::min(attributes.size(), (size_t)MAX_ATTRIBUTES);
@@ -90,6 +94,8 @@ void Entry::from_entry_t(const entry_t& c_entry) {
     local_weight = c_entry.local_weight;
     copy_index = c_entry.copy_index;
     alignment_key = c_entry.alignment_key;
+    dst_idx = c_entry.dst_idx;
+    index = c_entry.index;
     
     // Clear and copy column names first to determine actual column count
     column_names.clear();

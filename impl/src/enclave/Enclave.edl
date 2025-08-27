@@ -7,8 +7,8 @@ enclave {
     trusted {
         /* Transform functions for Map operations */
         
-        // Initialize leaf multiplicities (set local_mult = 1)
-        public void ecall_transform_initialize_leaf([in,out] entry_t* entry);
+        // Set local_mult = 1 (for initializing all tables in bottom-up phase)
+        public void ecall_transform_set_local_mult_one([in,out] entry_t* entry);
         
         // Add metadata columns with null placeholders
         public void ecall_transform_add_metadata([in,out] entry_t* entry);
@@ -18,6 +18,12 @@ enclave {
         
         // Initialize temporary fields for bottom-up computation
         public void ecall_transform_init_local_temps([in,out] entry_t* entry);
+        
+        // Initialize final_mult from local_mult (for root in top-down)
+        public void ecall_transform_init_final_mult([in,out] entry_t* entry);
+        
+        // Initialize foreign temporary fields for top-down
+        public void ecall_transform_init_foreign_temps([in,out] entry_t* entry);
         
         // Create SOURCE entry from source table tuple
         public void ecall_transform_to_source([in,out] entry_t* entry);
@@ -32,8 +38,8 @@ enclave {
                                            int32_t deviation,
                                            equality_type_t equality);
         
-        // Set entry as EMPTY (for padding in oblivious operations)
-        public void ecall_transform_set_empty([in,out] entry_t* entry);
+        // Set entry as SORT_PADDING (for padding in bitonic sort)
+        public void ecall_transform_set_sort_padding([in,out] entry_t* entry);
         
         /* Window functions for multiplicity computation */
         
@@ -51,6 +57,7 @@ enclave {
         
         // Top-down phase: compute foreign multiplicity from cumulative sums
         public void ecall_window_compute_foreign_interval([in,out] entry_t* e1, [in,out] entry_t* e2);
+        public void ecall_window_propagate_foreign_interval([in,out] entry_t* e1, [in,out] entry_t* e2);
         
         // Bottom-up parallel: multiply local_mult by computed interval
         public void ecall_update_target_multiplicity([in,out] entry_t* e1, [in,out] entry_t* e2);
@@ -77,6 +84,51 @@ enclave {
         
         // Sort by alignment_key field
         public void ecall_comparator_alignment_key([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        /* Distribute-expand phase functions */
+        
+        // Initialize destination index to 0
+        public void ecall_transform_init_dst_idx([in,out] entry_t* entry);
+        
+        // Initialize index field to 0
+        public void ecall_transform_init_index([in,out] entry_t* entry);
+        
+        // Mark entries with final_mult=0 as DIST_PADDING
+        public void ecall_transform_mark_zero_mult_padding([in,out] entry_t* entry);
+        
+        // Create a distribution padding entry
+        public void ecall_transform_create_dist_padding([in,out] entry_t* entry);
+        
+        // Compute destination index as cumulative sum
+        public void ecall_window_compute_dst_idx([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Increment index field
+        public void ecall_window_increment_index([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Expand by copying to fill padding
+        public void ecall_window_expand_copy([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Sort padding entries to end
+        public void ecall_comparator_padding_last([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Distribute comparator for variable-distance passes
+        public void ecall_comparator_distribute([in,out] entry_t* e1, [in,out] entry_t* e2, int32_t distance);
+        
+        // ============================================================================
+        // Align-Concat Phase Functions
+        // ============================================================================
+        
+        // Initialize copy index to 0
+        public void ecall_transform_init_copy_index([in,out] entry_t* entry);
+        
+        // Compute alignment key = foreign_sum + (copy_index / local_mult)
+        public void ecall_transform_compute_alignment_key([in,out] entry_t* entry);
+        
+        // Update copy index based on original_index comparison
+        public void ecall_window_update_copy_index([in,out] entry_t* e1, [in,out] entry_t* e2);
+        
+        // Get output size from last entry
+        public void ecall_obtain_output_size([out] int32_t* retval, [in] const entry_t* entry);
         
         /* AES-CTR Encryption/Decryption functions */
         /* The encryption key is stored securely inside the enclave and never exposed */

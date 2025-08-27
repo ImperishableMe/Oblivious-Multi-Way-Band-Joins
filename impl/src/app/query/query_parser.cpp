@@ -99,10 +99,11 @@ void QueryParser::parse_where(ParsedQuery& query) {
     
     for (const auto& raw_cond : raw_conditions) {
         // Try to parse as join condition
-        auto join_opt = InequalityParser::parse(raw_cond);
+        JoinConstraint join_constraint;
+        bool is_join = InequalityParser::parse(raw_cond, join_constraint);
         
-        if (join_opt.has_value()) {
-            all_join_conditions.push_back(join_opt.value());
+        if (is_join) {
+            all_join_conditions.push_back(join_constraint);
         } else {
             // Not a join condition, treat as filter
             query.filter_conditions.push_back(raw_cond);
@@ -165,9 +166,10 @@ void QueryParser::merge_join_conditions(std::vector<JoinConstraint>& conditions)
             processed_indices.insert(indices[0]);
             
             for (size_t i = 1; i < indices.size(); i++) {
-                auto merge_result = ConditionMerger::merge(merged, conditions[indices[i]]);
-                if (merge_result.has_value()) {
-                    merged = merge_result.value();
+                JoinConstraint merge_result;
+                bool can_merge = ConditionMerger::merge(merged, conditions[indices[i]], merge_result);
+                if (can_merge) {
+                    merged = merge_result;
                     processed_indices.insert(indices[i]);
                 } else {
                     // Can't merge (conflicting conditions), keep separate

@@ -3,7 +3,6 @@
 
 #include "../data_structures/join_constraint.h"
 #include <string>
-#include <optional>
 #include <vector>
 #include <regex>
 
@@ -24,9 +23,9 @@ class InequalityParser {
 public:
     /**
      * Parse a single inequality condition from SQL WHERE clause
-     * Returns nullopt if the condition is not a valid join condition
+     * Returns true if successful, false if not a valid join condition
      */
-    static std::optional<JoinConstraint> parse(const std::string& condition);
+    static bool parse(const std::string& condition, JoinConstraint& result);
     
     /**
      * Check if a condition is a join condition (involves two tables)

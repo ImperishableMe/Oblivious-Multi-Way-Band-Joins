@@ -4,7 +4,7 @@
 
 uint32_t SubtreeVerifier::GetLocalMult(Entry entry, sgx_enclave_id_t eid) {
     // Decrypt if needed (test code can decrypt)
-    if (entry.get_is_encrypted()) {
+    if (entry.is_encrypted) {
         crypto_status_t status = CryptoUtils::decrypt_entry(entry, eid);
         if (status != CRYPTO_SUCCESS) {
             throw std::runtime_error("Failed to decrypt entry for verification");
@@ -16,7 +16,7 @@ uint32_t SubtreeVerifier::GetLocalMult(Entry entry, sgx_enclave_id_t eid) {
 
 uint32_t SubtreeVerifier::GetOriginalIndex(Entry entry, sgx_enclave_id_t eid) {
     // Decrypt if needed
-    if (entry.get_is_encrypted()) {
+    if (entry.is_encrypted) {
         crypto_status_t status = CryptoUtils::decrypt_entry(entry, eid);
         if (status != CRYPTO_SUCCESS) {
             throw std::runtime_error("Failed to decrypt entry for verification");
@@ -79,7 +79,7 @@ std::map<uint32_t, uint32_t> SubtreeVerifier::ComputeExpectedMultiplicities(
             Entry orig = node_table[i];
             
             // Decrypt original to compare attributes
-            if (orig.get_is_encrypted()) {
+            if (orig.is_encrypted) {
                 CryptoUtils::decrypt_entry(orig, eid);
             }
             

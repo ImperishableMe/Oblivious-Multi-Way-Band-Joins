@@ -1,9 +1,18 @@
 #include <iostream>
-#include <cstring>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <string>
+#include <map>
+#include <dirent.h>
 #include "sgx_urts.h"
 #include "Enclave_u.h"
-#include "crypto/crypto_utils.h"
-#include "data_structures/types.h"
+#include "algorithms/oblivious_join.h"
+#include "data_structures/join_tree_node.h"
+#include "data_structures/join_tree_builder.h"
+#include "query/query_parser.h"
+#include "io/table_io.h"
+#include "../common/debug_util.h"
 
 /* Global enclave ID */
 sgx_enclave_id_t global_eid = 0;
@@ -19,7 +28,7 @@ int initialize_enclave() {
         return -1;
     }
     
-    std::cout << "Enclave created successfully. ID: " << global_eid << std::endl;
+    std::cout << "SGX Enclave initialized (ID: " << global_eid << ")" << std::endl;
     return 0;
 }
 
@@ -27,65 +36,130 @@ int initialize_enclave() {
 void destroy_enclave() {
     if (global_eid != 0) {
         sgx_destroy_enclave(global_eid);
-        std::cout << "Enclave destroyed." << std::endl;
+        std::cout << "SGX Enclave destroyed" << std::endl;
     }
 }
 
-/* Simple test function */
-void test_encryption() {
-    std::cout << "\n=== Testing Encryption through SGX ===" << std::endl;
-    
-    Entry entry;
-    entry.original_index = 42;
-    entry.local_mult = 100;
-    entry.join_attr = 3.14159;
-    entry.is_encrypted = false;
-    entry.field_type = SOURCE;
-    entry.equality_type = EQ;
-    
-    // Add some test data
-    for (int i = 0; i < 5; i++) {
-        entry.attributes.push_back(i * 1.5);
-        entry.column_names.push_back("col" + std::to_string(i));
+/* Parse SQL query from file and build join tree */
+JoinTreeNodePtr parse_sql_query(const std::string& query_file, 
+                                const std::map<std::string, Table>& tables) {
+    // Read SQL query from file
+    std::ifstream file(query_file);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open query file: " + query_file);
     }
     
-    // Test encryption (key is now stored securely in enclave)
-    std::cout << "Original index: " << entry.original_index << std::endl;
-    crypto_status_t status = CryptoUtils::encrypt_entry(entry, global_eid);
-    if (status == CRYPTO_SUCCESS) {
-        std::cout << "Encryption successful. Encrypted index: " << entry.original_index << std::endl;
-    } else {
-        std::cerr << "Encryption failed with status: " << status << std::endl;
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string sql_query = buffer.str();
+    file.close();
+    
+    std::cout << "\nSQL Query:\n" << sql_query << std::endl;
+    
+    // Parse SQL query
+    QueryParser parser;
+    ParsedQuery parsed_query = parser.parse(sql_query);
+    
+    std::cout << "\nParsed query:" << std::endl;
+    std::cout << "  Tables: ";
+    for (const auto& table : parsed_query.tables) {
+        std::cout << table << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "  Join conditions: " << parsed_query.join_conditions.size() << std::endl;
+    
+    // Build join tree from parsed query
+    JoinTreeBuilder builder;
+    JoinTreeNodePtr root = builder.build_from_query(parsed_query, tables);
+    
+    if (!root) {
+        throw std::runtime_error("Failed to build join tree from query");
     }
     
-    // Test decryption
-    status = CryptoUtils::decrypt_entry(entry, global_eid);
-    if (status == CRYPTO_SUCCESS) {
-        std::cout << "Decryption successful. Decrypted index: " << entry.original_index << std::endl;
-    } else {
-        std::cerr << "Decryption failed with status: " << status << std::endl;
-    }
+    return root;
+}
+
+/* Print usage information */
+void print_usage(const char* program_name) {
+    std::cout << "Usage: " << program_name << " <input_dir> <query_file> <output_file>" << std::endl;
+    std::cout << "  input_dir   : Directory containing encrypted CSV table files" << std::endl;
+    std::cout << "  query_file  : SQL query file (.sql)" << std::endl;
+    std::cout << "  output_file : Output file for encrypted join result" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "SGX Encryption Test Application" << std::endl;
-    std::cout << "================================" << std::endl;
-    
-    /* Initialize the enclave */
-    if (initialize_enclave() < 0) {
-        std::cerr << "Enclave initialization failed!" << std::endl;
-        return -1;
+    if (argc != 4) {
+        print_usage(argv[0]);
+        return 1;
     }
     
-    /* Run test if requested */
-    if (argc > 1 && strcmp(argv[1], "test") == 0) {
-        test_encryption();
-    } else {
-        std::cout << "Enclave ready. Use './sgx_app test' to run encryption test." << std::endl;
+    std::string input_dir = argv[1];
+    std::string query_file = argv[2];
+    std::string output_file = argv[3];
+    
+    std::cout << "\n=== SGX Oblivious Join ===" << std::endl;
+    std::cout << "Input directory: " << input_dir << std::endl;
+    std::cout << "Query file: " << query_file << std::endl;
+    std::cout << "Output file: " << output_file << std::endl;
+    
+    try {
+        // Initialize the enclave
+        if (initialize_enclave() < 0) {
+            std::cerr << "Enclave initialization failed!" << std::endl;
+            return -1;
+        }
+        
+        // Load all CSV files from input directory
+        std::cout << "\nLoading encrypted tables..." << std::endl;
+        std::map<std::string, Table> tables;
+        
+        DIR* dir = opendir(input_dir.c_str());
+        if (!dir) {
+            throw std::runtime_error("Cannot open input directory: " + input_dir);
+        }
+        
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            std::string filename = entry->d_name;
+            if (filename.size() > 4 && filename.substr(filename.size() - 4) == ".csv") {
+                std::string filepath = input_dir + "/" + filename;
+                std::string table_name = filename.substr(0, filename.size() - 4);
+                
+                std::cout << "  Loading " << filename << "..." << std::endl;
+                Table table = TableIO::load_csv(filepath);
+                table.set_table_name(table_name);
+                tables[table_name] = table;
+                std::cout << "    " << table.size() << " rows loaded" << std::endl;
+            }
+        }
+        closedir(dir);
+        
+        if (tables.empty()) {
+            throw std::runtime_error("No CSV files found in input directory");
+        }
+        
+        // Parse SQL query and build join tree
+        std::cout << "\nParsing SQL query..." << std::endl;
+        JoinTreeNodePtr join_tree = parse_sql_query(query_file, tables);
+        
+        // Execute oblivious join
+        std::cout << "\nExecuting oblivious join..." << std::endl;
+        Table result = ObliviousJoin::Execute(join_tree, global_eid);
+        
+        // Save result
+        std::cout << "\nSaving result to " << output_file << "..." << std::endl;
+        TableIO::save_csv(result, output_file);
+        std::cout << "Result saved (" << result.size() << " rows)" << std::endl;
+        
+        // Cleanup
+        destroy_enclave();
+        
+        std::cout << "\n=== Join Complete ===" << std::endl;
+        return 0;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        destroy_enclave();
+        return 1;
     }
-    
-    /* Destroy the enclave */
-    destroy_enclave();
-    
-    return 0;
 }

@@ -22,7 +22,7 @@
 // Entry structure for enclave processing
 typedef struct {
     // Entry metadata
-    entry_type_t field_type;      // EMPTY, SOURCE, START, END, TARGET
+    entry_type_t field_type;      // SORT_PADDING, SOURCE, START, END, TARGET, DIST_PADDING
     equality_type_t equality_type; // EQ, NEQ, NONE
     uint8_t is_encrypted;         // Whether data is encrypted (0 or 1)
     
@@ -48,6 +48,10 @@ typedef struct {
     // Expansion metadata
     int32_t copy_index;          // Which copy of the tuple (0 to final_mult-1)
     int32_t alignment_key;       // Key for alignment phase
+    
+    // Distribution fields
+    int32_t dst_idx;             // Destination index for distribution
+    int32_t index;               // Current position (0 to output_size-1)
     
     // Data attributes (all integers for our use case)
     int32_t attributes[MAX_ATTRIBUTES];

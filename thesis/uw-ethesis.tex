@@ -261,6 +261,68 @@ type=symbols,
 description={Number of tables in the multi-way join}
 }
 
+% ------------------------------------------------------------------------------
+% Tree Notation Symbols
+% ------------------------------------------------------------------------------
+\newglossaryentry{jointree}
+{
+name={$T = (V, E)$},
+sort={T},
+type=symbols,
+description={Join tree with table nodes $V$ and join edges $E$}
+}
+
+\newglossaryentry{treetotal}
+{
+name={$\mathcal{T}$},
+sort={T-cal},
+type=symbols,
+description={The entire join tree}
+}
+
+\newglossaryentry{subtree}
+{
+name={$\mathcal{T}_v$},
+sort={T-v},
+type=symbols,
+description={Subtree rooted at node $v$}
+}
+
+\newglossaryentry{subtreeminus}
+{
+name={$\mathcal{T}_v^{-}$},
+sort={T-v-minus},
+type=symbols,
+description={Subtree rooted at $v$ excluding $v$ itself}
+}
+
+\newglossaryentry{treeexclude}
+{
+name={$\mathcal{T} \setminus \mathcal{T}_c$},
+sort={T-exclude},
+type=symbols,
+description={Tree excluding subtree rooted at $c$}
+}
+
+% ------------------------------------------------------------------------------
+% Additional Field Accessors
+% ------------------------------------------------------------------------------
+\newglossaryentry{foreignsum}
+{
+name={$F_{\text{sum}}$},
+sort={F-sum},
+type=symbols,
+description={Foreign multiplicity sum: index position for alignment}
+}
+
+\newglossaryentry{localweight}
+{
+name={$w_{\text{local}}$},
+sort={w-local},
+type=symbols,
+description={Local weight counter: tracks sum of matching tuples' multiplicities}
+}
+
 %======================================================================
 %   L O G I C A L    D O C U M E N T
 % The logical document contains the main content of your thesis.

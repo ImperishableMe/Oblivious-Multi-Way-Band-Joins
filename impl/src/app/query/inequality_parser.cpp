@@ -155,9 +155,9 @@ JoinConstraint InequalityParser::operator_to_constraint(
     return JoinConstraint::equality(left_table, left_column, right_table, right_column);
 }
 
-std::optional<JoinConstraint> InequalityParser::parse(const std::string& condition) {
+bool InequalityParser::parse(const std::string& condition, JoinConstraint& result) {
     if (!is_join_condition(condition)) {
-        return std::nullopt;
+        return false;
     }
     
     std::string trimmed = trim(condition);
@@ -180,7 +180,7 @@ std::optional<JoinConstraint> InequalityParser::parse(const std::string& conditi
     
     if (op_pos == std::string::npos) {
         // No operator found
-        return std::nullopt;
+        return false;
     }
     
     // Split into left and right parts
@@ -190,7 +190,7 @@ std::optional<JoinConstraint> InequalityParser::parse(const std::string& conditi
     // Parse left side (should be table.column)
     auto [left_table, left_column] = parse_qualified_name(left_part);
     if (left_table.empty() || left_column.empty()) {
-        return std::nullopt;
+        return false;
     }
     
     // Parse right side (table.column [+/- value])
@@ -221,18 +221,18 @@ std::optional<JoinConstraint> InequalityParser::parse(const std::string& conditi
     
     auto [right_table, right_column] = parse_qualified_name(right_qualified);
     if (right_table.empty() || right_column.empty()) {
-        return std::nullopt;
+        return false;
     }
     
     // Parse deviation from the right part
     int32_t deviation = parse_deviation(right_part);
     
     // Create the constraint based on the operator
-    JoinConstraint constraint = operator_to_constraint(
+    result = operator_to_constraint(
         left_table, left_column,
         right_table, right_column,
         op, deviation
     );
     
-    return constraint;
+    return true;
 }

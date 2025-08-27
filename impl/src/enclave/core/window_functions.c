@@ -242,6 +242,14 @@ static void expand_copy_op(entry_t* e1, entry_t* e2) {
         e2->attributes[i] = is_padding * e1->attributes[i] + (1 - is_padding) * e2->attributes[i];
     }
     
+    // Copy column names obliviously
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        for (int j = 0; j < MAX_COLUMN_NAME_LEN; j++) {
+            e2->column_names[i][j] = is_padding * e1->column_names[i][j] + 
+                                     (1 - is_padding) * e2->column_names[i][j];
+        }
+    }
+    
     // Restore e2's index
     e2->index = saved_index;
     
@@ -253,4 +261,25 @@ static void expand_copy_op(entry_t* e1, entry_t* e2) {
 
 void window_expand_copy(entry_t* e1, entry_t* e2) {
     apply_to_decrypted_pair(e1, e2, expand_copy_op);
+}
+
+// ============================================================================
+// Align-Concat Window Functions
+// ============================================================================
+
+/**
+ * Update copy index based on original index
+ * If same original index, increment from previous
+ * If different, reset to 0
+ */
+static void update_copy_index_op(entry_t* e1, entry_t* e2) {
+    // Check if same original tuple (obliviously)
+    int is_same = (e1->original_index == e2->original_index);
+    
+    // If same, increment; if different, reset to 0
+    e2->copy_index = is_same * (e1->copy_index + 1) + (1 - is_same) * 0;
+}
+
+void window_update_copy_index(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, update_copy_index_op);
 }

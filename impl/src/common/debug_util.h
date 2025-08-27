@@ -20,6 +20,29 @@
     #endif
 #endif
 
+// Debug output configuration
+#define DEBUG_OUTPUT_CONSOLE 0
+#define DEBUG_OUTPUT_FILE    1
+#define DEBUG_OUTPUT_BOTH    2
+
+// Default to console output
+#ifndef DEBUG_OUTPUT_MODE
+    #define DEBUG_OUTPUT_MODE DEBUG_OUTPUT_FILE
+#endif
+
+// Table dumping configuration
+#ifndef DEBUG_DUMP_TABLES
+    #define DEBUG_DUMP_TABLES 1  // Enable table dumping by default in debug mode
+#endif
+
+// Debug format for table output
+#define DEBUG_FORMAT_CSV  0
+#define DEBUG_FORMAT_JSON 1
+
+#ifndef DEBUG_TABLE_FORMAT
+    #define DEBUG_TABLE_FORMAT DEBUG_FORMAT_CSV
+#endif
+
 // Function declarations based on environment
 #ifdef ENCLAVE_BUILD
     // Enclave environment - will use ocall
@@ -101,6 +124,12 @@
     #define DEBUG_HEX_DUMP(label, data, len) ((void)0)
 #endif
 
+// Forward declarations for table debugging
+#ifdef __cplusplus
+class Table;
+void debug_dump_table(const Table& table, const char* table_name, const char* phase = nullptr);
+#endif
+
 // Level to string conversion for output
 static inline const char* debug_level_str(uint32_t level) {
     switch(level) {
@@ -112,5 +141,36 @@ static inline const char* debug_level_str(uint32_t level) {
         default: return "UNKN ";
     }
 }
+
+// Table dumping support (only in app environment)
+#ifndef ENCLAVE_BUILD
+#ifdef __cplusplus
+
+// Forward declarations
+class Table;
+class Entry;
+
+// Debug session management
+void debug_init_session(const char* session_name);
+void debug_close_session();
+
+// Table dumping functions
+void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid);
+void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid);
+
+// File output functions
+void debug_to_file(const char* filename, const char* content);
+void debug_append_to_file(const char* filename, const char* content);
+
+// Convenience macro for table dumping
+#if DEBUG_LEVEL >= DEBUG_LEVEL_DEBUG && DEBUG_DUMP_TABLES
+    #define DEBUG_TABLE(table, label, step) \
+        debug_dump_table(table, label, step, global_eid)
+#else
+    #define DEBUG_TABLE(table, label, step) ((void)0)
+#endif
+
+#endif // __cplusplus
+#endif // !ENCLAVE_BUILD
 
 #endif // DEBUG_UTIL_H

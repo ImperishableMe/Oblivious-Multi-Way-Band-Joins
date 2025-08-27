@@ -27,8 +27,8 @@ crypto_status_t ecall_decrypt_entry(entry_t* entry) {
  * Transform Function Ecall Implementations
  */
 
-void ecall_transform_initialize_leaf(entry_t* entry) {
-    transform_initialize_leaf(entry);
+void ecall_transform_set_local_mult_one(entry_t* entry) {
+    transform_set_local_mult_one(entry);
 }
 
 void ecall_transform_add_metadata(entry_t* entry) {
@@ -43,6 +43,14 @@ void ecall_transform_init_local_temps(entry_t* entry) {
     transform_init_local_temps(entry);
 }
 
+void ecall_transform_init_final_mult(entry_t* entry) {
+    transform_init_final_mult(entry);
+}
+
+void ecall_transform_init_foreign_temps(entry_t* entry) {
+    transform_init_foreign_temps(entry);
+}
+
 void ecall_transform_to_source(entry_t* entry) {
     transform_to_source(entry);
 }
@@ -55,8 +63,8 @@ void ecall_transform_to_end(entry_t* entry, int32_t deviation, equality_type_t e
     transform_to_end(entry, deviation, equality);
 }
 
-void ecall_transform_set_empty(entry_t* entry) {
-    transform_set_empty(entry);
+void ecall_transform_set_sort_padding(entry_t* entry) {
+    transform_set_sort_padding(entry);
 }
 
 /**
@@ -81,6 +89,10 @@ void ecall_window_compute_foreign_sum(entry_t* e1, entry_t* e2) {
 
 void ecall_window_compute_foreign_interval(entry_t* e1, entry_t* e2) {
     window_compute_foreign_interval(e1, e2);
+}
+
+void ecall_window_propagate_foreign_interval(entry_t* e1, entry_t* e2) {
+    window_propagate_foreign_interval(e1, e2);
 }
 
 void ecall_update_target_multiplicity(entry_t* e1, entry_t* e2) {
@@ -117,4 +129,62 @@ void ecall_comparator_original_index(entry_t* e1, entry_t* e2) {
 
 void ecall_comparator_alignment_key(entry_t* e1, entry_t* e2) {
     comparator_alignment_key(e1, e2);
+}
+
+// Distribute-expand phase functions
+
+void ecall_transform_init_dst_idx(entry_t* entry) {
+    transform_init_dst_idx(entry);
+}
+
+void ecall_transform_init_index(entry_t* entry) {
+    transform_init_index(entry);
+}
+
+void ecall_transform_mark_zero_mult_padding(entry_t* entry) {
+    transform_mark_zero_mult_padding(entry);
+}
+
+void ecall_transform_create_dist_padding(entry_t* entry) {
+    transform_create_dist_padding(entry);
+}
+
+void ecall_window_compute_dst_idx(entry_t* e1, entry_t* e2) {
+    window_compute_dst_idx(e1, e2);
+}
+
+void ecall_window_increment_index(entry_t* e1, entry_t* e2) {
+    window_increment_index(e1, e2);
+}
+
+void ecall_window_expand_copy(entry_t* e1, entry_t* e2) {
+    window_expand_copy(e1, e2);
+}
+
+void ecall_comparator_padding_last(entry_t* e1, entry_t* e2) {
+    comparator_padding_last(e1, e2);
+}
+
+void ecall_comparator_distribute(entry_t* e1, entry_t* e2, int32_t distance) {
+    comparator_distribute(e1, e2, distance);
+}
+
+void ecall_obtain_output_size(int32_t* retval, const entry_t* entry) {
+    *retval = obtain_output_size(entry);
+}
+
+// ============================================================================
+// Align-Concat Phase ECalls
+// ============================================================================
+
+void ecall_transform_init_copy_index(entry_t* entry) {
+    transform_init_copy_index(entry);
+}
+
+void ecall_transform_compute_alignment_key(entry_t* entry) {
+    transform_compute_alignment_key(entry);
+}
+
+void ecall_window_update_copy_index(entry_t* e1, entry_t* e2) {
+    window_update_copy_index(e1, e2);
 }

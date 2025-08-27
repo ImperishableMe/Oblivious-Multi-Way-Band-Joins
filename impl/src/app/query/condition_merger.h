@@ -2,7 +2,6 @@
 #define CONDITION_MERGER_H
 
 #include "../data_structures/join_constraint.h"
-#include <optional>
 #include <string>
 
 /**
@@ -27,9 +26,10 @@ public:
      * - Upper bound = min(c1.upper, c2.upper)
      * - For equal deviations, use stricter equality (NEQ > EQ)
      */
-    static std::optional<JoinConstraint> merge(
+    static bool merge(
         const JoinConstraint& c1,
-        const JoinConstraint& c2);
+        const JoinConstraint& c2,
+        JoinConstraint& result);
     
     /**
      * Check if two conditions can be merged (same tables and columns)

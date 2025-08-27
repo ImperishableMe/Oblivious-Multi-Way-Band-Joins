@@ -6,7 +6,6 @@
 #include <vector>
 #include <string>
 #include <set>
-#include <optional>
 #include "../query/parsed_query.h"
 #include "join_tree_node.h"
 #include "types.h"
@@ -27,11 +26,13 @@ class JoinTreeBuilder {
 private:
     /**
      * Find which join constraint connects two tables
+     * Returns true if found, false otherwise
      */
-    std::optional<JoinConstraint> find_constraint_between(
+    bool find_constraint_between(
         const std::string& table1,
         const std::string& table2,
-        const std::vector<JoinConstraint>& constraints);
+        const std::vector<JoinConstraint>& constraints,
+        JoinConstraint& result);
     
     /**
      * Build tree recursively from a node

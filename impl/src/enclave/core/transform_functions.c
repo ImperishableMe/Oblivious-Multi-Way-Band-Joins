@@ -17,17 +17,16 @@ static equality_type_t g_equality;
 static uint32_t g_index;
 
 // Operation functions for transforms
-static void initialize_leaf_op(entry_t* entry) {
+static void set_local_mult_one_op(entry_t* entry) {
     entry->local_mult = 1;
     entry->final_mult = 0;  // Initialize to 0
 }
 
 /**
- * Initialize leaf multiplicities
- * Sets local_mult = 1 for leaf nodes in the join tree
+ * Set local_mult = 1 for all tables in bottom-up phase initialization
  */
-void transform_initialize_leaf(entry_t* entry) {
-    apply_to_decrypted_entry(entry, initialize_leaf_op);
+void transform_set_local_mult_one(entry_t* entry) {
+    apply_to_decrypted_entry(entry, set_local_mult_one_op);
 }
 
 static void add_metadata_op(entry_t* entry) {
@@ -103,6 +102,8 @@ static void to_start_op(entry_t* entry) {
     entry->field_type = START;
     entry->equality_type = g_equality;
     entry->join_attr = entry->join_attr + g_deviation;
+    // Preserve final_mult if already set (for top-down phase)
+    // final_mult remains unchanged
 }
 
 /**
@@ -120,6 +121,8 @@ static void to_end_op(entry_t* entry) {
     entry->field_type = END;
     entry->equality_type = g_equality;
     entry->join_attr = entry->join_attr + g_deviation;
+    // Preserve final_mult if already set (for top-down phase)
+    // final_mult remains unchanged
 }
 
 /**
@@ -133,10 +136,10 @@ void transform_to_end(entry_t* entry, int32_t deviation, equality_type_t equalit
 }
 
 /**
- * NEW: Transform entry to EMPTY type (for padding)
+ * Transform entry to SORT_PADDING type (for bitonic sort padding)
  */
-static void set_empty_op(entry_t* entry) {
-    entry->field_type = EMPTY;
+static void set_sort_padding_op(entry_t* entry) {
+    entry->field_type = SORT_PADDING;
     entry->join_attr = INT32_MAX;  // Sort to end
     entry->original_index = UINT32_MAX;
     entry->local_mult = 0;
@@ -150,6 +153,96 @@ static void set_empty_op(entry_t* entry) {
     entry->local_weight = 0;
 }
 
-void transform_set_empty(entry_t* entry) {
-    apply_to_decrypted_entry(entry, set_empty_op);
+void transform_set_sort_padding(entry_t* entry) {
+    apply_to_decrypted_entry(entry, set_sort_padding_op);
+}
+
+/**
+ * Initialize final_mult from local_mult (for root table in top-down)
+ */
+static void init_final_mult_op(entry_t* entry) {
+    entry->final_mult = entry->local_mult;
+    // Also initialize foreign fields
+    entry->foreign_sum = 0;
+    entry->foreign_cumsum = 0;
+    entry->foreign_interval = 0;
+    entry->local_weight = 0;
+}
+
+void transform_init_final_mult(entry_t* entry) {
+    apply_to_decrypted_entry(entry, init_final_mult_op);
+}
+
+/**
+ * Initialize foreign temporary fields for top-down computation
+ */
+static void init_foreign_temps_op(entry_t* entry) {
+    // Initialize foreign tracking fields
+    entry->foreign_sum = 0;
+    entry->foreign_cumsum = 0;
+    entry->foreign_interval = 0;
+    entry->local_weight = entry->local_mult;  // Initialize to local_mult per pseudocode
+    // Preserve final_mult from parent if it's a START/END entry
+    // For SOURCE entries, final_mult will be computed later
+}
+
+void transform_init_foreign_temps(entry_t* entry) {
+    apply_to_decrypted_entry(entry, init_foreign_temps_op);
+}
+
+// ============================================================================
+// Distribute-Expand Transform Functions
+// ============================================================================
+
+/**
+ * Initialize destination index to 0
+ */
+static void init_dst_idx_op(entry_t* entry) {
+    entry->dst_idx = 0;
+}
+
+void transform_init_dst_idx(entry_t* entry) {
+    apply_to_decrypted_entry(entry, init_dst_idx_op);
+}
+
+/**
+ * Initialize index field to 0
+ */
+static void init_index_op(entry_t* entry) {
+    entry->index = 0;
+}
+
+void transform_init_index(entry_t* entry) {
+    apply_to_decrypted_entry(entry, init_index_op);
+}
+
+/**
+ * Mark entries with final_mult = 0 as DIST_PADDING
+ */
+static void mark_zero_mult_padding_op(entry_t* entry) {
+    // Use oblivious selection to avoid branching
+    int is_zero = (entry->final_mult == 0);
+    entry->field_type = is_zero * DIST_PADDING + (1 - is_zero) * entry->field_type;
+}
+
+void transform_mark_zero_mult_padding(entry_t* entry) {
+    apply_to_decrypted_entry(entry, mark_zero_mult_padding_op);
+}
+
+/**
+ * Create a distribution padding entry
+ */
+static void create_dist_padding_op(entry_t* entry) {
+    // Initialize a padding entry
+    entry->field_type = DIST_PADDING;
+    entry->final_mult = 0;
+    entry->dst_idx = -1;
+    entry->index = 0;
+    entry->original_index = -1;
+    entry->local_mult = 0;
+    // Other fields can remain as is or be zeroed
+}
+
+void transform_create_dist_padding(entry_t* entry) {
+    apply_to_decrypted_entry(entry, create_dist_padding_op);
 }

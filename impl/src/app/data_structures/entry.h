@@ -29,21 +29,21 @@ public:
     int32_t join_attr;
     
     // Persistent metadata
-    uint32_t original_index;
-    uint32_t local_mult;
-    uint32_t final_mult;
-    uint32_t foreign_sum;
+    int32_t original_index;
+    int32_t local_mult;
+    int32_t final_mult;
+    int32_t foreign_sum;
     
     // Temporary metadata
-    uint32_t local_cumsum;
-    uint32_t local_interval;
-    uint32_t foreign_cumsum;
-    uint32_t foreign_interval;
-    uint32_t local_weight;
+    int32_t local_cumsum;
+    int32_t local_interval;
+    int32_t foreign_cumsum;
+    int32_t foreign_interval;
+    int32_t local_weight;
     
     // Expansion metadata
-    uint32_t copy_index;
-    uint32_t alignment_key;
+    int32_t copy_index;
+    int32_t alignment_key;
     
     // Distribution fields
     int32_t dst_idx;

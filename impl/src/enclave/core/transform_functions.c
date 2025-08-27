@@ -274,3 +274,39 @@ static void compute_alignment_key_op(entry_t* entry) {
 void transform_compute_alignment_key(entry_t* entry) {
     apply_to_decrypted_entry(entry, compute_alignment_key_op);
 }
+
+/**
+ * Set join_attr from a specific column (Algorithm 999)
+ * Extract the value from attributes[column_index] and set as join_attr
+ */
+static void set_join_attr_op(entry_t* entry, int32_t column_index) {
+    // Validate column index
+    if (column_index >= 0 && column_index < MAX_ATTRIBUTES) {
+        entry->join_attr = entry->attributes[column_index];
+    } else {
+        // Invalid index, set to 0 as default
+        entry->join_attr = 0;
+    }
+}
+
+void transform_set_join_attr(entry_t* entry, int32_t column_index) {
+    if (!entry) return;
+    
+    uint8_t was_encrypted = entry->is_encrypted;
+    
+    // Decrypt if needed
+    if (was_encrypted) {
+        crypto_status_t status = aes_decrypt_entry(entry);
+        if (status != CRYPTO_SUCCESS) {
+            return;
+        }
+    }
+    
+    // Apply the operation
+    set_join_attr_op(entry, column_index);
+    
+    // Re-encrypt if it was encrypted
+    if (was_encrypted) {
+        aes_encrypt_entry(entry);
+    }
+}

@@ -67,6 +67,10 @@ void ecall_transform_set_sort_padding(entry_t* entry) {
     transform_set_sort_padding(entry);
 }
 
+void ecall_transform_set_join_attr(entry_t* entry, int32_t column_index) {
+    transform_set_join_attr(entry, column_index);
+}
+
 /**
  * Window Function Ecall Implementations
  */
@@ -165,8 +169,8 @@ void ecall_comparator_padding_last(entry_t* e1, entry_t* e2) {
     comparator_padding_last(e1, e2);
 }
 
-void ecall_comparator_distribute(entry_t* e1, entry_t* e2, int32_t distance) {
-    comparator_distribute(e1, e2, distance);
+void ecall_comparator_distribute(entry_t* e1, entry_t* e2) {
+    comparator_distribute(e1, e2);
 }
 
 void ecall_obtain_output_size(int32_t* retval, const entry_t* entry) {

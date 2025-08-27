@@ -1,4 +1,5 @@
 #include "bottom_up_phase.h"
+#include "../data_structures/join_attribute_setter.h"
 #include <iostream>
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
@@ -146,12 +147,19 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     const JoinConstraint& constraint,
     sgx_enclave_id_t eid) {
     
+    // Step 0: Set join_attr for both parent and child based on their join columns
+    DEBUG_INFO("Setting join_attr for parent using column: %s", constraint.get_target_column().c_str());
+    JoinAttributeSetter::SetJoinAttributesForTable(parent, constraint.get_target_column(), eid);
+    
+    DEBUG_INFO("Setting join_attr for child using column: %s", constraint.get_source_column().c_str());
+    JoinAttributeSetter::SetJoinAttributesForTable(child, constraint.get_source_column(), eid);
+    
     // Step 1: Create combined table with dual-entry technique
     DEBUG_INFO("Creating combined table from parent (%zu) and child (%zu)", 
                parent.size(), child.size());
     Table combined = CombineTable(parent, child, constraint, eid);
     DEBUG_INFO("Combined table has %zu entries", combined.size());
-    debug_dump_table(combined, "combined", "step1_combined", eid);
+    debug_dump_table(combined, "combined", "bottomup_step1_combined", eid);
     
     // Step 2: Initialize temporary fields (local_cumsum = local_mult, local_interval = 0)
     DEBUG_INFO("Initializing temporary fields");
@@ -160,7 +168,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
             return ecall_transform_init_local_temps(eid, e);
         });
     DEBUG_INFO("Temporary fields initialized");
-    debug_dump_table(combined, "combined", "step2_init_temps", eid);
+    debug_dump_table(combined, "combined", "bottomup_step2_init_temps", eid);
     
     // Step 3: Sort by join attribute and precedence
     DEBUG_INFO("Sorting combined table by join attribute");
@@ -169,7 +177,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
             return ecall_comparator_join_attr(eid, e1, e2);
         });
     DEBUG_INFO("Sort completed");
-    debug_dump_table(combined, "combined", "step3_sorted", eid);
+    debug_dump_table(combined, "combined", "bottomup_step3_sorted", eid);
     
     // Step 4: Compute local cumulative sums
     DEBUG_INFO("Computing local cumulative sums");
@@ -177,7 +185,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_window_compute_local_sum(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined", "step4_cumsum", eid);
+    debug_dump_table(combined, "combined", "bottomup_step4_cumsum", eid);
     
     // Step 5: Sort for pairwise processing (group START/END pairs)
     DEBUG_INFO("Sorting for pairwise processing");
@@ -185,7 +193,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_pairwise(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined", "step5_pairwise", eid);
+    debug_dump_table(combined, "combined", "bottomup_step5_pairwise", eid);
     
     // Step 6: Compute intervals between START/END pairs
     DEBUG_INFO("Computing intervals between START/END pairs");
@@ -193,7 +201,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_window_compute_local_interval(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined", "step6_intervals", eid);
+    debug_dump_table(combined, "combined", "bottomup_step6_intervals", eid);
     
     // Step 7: Sort END entries first for final update
     DEBUG_INFO("Sorting END entries first");
@@ -201,7 +209,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_end_first(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined", "step7_end_first", eid);
+    debug_dump_table(combined, "combined", "bottomup_step7_end_first", eid);
     
     // Step 8: Truncate to parent size - now we have END entries with computed intervals
     // The first parent.size() entries are now the END entries with computed intervals
@@ -212,19 +220,19 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     for (size_t i = 0; i < parent.size() && i < combined.size(); i++) {
         truncated.add_entry(combined[i]);
     }
-    debug_dump_table(truncated, "truncated", "step8_truncated", eid);
+    debug_dump_table(truncated, "truncated", "bottomup_step8_truncated", eid);
     
     // Step 9: Update parent multiplicities using parallel pass
     // This multiplies parent's local_mult by the computed interval from END entries
     DEBUG_INFO("Updating parent multiplicities");
-    debug_dump_table(parent, "parent_before", "step9a_parent_before", eid);
+    debug_dump_table(parent, "parent_before", "bottomup_step9a_parent_before", eid);
     truncated.parallel_pass(parent, eid,
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             // e1 is from truncated (source with intervals), e2 is from parent (target to update)
             return ecall_update_target_multiplicity(eid, e2, e1);
         });
     DEBUG_INFO("Parent multiplicities updated");
-    debug_dump_table(parent, "parent_after", "step9b_parent_after", eid);
+    debug_dump_table(parent, "parent_after", "bottomup_step9b_parent_after", eid);
 }
 
 std::vector<JoinTreeNodePtr> BottomUpPhase::PostOrderTraversal(JoinTreeNodePtr root) {

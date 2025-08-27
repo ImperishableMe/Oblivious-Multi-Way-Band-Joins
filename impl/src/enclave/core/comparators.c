@@ -1,4 +1,5 @@
 #include "../enclave_types.h"
+#include "crypto_helpers.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -101,10 +102,10 @@ void oblivious_swap(entry_t* e1, entry_t* e2, int should_swap) {
 }
 
 /**
- * Comparator by join attribute (Algorithm 399)
+ * Core operation for comparator by join attribute (Algorithm 399)
  * Primary: join_attr, Secondary: entry type precedence
  */
-void comparator_join_attr(entry_t* e1, entry_t* e2) {
+static void comparator_join_attr_op(entry_t* e1, entry_t* e2) {
     // Compare join attributes (both are int32_t)
     int32_t diff = e1->join_attr - e2->join_attr;
     int32_t cmp = oblivious_sign(diff);
@@ -128,10 +129,17 @@ void comparator_join_attr(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Comparator for pairwise processing (Algorithm 438)
+ * Comparator by join attribute with decrypt/encrypt wrapper
+ */
+void comparator_join_attr(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, comparator_join_attr_op);
+}
+
+/**
+ * Core operation for comparator for pairwise processing (Algorithm 438)
  * Priority: 1) TARGET before SOURCE, 2) by original_index, 3) START before END
  */
-void comparator_pairwise(entry_t* e1, entry_t* e2) {
+static void comparator_pairwise_op(entry_t* e1, entry_t* e2) {
     // Check if entries are TARGET type (START or END)
     int32_t is_target1 = ((e1->field_type == START) | (e1->field_type == END));
     int32_t is_target2 = ((e2->field_type == START) | (e2->field_type == END));
@@ -164,10 +172,17 @@ void comparator_pairwise(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Comparator with END entries first (Algorithm 479)
+ * Comparator for pairwise processing with decrypt/encrypt wrapper
+ */
+void comparator_pairwise(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, comparator_pairwise_op);
+}
+
+/**
+ * Core operation for comparator with END entries first (Algorithm 479)
  * Priority: 1) END before others, 2) by original_index
  */
-void comparator_end_first(entry_t* e1, entry_t* e2) {
+static void comparator_end_first_op(entry_t* e1, entry_t* e2) {
     // Check if entries are END type
     int32_t is_end1 = (e1->field_type == END);
     int32_t is_end2 = (e2->field_type == END);
@@ -192,10 +207,17 @@ void comparator_end_first(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Comparator by join attribute then original index (Algorithm 697)
+ * Comparator with END entries first with decrypt/encrypt wrapper
+ */
+void comparator_end_first(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, comparator_end_first_op);
+}
+
+/**
+ * Core operation for comparator by join attribute then original index (Algorithm 697)
  * Primary: join_attr, Secondary: original_index
  */
-void comparator_join_then_other(entry_t* e1, entry_t* e2) {
+static void comparator_join_then_other_op(entry_t* e1, entry_t* e2) {
     // Compare join attributes (both are int32_t)
     int32_t diff = e1->join_attr - e2->join_attr;
     int32_t cmp = oblivious_sign(diff);
@@ -217,10 +239,17 @@ void comparator_join_then_other(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Comparator by original index only
+ * Comparator by join attribute then original index with decrypt/encrypt wrapper
+ */
+void comparator_join_then_other(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, comparator_join_then_other_op);
+}
+
+/**
+ * Core operation for comparator by original index only
  * Simple comparison for maintaining original order
  */
-void comparator_original_index(entry_t* e1, entry_t* e2) {
+static void comparator_original_index_op(entry_t* e1, entry_t* e2) {
     // Compare original indices
     int32_t normal_result = oblivious_sign(e1->original_index - e2->original_index);
     
@@ -232,10 +261,17 @@ void comparator_original_index(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Comparator by alignment key (Algorithm 715)
+ * Comparator by original index only with decrypt/encrypt wrapper
+ */
+void comparator_original_index(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, comparator_original_index_op);
+}
+
+/**
+ * Core operation for comparator by alignment key (Algorithm 715)
  * Used in final alignment phase
  */
-void comparator_alignment_key(entry_t* e1, entry_t* e2) {
+static void comparator_alignment_key_op(entry_t* e1, entry_t* e2) {
     // Compare alignment keys
     int32_t normal_result = oblivious_sign(e1->alignment_key - e2->alignment_key);
     
@@ -247,10 +283,17 @@ void comparator_alignment_key(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Comparator to put DIST_PADDING entries last
+ * Comparator by alignment key with decrypt/encrypt wrapper
+ */
+void comparator_alignment_key(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, comparator_alignment_key_op);
+}
+
+/**
+ * Core operation for comparator to put DIST_PADDING entries last
  * Sorts non-padding entries before padding entries
  */
-void comparator_padding_last(entry_t* e1, entry_t* e2) {
+static void comparator_padding_last_op(entry_t* e1, entry_t* e2) {
     // Check if entries are DIST_PADDING
     int32_t is_padding1 = (e1->field_type == DIST_PADDING);
     int32_t is_padding2 = (e2->field_type == DIST_PADDING);
@@ -275,11 +318,18 @@ void comparator_padding_last(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Comparator for distribution phase
+ * Comparator to put DIST_PADDING entries last with decrypt/encrypt wrapper
+ */
+void comparator_padding_last(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, comparator_padding_last_op);
+}
+
+/**
+ * Core operation for comparator for distribution phase
  * Checks if e1's dst_idx >= e2's index AND e1 is not DIST_PADDING
  * Swaps content while preserving index
  */
-void comparator_distribute(entry_t* e1, entry_t* e2, int32_t distance) {
+static void comparator_distribute_op(entry_t* e1, entry_t* e2) {
     // Check if we should swap: e1.dst_idx >= e2.index AND e1 is not DIST_PADDING
     int32_t dst_condition = (e1->dst_idx >= e2->index);
     int32_t not_padding = (e1->field_type != DIST_PADDING);
@@ -296,5 +346,12 @@ void comparator_distribute(entry_t* e1, entry_t* e2, int32_t distance) {
     // Restore original indices (always, obliviously)
     e1->index = idx1;
     e2->index = idx2;
+}
+
+/**
+ * Comparator for distribution phase with decrypt/encrypt wrapper
+ */
+void comparator_distribute(entry_t* e1, entry_t* e2) {
+    apply_to_decrypted_pair(e1, e2, comparator_distribute_op);
 }
 

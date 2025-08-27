@@ -19,7 +19,6 @@
 #include "../../app/algorithms/top_down_phase.h"
 #include "../../app/query/query_parser.h"
 #include "../../app/data_structures/join_tree_builder.h"
-#include "../../app/data_structures/join_attribute_setter.h"
 #include "../../app/io/table_io.h"
 #include "../../app/Enclave_u.h"
 #include "../../common/debug_util.h"
@@ -79,9 +78,6 @@ public:
             JoinTreeBuilder builder;
             auto root = builder.build_from_query(query, tables_map);
             std::cout << "  Root table: " << root->get_table_name() << std::endl;
-            
-            // Set join attributes
-            JoinAttributeSetter::SetJoinAttributesForTree(root);
             
             // Tables already loaded in the tree during build_from_query
             

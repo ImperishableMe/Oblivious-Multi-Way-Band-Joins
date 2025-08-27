@@ -1,4 +1,5 @@
 #include "align_concat.h"
+#include "../data_structures/join_attribute_setter.h"
 #include <iostream>
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
@@ -25,15 +26,27 @@ Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root, sgx_enclave_id_t ei
     Table accumulator = root->get_table();
     
     // Debug the initial accumulator
-    debug_dump_table(accumulator, "accumulator_initial", "align_root", eid);
+    debug_dump_table(accumulator, "accumulator_initial", "aligncat_step0_root", eid);
     
     // Process each child in pre-order
     for (const auto& child : root->get_children()) {
         DEBUG_INFO("Aligning and concatenating child: %s", 
                    child->get_table_name().c_str());
         
+        // Get the child's join constraint with its parent
+        const JoinConstraint& constraint = child->get_constraint_with_parent();
+        
+        // Set join_attr for accumulator to the child's join column with parent
+        // This ensures proper alignment during concatenation
+        DEBUG_INFO("Setting accumulator join_attr to: %s", constraint.get_target_column().c_str());
+        JoinAttributeSetter::SetJoinAttributesForTable(accumulator, constraint.get_target_column(), eid);
+        
         // Recursively get the result for the child subtree
         Table child_result = ConstructJoinResult(child, eid);
+        
+        // Set join_attr for child result to its join column with parent
+        DEBUG_INFO("Setting child result join_attr to: %s", constraint.get_source_column().c_str());
+        JoinAttributeSetter::SetJoinAttributesForTable(child_result, constraint.get_source_column(), eid);
         
         // Align and concatenate with accumulator
         accumulator = AlignAndConcatenate(accumulator, child_result, eid);
@@ -58,17 +71,17 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_join_then_other(eid, e1, e2);
         });
-    debug_dump_table(sorted_accumulator, "accumulator", "align_step1_sorted", eid);
+    debug_dump_table(sorted_accumulator, "accumulator", "aligncat_step1_sorted", eid);
     
     // Step 2: Compute copy indices for child table
     DEBUG_INFO("Step 2: Computing copy indices");
     Table indexed_child = ComputeCopyIndices(child, eid);
-    debug_dump_table(indexed_child, "child", "align_step2_copy_indices", eid);
+    debug_dump_table(indexed_child, "child", "aligncat_step2_copy_indices", eid);
     
     // Step 3: Compute alignment keys
     DEBUG_INFO("Step 3: Computing alignment keys");
     Table aligned_child = ComputeAlignmentKeys(indexed_child, eid);
-    debug_dump_table(aligned_child, "child", "align_step3_alignment_keys", eid);
+    debug_dump_table(aligned_child, "child", "aligncat_step3_alignment_keys", eid);
     
     // Step 4: Sort child by alignment key
     DEBUG_INFO("Step 4: Sorting child by alignment key");
@@ -76,12 +89,12 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_alignment_key(eid, e1, e2);
         });
-    debug_dump_table(aligned_child, "child", "align_step4_sorted", eid);
+    debug_dump_table(aligned_child, "child", "aligncat_step4_sorted", eid);
     
     // Step 5: Horizontal concatenation
     DEBUG_INFO("Step 5: Horizontal concatenation");
     Table result = Table::horizontal_concatenate(sorted_accumulator, aligned_child);
-    debug_dump_table(result, "result", "align_step5_concatenated", eid);
+    debug_dump_table(result, "result", "aligncat_step5_concatenated", eid);
     
     DEBUG_INFO("Alignment and concatenation complete. Result size: %zu", result.size());
     

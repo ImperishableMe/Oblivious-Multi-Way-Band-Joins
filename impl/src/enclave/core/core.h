@@ -59,7 +59,7 @@ void comparator_join_then_other(entry_t* e1, entry_t* e2);
 void comparator_original_index(entry_t* e1, entry_t* e2);
 void comparator_alignment_key(entry_t* e1, entry_t* e2);
 void comparator_padding_last(entry_t* e1, entry_t* e2);
-void comparator_distribute(entry_t* e1, entry_t* e2, int32_t distance);
+void comparator_distribute(entry_t* e1, entry_t* e2);
 
 /**
  * Oblivious swap utility
@@ -77,6 +77,11 @@ int32_t obtain_output_size(const entry_t* last_entry);
 void transform_init_copy_index(entry_t* entry);
 void transform_compute_alignment_key(entry_t* entry);
 void window_update_copy_index(entry_t* e1, entry_t* e2);
+
+/**
+ * Join attribute setting
+ */
+void transform_set_join_attr(entry_t* entry, int32_t column_index);
 
 #ifdef __cplusplus
 }

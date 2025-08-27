@@ -41,6 +41,9 @@ enclave {
         // Set entry as SORT_PADDING (for padding in bitonic sort)
         public void ecall_transform_set_sort_padding([in,out] entry_t* entry);
         
+        // Set join_attr from a specific column index
+        public void ecall_transform_set_join_attr([in,out] entry_t* entry, int32_t column_index);
+        
         /* Window functions for multiplicity computation */
         
         // Assign sequential indices during initialization
@@ -112,7 +115,7 @@ enclave {
         public void ecall_comparator_padding_last([in,out] entry_t* e1, [in,out] entry_t* e2);
         
         // Distribute comparator for variable-distance passes
-        public void ecall_comparator_distribute([in,out] entry_t* e1, [in,out] entry_t* e2, int32_t distance);
+        public void ecall_comparator_distribute([in,out] entry_t* e1, [in,out] entry_t* e2);
         
         // ============================================================================
         // Align-Concat Phase Functions

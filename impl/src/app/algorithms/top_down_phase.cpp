@@ -1,4 +1,5 @@
 #include "top_down_phase.h"
+#include "../data_structures/join_attribute_setter.h"
 #include <iostream>
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
@@ -31,6 +32,21 @@ void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     }
     
     std::cout << "Top-Down Phase completed." << std::endl;
+    
+    // Final debug check of all tables
+    DEBUG_INFO("Top-Down Phase final check - validating all tables");
+    for (auto& node : nodes) {
+        if (node->get_table().size() > 0) {
+            Entry first = node->get_table()[0];
+            DEBUG_INFO("  Table %s[0]: field_type=%d, equality_type=%d",
+                       node->get_table_name().c_str(), 
+                       first.field_type, first.equality_type);
+            
+            // Dump table for final check
+            std::string label = "topdown_final_" + node->get_table_name();
+            debug_dump_table(node->get_table(), label.c_str(), "topdown_final_check", eid);
+        }
+    }
 }
 
 void TopDownPhase::InitializeRootTable(JoinTreeNodePtr node, sgx_enclave_id_t eid) {
@@ -117,6 +133,13 @@ void TopDownPhase::ComputeForeignMultiplicities(
     const JoinConstraint& constraint,
     sgx_enclave_id_t eid) {
     
+    // Step 0: Set join_attr for both parent and child based on their join columns
+    DEBUG_INFO("Setting join_attr for parent using column: %s", constraint.get_target_column().c_str());
+    JoinAttributeSetter::SetJoinAttributesForTable(parent, constraint.get_target_column(), eid);
+    
+    DEBUG_INFO("Setting join_attr for child using column: %s", constraint.get_source_column().c_str());
+    JoinAttributeSetter::SetJoinAttributesForTable(child, constraint.get_source_column(), eid);
+    
     // Step 1: Create combined table for foreign computation
     DEBUG_INFO("Creating combined table for foreign computation");
     Table combined = CombineTableForForeign(parent, child, constraint, eid);
@@ -183,12 +206,31 @@ void TopDownPhase::ComputeForeignMultiplicities(
     // Step 9: Update child's final multiplicities
     DEBUG_INFO("Updating child's final multiplicities");
     debug_dump_table(child, "child_before", "topdown_step9a_child_before", eid);
+    debug_dump_table(truncated, "truncated_before", "topdown_step9a_truncated_before", eid);
+    
+    // Debug: Check field types before update
+    DEBUG_INFO("Before parallel_pass - checking first entry field types");
+    if (child.size() > 0) {
+        Entry first = child[0];
+        DEBUG_INFO("  Child[0] field_type=%d, equality_type=%d", 
+                   first.field_type, first.equality_type);
+    }
+    
     truncated.parallel_pass(child, eid,
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             // e1 is from truncated (source with foreign intervals)
             // e2 is from child (target to update)
             return ecall_update_target_final_multiplicity(eid, e2, e1);
         });
+    
+    // Debug: Check field types after update
+    DEBUG_INFO("After parallel_pass - checking first entry field types");
+    if (child.size() > 0) {
+        Entry first = child[0];
+        DEBUG_INFO("  Child[0] field_type=%d, equality_type=%d", 
+                   first.field_type, first.equality_type);
+    }
+    
     DEBUG_INFO("Child final multiplicities updated");
     debug_dump_table(child, "child_after", "topdown_step9b_child_after", eid);
 }

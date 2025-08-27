@@ -2,7 +2,7 @@
 #include <iostream>
 #include <iomanip>
 
-uint32_t SubtreeVerifier::GetLocalMult(Entry entry, sgx_enclave_id_t eid) {
+int32_t SubtreeVerifier::GetLocalMult(Entry entry, sgx_enclave_id_t eid) {
     // Decrypt if needed (test code can decrypt)
     if (entry.is_encrypted) {
         crypto_status_t status = CryptoUtils::decrypt_entry(entry, eid);
@@ -14,7 +14,7 @@ uint32_t SubtreeVerifier::GetLocalMult(Entry entry, sgx_enclave_id_t eid) {
     return entry.local_mult;
 }
 
-uint32_t SubtreeVerifier::GetOriginalIndex(Entry entry, sgx_enclave_id_t eid) {
+int32_t SubtreeVerifier::GetOriginalIndex(Entry entry, sgx_enclave_id_t eid) {
     // Decrypt if needed
     if (entry.is_encrypted) {
         crypto_status_t status = CryptoUtils::decrypt_entry(entry, eid);
@@ -54,16 +54,16 @@ bool SubtreeVerifier::RowMatchesOriginal(
     return true;
 }
 
-std::map<uint32_t, uint32_t> SubtreeVerifier::ComputeExpectedMultiplicities(
+std::map<int32_t, int32_t> SubtreeVerifier::ComputeExpectedMultiplicities(
     JoinTreeNodePtr node,
     sgx_enclave_id_t eid) {
     
-    std::map<uint32_t, uint32_t> expected;
+    std::map<int32_t, int32_t> expected;
     
     // Initialize counts to 0 for all original indices
     Table& node_table = node->get_table();
     for (size_t i = 0; i < node_table.size(); i++) {
-        uint32_t orig_idx = GetOriginalIndex(node_table[i], eid);
+        int32_t orig_idx = GetOriginalIndex(node_table[i], eid);
         expected[orig_idx] = 0;
     }
     
@@ -85,7 +85,7 @@ std::map<uint32_t, uint32_t> SubtreeVerifier::ComputeExpectedMultiplicities(
             
             // Check if this result row contains the original tuple's data
             if (RowMatchesOriginal(result_row, orig, node->get_table_name())) {
-                uint32_t orig_idx = GetOriginalIndex(node_table[i], eid);
+                int32_t orig_idx = GetOriginalIndex(node_table[i], eid);
                 expected[orig_idx]++;
                 break;  // Found the match, move to next result row
             }
@@ -97,7 +97,7 @@ std::map<uint32_t, uint32_t> SubtreeVerifier::ComputeExpectedMultiplicities(
 
 bool SubtreeVerifier::VerifyLocalMultiplicities(
     JoinTreeNodePtr node,
-    const std::map<uint32_t, uint32_t>& expected,
+    const std::map<int32_t, int32_t>& expected,
     sgx_enclave_id_t eid,
     bool verbose) {
     
@@ -115,10 +115,10 @@ bool SubtreeVerifier::VerifyLocalMultiplicities(
         Entry entry = table[i];
         
         // Get actual local_mult (requires decryption)
-        uint32_t actual = GetLocalMult(entry, eid);
+        int32_t actual = GetLocalMult(entry, eid);
         
         // Get original index to look up expected value
-        uint32_t orig_idx = GetOriginalIndex(entry, eid);
+        int32_t orig_idx = GetOriginalIndex(entry, eid);
         
         // Get expected value
         auto it = expected.find(orig_idx);
@@ -128,7 +128,7 @@ bool SubtreeVerifier::VerifyLocalMultiplicities(
             continue;
         }
         
-        uint32_t expected_mult = it->second;
+        int32_t expected_mult = it->second;
         total_checked++;
         
         if (actual != expected_mult) {

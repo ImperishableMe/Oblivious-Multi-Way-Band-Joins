@@ -15,7 +15,6 @@
 #include "../../app/algorithms/top_down_phase.h"
 #include "../../app/query/query_parser.h"
 #include "../../app/data_structures/join_tree_builder.h"
-#include "../../app/data_structures/join_attribute_setter.h"
 #include "../../app/io/table_io.h"
 #include "../../app/Enclave_u.h"
 #include "../../common/debug_util.h"
@@ -59,7 +58,6 @@ public:
             
             JoinTreeBuilder builder;
             auto root = builder.build_from_query(query, tables_map);
-            JoinAttributeSetter::SetJoinAttributesForTree(root);
             
             // Initialize debug session
             test_name = query_file.substr(query_file.find_last_of("/\\") + 1);

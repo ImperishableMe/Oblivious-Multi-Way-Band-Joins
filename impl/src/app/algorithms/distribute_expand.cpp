@@ -14,9 +14,32 @@ void DistributeExpand::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     // Get all nodes to expand
     auto nodes = GetAllNodes(root);
     
+    // Debug: Check tables right after getting nodes
+    DEBUG_INFO("Distribute-Expand: Checking tables after GetAllNodes");
+    for (auto& node : nodes) {
+        if (node->get_table().size() > 0) {
+            Entry first = node->get_table()[0];
+            DEBUG_INFO("  Table %s[0]: field_type=%d, equality_type=%d",
+                       node->get_table_name().c_str(), 
+                       first.field_type, first.equality_type);
+        }
+    }
+    
     // Expand each table according to its final multiplicities
     for (auto& node : nodes) {
         std::cout << "  Expanding table: " << node->get_table_name() << std::endl;
+        
+        // Debug: Check table before expansion
+        DEBUG_INFO("Before ExpandSingleTable for %s", node->get_table_name().c_str());
+        if (node->get_table().size() > 0) {
+            Entry first = node->get_table()[0];
+            DEBUG_INFO("  field_type=%d, equality_type=%d", 
+                       first.field_type, first.equality_type);
+            
+            // Dump table before expansion
+            std::string label = "distexp_pre_expand_" + node->get_table_name();
+            debug_dump_table(node->get_table(), label.c_str(), "distexp_pre_expand", eid);
+        }
         
         Table expanded = ExpandSingleTable(node->get_table(), eid);
         node->set_table(expanded);
@@ -36,15 +59,36 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     DEBUG_INFO("Expanding table with %zu entries", table.size());
     
+    // Debug: Check table at very beginning of ExpandSingleTable
+    DEBUG_INFO("ExpandSingleTable entry - checking field types");
+    if (table.size() > 0) {
+        Entry first = table[0];
+        DEBUG_INFO("  Input[0]: field_type=%d, equality_type=%d", 
+                   first.field_type, first.equality_type);
+        
+        // Check if values are in valid range
+        if (first.field_type < 0 || first.field_type > 10) {
+            DEBUG_ERROR("  WARNING: field_type=%d is outside expected range [0-10]!", 
+                        first.field_type);
+        }
+        if (first.equality_type < 0 || first.equality_type > 5) {
+            DEBUG_ERROR("  WARNING: equality_type=%d is outside expected range [0-5]!", 
+                        first.equality_type);
+        }
+    }
+    
+    // Dump raw input for debugging
+    debug_dump_table(table, "raw_input", "distexp_step0_raw_input", eid);
+    
     // Step 1: Initialize dst_idx field to 0
     DEBUG_INFO("Step 1 - Initializing dst_idx");
-    debug_dump_table(table, "input", "dist_step0_input", eid);
+    debug_dump_table(table, "input", "distexp_step0_input", eid);
     Table working = table.map(eid,
         [](sgx_enclave_id_t eid, entry_t* e) {
             return ecall_transform_init_dst_idx(eid, e);
         });
     DEBUG_INFO("Step 1 complete");
-    debug_dump_table(working, "working", "dist_step1_init_dst", eid);
+    debug_dump_table(working, "working", "distexp_step1_init_dst", eid);
     
     // Step 2: Compute cumulative sum of final_mult to get dst_idx
     DEBUG_INFO("Step 2 - Computing cumulative sum");
@@ -53,7 +97,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
             return ecall_window_compute_dst_idx(eid, e1, e2);
         });
     DEBUG_INFO("Step 2 complete");
-    debug_dump_table(working, "working", "dist_step2_cumsum", eid);
+    debug_dump_table(working, "working", "distexp_step2_cumsum", eid);
     
     // Step 3: Get output size from last entry
     DEBUG_INFO("Step 3 - Getting output size");
@@ -74,7 +118,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
             return ecall_transform_mark_zero_mult_padding(eid, e);
         });
     DEBUG_INFO("Step 4 complete, table size=%zu", working.size());
-    debug_dump_table(working, "working", "dist_step4_marked", eid);
+    debug_dump_table(working, "working", "distexp_step4_marked", eid);
     
     // Step 5: Sort to move DIST_PADDING entries to the end
     DEBUG_INFO("Step 5 - Sorting (size=%zu)", working.size());
@@ -83,7 +127,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
             return ecall_comparator_padding_last(eid, e1, e2);
         });
     DEBUG_INFO("Step 5 complete, table size after sort=%zu", working.size());
-    debug_dump_table(working, "working", "dist_step5_sorted", eid);
+    debug_dump_table(working, "working", "distexp_step5_sorted", eid);
     
     // Step 5b: Truncate table to remove excess DIST_PADDING entries
     // This handles cases where output_size < original_size
@@ -96,7 +140,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
         }
         working = truncated;
         DEBUG_INFO("Step 5b complete, table size after truncation=%zu", working.size());
-        debug_dump_table(working, "working", "dist_step5b_truncated", eid);
+        debug_dump_table(working, "working", "distexp_step5b_truncated", eid);
     }
     
     // Step 6: Add padding entries to reach output_size
@@ -110,7 +154,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
         working.add_entry(Entry(padding));
     }
     DEBUG_INFO("Step 6 complete, table size after padding=%zu", working.size());
-    debug_dump_table(working, "working", "dist_step6_padded", eid);
+    debug_dump_table(working, "working", "distexp_step6_padded", eid);
     
     // Step 7: Initialize index field (0 to output_size-1)
     DEBUG_INFO("Step 7 - Initializing index field");
@@ -124,19 +168,19 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
             return ecall_window_increment_index(eid, e1, e2);
         });
     DEBUG_INFO("Step 7 complete, table size=%zu", working.size());
-    debug_dump_table(working, "working", "dist_step7_indexed", eid);
+    debug_dump_table(working, "working", "distexp_step7_indexed", eid);
     
     // Step 8: Distribution phase using variable-distance passes
     DEBUG_INFO("Step 8 - Distribution phase");
     DistributePhase(working, output_size, eid);
     DEBUG_INFO("Step 8 complete, table size=%zu", working.size());
-    debug_dump_table(working, "working", "dist_step8_distributed", eid);
+    debug_dump_table(working, "working", "distexp_step8_distributed", eid);
     
     // Step 9: Expansion phase to fill gaps
     DEBUG_INFO("Step 9 - Expansion phase");
     ExpansionPhase(working, eid);
     DEBUG_INFO("Step 9 complete, final table size=%zu", working.size());
-    debug_dump_table(working, "working", "dist_step9_final", eid);
+    debug_dump_table(working, "working", "distexp_step9_final", eid);
     
     return working;
 }
@@ -183,7 +227,7 @@ void DistributeExpand::DistributePhase(Table& table, size_t output_size, sgx_enc
         // Use a special function that operates on pairs at given distance
         table.distribute_pass(eid, distance,
             [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2, size_t dist) {
-                ecall_comparator_distribute(eid, e1, e2, static_cast<int32_t>(dist));
+                ecall_comparator_distribute(eid, e1, e2);
             });
         
         distance >>= 1;  // Halve the distance

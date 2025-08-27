@@ -75,12 +75,15 @@ Table TableIO::load_csv(const std::string& filepath) {
             }
             
             // Initialize metadata
-            entry.field_type = SOURCE;  // Default type
-            entry.equality_type = NONE;
+            // IMPORTANT: Don't set field_type or equality_type here!
+            // These are set during algorithm phases (transform_to_source, etc.)
+            // If data is encrypted, these fields are part of encrypted region
+            entry.field_type = 0;  // Will be set during algorithm
+            entry.equality_type = 0;  // Will be set during algorithm
             entry.is_encrypted = (nonce_column_index >= 0);  // Encrypted if nonce column exists
             entry.nonce = nonce_value;
-            entry.original_index = table.size();
-            entry.local_mult = 1;  // Will be computed during algorithm
+            entry.original_index = 0;  // Will be set in InitializeAllTables
+            entry.local_mult = 0;  // Will be computed during algorithm
             entry.final_mult = 0;
             entry.foreign_sum = 0;
             entry.local_cumsum = 0;
@@ -90,6 +93,8 @@ Table TableIO::load_csv(const std::string& filepath) {
             entry.local_weight = 0;
             entry.copy_index = 0;
             entry.alignment_key = 0;
+            entry.dst_idx = 0;
+            entry.index = 0;
             
             table.add_entry(entry);
         }

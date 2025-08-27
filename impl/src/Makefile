@@ -69,6 +69,7 @@ App_Cpp_Files := app/main.cpp \
                  app/data_structures/join_condition.cpp \
                  app/data_structures/join_constraint.cpp \
                  app/data_structures/join_tree_builder.cpp \
+                 app/data_structures/join_attribute_setter.cpp \
                  app/query/query_tokenizer.cpp \
                  app/query/query_parser.cpp \
                  app/query/inequality_parser.cpp \

@@ -142,9 +142,9 @@ int main(int argc, char* argv[]) {
         std::cout << "\nParsing SQL query..." << std::endl;
         JoinTreeNodePtr join_tree = parse_sql_query(query_file, tables);
         
-        // Execute oblivious join
+        // Execute oblivious join with debug output
         std::cout << "\nExecuting oblivious join..." << std::endl;
-        Table result = ObliviousJoin::Execute(join_tree, global_eid);
+        Table result = ObliviousJoin::ExecuteWithDebug(join_tree, global_eid, "oblivious_join");
         
         // Save result
         std::cout << "\nSaving result to " << output_file << "..." << std::endl;

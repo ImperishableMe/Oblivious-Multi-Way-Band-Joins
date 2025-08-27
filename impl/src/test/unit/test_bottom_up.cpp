@@ -15,7 +15,6 @@
 #include "../../app/algorithms/bottom_up_phase.h"
 #include "../../app/query/query_parser.h"
 #include "../../app/data_structures/join_tree_builder.h"
-#include "../../app/data_structures/join_attribute_setter.h"
 #include "../../app/io/table_io.h"
 #include "../../app/crypto/crypto_utils.h"
 #include "../../app/Enclave_u.h"
@@ -138,9 +137,6 @@ public:
             JoinTreeBuilder builder;
             auto root = builder.build_from_query(parsed, tables);
             
-            // Set join attributes
-            JoinAttributeSetter::SetJoinAttributesForTree(root);
-            
             // Run bottom-up phase
             BottomUpPhase::Execute(root, global_eid);
             
@@ -192,9 +188,6 @@ public:
             
             JoinTreeBuilder builder;
             auto root = builder.build_from_query(parsed, tables);
-            
-            // Set join attributes for all nodes in the tree
-            JoinAttributeSetter::SetJoinAttributesForTree(root);
             
             std::cout << "\nJoin tree structure:" << std::endl;
             root->print_tree();
@@ -253,9 +246,6 @@ public:
             
             JoinTreeBuilder builder;
             auto root = builder.build_from_query(parsed, tables);
-            
-            // Set join attributes for all nodes in the tree
-            JoinAttributeSetter::SetJoinAttributesForTree(root);
             
             std::cout << "\nJoin tree structure:" << std::endl;
             root->print_tree();
@@ -336,9 +326,6 @@ public:
                 // Build join tree
                 JoinTreeBuilder builder;
                 auto root = builder.build_from_query(parsed, tables);
-                
-                // Set join attributes for all nodes in the tree
-                JoinAttributeSetter::SetJoinAttributesForTree(root);
                 
                 // Run bottom-up phase
                 auto start = std::chrono::high_resolution_clock::now();

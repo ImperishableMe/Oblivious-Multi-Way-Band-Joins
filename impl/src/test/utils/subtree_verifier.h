@@ -43,7 +43,7 @@ public:
      * @param eid SGX enclave ID
      * @return Map from original_index to expected multiplicity
      */
-    static std::map<uint32_t, uint32_t> ComputeExpectedMultiplicities(
+    static std::map<int32_t, int32_t> ComputeExpectedMultiplicities(
         JoinTreeNodePtr node,
         sgx_enclave_id_t eid);
     
@@ -58,7 +58,7 @@ public:
      */
     static bool VerifyLocalMultiplicities(
         JoinTreeNodePtr node,
-        const std::map<uint32_t, uint32_t>& expected,
+        const std::map<int32_t, int32_t>& expected,
         sgx_enclave_id_t eid,
         bool verbose = true);
 
@@ -71,7 +71,7 @@ private:
      * @param eid SGX enclave ID
      * @return local_mult value
      */
-    static uint32_t GetLocalMult(Entry entry, sgx_enclave_id_t eid);
+    static int32_t GetLocalMult(Entry entry, sgx_enclave_id_t eid);
     
     /**
      * Get original_index from an entry
@@ -81,7 +81,7 @@ private:
      * @param eid SGX enclave ID
      * @return original_index value
      */
-    static uint32_t GetOriginalIndex(Entry entry, sgx_enclave_id_t eid);
+    static int32_t GetOriginalIndex(Entry entry, sgx_enclave_id_t eid);
     
     /**
      * Check if a result row matches an original tuple

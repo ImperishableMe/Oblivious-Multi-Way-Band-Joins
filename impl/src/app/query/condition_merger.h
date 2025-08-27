@@ -1,7 +1,7 @@
 #ifndef CONDITION_MERGER_H
 #define CONDITION_MERGER_H
 
-#include "join_constraint.h"
+#include "../data_structures/join_constraint.h"
 #include <optional>
 #include <string>
 

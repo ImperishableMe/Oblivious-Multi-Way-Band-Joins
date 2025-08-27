@@ -4,8 +4,8 @@
 #include <vector>
 #include <string>
 #include <cstring>
-#include "types.h"
-#include "../enclave/enclave_types.h"
+#include "../data_structures/types.h"
+#include "../../enclave/enclave_types.h"
 
 // Forward declarations
 class Entry;

@@ -358,8 +358,8 @@ std::pair<Entry, Entry> JoinCondition::create_boundary_entries(const Entry& targ
 
 #include <stdexcept>
 #include <climits>
-#include "../common/debug_util.h"
-#include "Enclave_u.h"
+#include "../../common/debug_util.h"
+#include "../Enclave_u.h"
 
 void Table::check_sgx_status(sgx_status_t status, const std::string& operation) {
     if (status != SGX_SUCCESS) {

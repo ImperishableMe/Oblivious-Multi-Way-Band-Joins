@@ -3,10 +3,10 @@
 
 #include <memory>
 #include <vector>
-#include "../types.h"
-#include "../utils/join_tree_node.h"
-#include "../utils/join_constraint.h"
-#include "../app/Enclave_u.h"
+#include "../data_structures/types.h"
+#include "../data_structures/join_tree_node.h"
+#include "../data_structures/join_constraint.h"
+#include "../Enclave_u.h"
 #include "sgx_urts.h"
 
 /**

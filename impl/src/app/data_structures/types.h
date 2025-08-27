@@ -6,9 +6,9 @@
 #include <map>
 #include <utility>
 #include <functional>
-#include "../common/constants.h"
-#include "../common/types_common.h"
-#include "../enclave/enclave_types.h"
+#include "../../common/constants.h"
+#include "../../common/types_common.h"
+#include "../../enclave/enclave_types.h"
 #include "sgx_urts.h"
 
 /**

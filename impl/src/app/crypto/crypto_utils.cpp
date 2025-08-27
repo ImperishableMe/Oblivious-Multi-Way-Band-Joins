@@ -1,6 +1,6 @@
 #include "crypto_utils.h"
-#include "converters.h"
-#include "Enclave_u.h"
+#include "../io/converters.h"
+#include "../Enclave_u.h"
 #include <iostream>
 #include <random>
 #include <chrono>

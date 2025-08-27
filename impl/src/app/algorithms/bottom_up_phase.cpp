@@ -1,7 +1,7 @@
 #include "bottom_up_phase.h"
 #include <iostream>
 #include "../../common/debug_util.h"
-#include "../app/Enclave_u.h"
+#include "../Enclave_u.h"
 
 void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     std::cout << "Starting Bottom-Up Phase..." << std::endl;

@@ -1,8 +1,8 @@
 #ifndef CRYPTO_UTILS_H
 #define CRYPTO_UTILS_H
 
-#include "types.h"
-#include "../enclave/crypto/entry_crypto.h"
+#include "../data_structures/types.h"
+#include "../../enclave/crypto/entry_crypto.h"
 #include "sgx_urts.h"
 #include <string>
 

@@ -7,9 +7,9 @@
 #include <string>
 #include <set>
 #include <optional>
-#include "parsed_query.h"
+#include "../query/parsed_query.h"
 #include "join_tree_node.h"
-#include "../types.h"
+#include "types.h"
 
 /**
  * JoinTreeBuilder - Constructs a join tree from a parsed SQL query

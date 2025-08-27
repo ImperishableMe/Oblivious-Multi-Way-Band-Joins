@@ -60,7 +60,11 @@ else
 endif
 
 # App source files
-App_Cpp_Files := app/main.cpp app/crypto_utils.cpp app/converters.cpp app/types.cpp app/debug_util.cpp
+App_Cpp_Files := app/main.cpp \
+                 app/crypto/crypto_utils.cpp \
+                 app/io/converters.cpp \
+                 app/data_structures/types.cpp \
+                 app/debug_util.cpp
 App_Include_Paths := -I$(SGX_SDK)/include -Iapp -Ienclave -Icommon
 
 App_Compile_CFlags := -fPIC -Wno-attributes $(App_Include_Paths)
@@ -215,10 +219,10 @@ $(App_Name): $(App_Objects)
 	@echo "LINK =>  $@"
 
 # Build encrypt_tables utility
-Encrypt_Tool_Objects := encrypt_tables.o app/utils/table_io.o app/utils/join_constraint.o \
-                       app/converters.o app/crypto_utils.o app/types.o app/debug_util.o $(Gen_Untrusted_Object)
+Encrypt_Tool_Objects := app/tools/encrypt_tables.o app/io/table_io.o app/data_structures/join_constraint.o \
+                       app/io/converters.o app/crypto/crypto_utils.o app/data_structures/types.o app/debug_util.o $(Gen_Untrusted_Object)
 
-encrypt_tables.o: encrypt_tables.cpp $(Gen_Untrusted_Source)
+app/tools/encrypt_tables.o: app/tools/encrypt_tables.cpp $(Gen_Untrusted_Source)
 	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -std=c++17 -c $< -o $@
 	@echo "CXX  <=  $<"
 

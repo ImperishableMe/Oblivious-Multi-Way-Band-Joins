@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cstring>
 #include <climits>  // For INT32_MAX, INT32_MIN
-#include "../converters.h"
+#include "converters.h"
 #include "../Enclave_u.h"
 
 // For directory operations

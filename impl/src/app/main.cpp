@@ -2,8 +2,8 @@
 #include <cstring>
 #include "sgx_urts.h"
 #include "Enclave_u.h"
-#include "crypto_utils.h"
-#include "types.h"
+#include "crypto/crypto_utils.h"
+#include "data_structures/types.h"
 
 /* Global enclave ID */
 sgx_enclave_id_t global_eid = 0;

@@ -6,7 +6,7 @@
 #include <string>
 #include <stdexcept>
 #include <iostream>
-#include "../types.h"
+#include "types.h"
 #include "join_constraint.h"
 
 /**

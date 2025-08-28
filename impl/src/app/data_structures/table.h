@@ -117,9 +117,6 @@ public:
      */
     Table oblivious_expand(sgx_enclave_id_t eid) const;
     
-    // Static utility methods
-    static Table horizontal_concatenate(const Table& left, const Table& right);
-    
 private:
     // Helper methods for oblivious operations
     static void check_sgx_status(sgx_status_t status, const std::string& operation);

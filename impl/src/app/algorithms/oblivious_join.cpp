@@ -8,7 +8,6 @@
 #include "../../common/debug_util.h"
 
 // Forward declaration for table debugging
-void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid);
 
 Table ObliviousJoin::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     std::cout << "\n=== Starting Oblivious Multi-Way Band Join ===" << std::endl;
@@ -67,14 +66,12 @@ Table ObliviousJoin::ExecuteWithDebug(JoinTreeNodePtr root,
     
     for (const auto& node : nodes) {
         std::string label = "input_" + node->get_table_name();
-        debug_dump_table(node->get_table(), label.c_str(), "phase0_input", eid);
     }
     
     // Execute the join
     Table result = Execute(root, eid);
     
     // Dump final result
-    debug_dump_table(result, "final_result", "phase4_output", eid);
     
     // Close debug session
     debug_close_session();

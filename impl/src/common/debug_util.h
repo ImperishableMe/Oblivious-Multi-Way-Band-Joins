@@ -32,7 +32,7 @@
 
 // Table dumping configuration
 #ifndef DEBUG_DUMP_TABLES
-    #define DEBUG_DUMP_TABLES 1  // Enable table dumping by default in debug mode
+    #define DEBUG_DUMP_TABLES 1  // Enable table dumping for debug
 #endif
 
 // Debug format for table output
@@ -126,6 +126,8 @@
 
 // Forward declarations for table debugging
 #ifdef __cplusplus
+#include <vector>
+#include <string>
 class Table;
 void debug_dump_table(const Table& table, const char* table_name, const char* phase = nullptr);
 #endif
@@ -157,6 +159,8 @@ void debug_close_session();
 // Table dumping functions
 void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid);
 void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid);
+void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
+                                 uint32_t eid, const std::vector<std::string>& columns);
 
 // File output functions
 void debug_to_file(const char* filename, const char* content);

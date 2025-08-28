@@ -1,9 +1,11 @@
 #include "../enclave_types.h"
 #include "../crypto/aes_crypto.h"
 #include "crypto_helpers.h"
+#include "../../common/debug_util.h"
 #include <stdint.h>
 #include <string.h>
 #include <limits.h>
+#include <stdio.h>
 
 /**
  * Transform functions for Map operations
@@ -101,7 +103,22 @@ static void to_start_op(entry_t* entry) {
     // Transform to START boundary
     entry->field_type = START;
     entry->equality_type = g_equality;
-    entry->join_attr = entry->join_attr + g_deviation;
+    
+    // Debug: Check if values are within expected range
+    int32_t original_join_attr = entry->join_attr;
+    int32_t new_join_attr = entry->join_attr + g_deviation;
+    
+    // Check if original value is within design constraint
+    if (entry->join_attr < INT32_MIN/2 || entry->join_attr > INT32_MAX/2) {
+        DEBUG_WARN("to_start_op: join_attr=%d is outside design range [%d, %d]", 
+                   entry->join_attr, INT32_MIN/2, INT32_MAX/2);
+    }
+    
+    entry->join_attr = new_join_attr;
+    
+    DEBUG_TRACE("to_start_op: original=%d, deviation=%d, new=%d", 
+                original_join_attr, g_deviation, new_join_attr);
+    
     // Preserve final_mult if already set (for top-down phase)
     // final_mult remains unchanged
 }
@@ -120,7 +137,28 @@ static void to_end_op(entry_t* entry) {
     // Transform to END boundary
     entry->field_type = END;
     entry->equality_type = g_equality;
-    entry->join_attr = entry->join_attr + g_deviation;
+    
+    // Debug: Check if values are within expected range
+    int32_t original_join_attr = entry->join_attr;
+    int32_t new_join_attr = entry->join_attr + g_deviation;
+    
+    // Check for overflow/underflow
+    if (g_deviation > 0 && entry->join_attr > INT32_MAX - g_deviation) {
+        DEBUG_WARN("to_end_op overflow detected! join_attr=%d + deviation=%d would overflow", 
+                   entry->join_attr, g_deviation);
+    }
+    
+    // Check if original value is within design constraint
+    if (entry->join_attr < INT32_MIN/2 || entry->join_attr > INT32_MAX/2) {
+        DEBUG_WARN("to_end_op: join_attr=%d is outside design range [%d, %d]", 
+                   entry->join_attr, INT32_MIN/2, INT32_MAX/2);
+    }
+    
+    entry->join_attr = new_join_attr;
+    
+    DEBUG_TRACE("to_end_op: original=%d, deviation=%d, new=%d", 
+                original_join_attr, g_deviation, new_join_attr);
+    
     // Preserve final_mult if already set (for top-down phase)
     // final_mult remains unchanged
 }
@@ -283,9 +321,17 @@ static void set_join_attr_op(entry_t* entry, int32_t column_index) {
     // Validate column index
     if (column_index >= 0 && column_index < MAX_ATTRIBUTES) {
         entry->join_attr = entry->attributes[column_index];
+        
+        // Debug: Check if the join_attr is within design constraints
+        if (entry->join_attr < INT32_MIN/2 || entry->join_attr > INT32_MAX/2) {
+            DEBUG_WARN("set_join_attr: value %d from attributes[%d] is outside design range [%d, %d]", 
+                       entry->join_attr, column_index, INT32_MIN/2, INT32_MAX/2);
+        }
+        DEBUG_TRACE("set_join_attr: column_index=%d, value=%d", column_index, entry->join_attr);
     } else {
         // Invalid index, set to 0 as default
         entry->join_attr = 0;
+        DEBUG_WARN("set_join_attr: invalid column_index=%d", column_index);
     }
 }
 

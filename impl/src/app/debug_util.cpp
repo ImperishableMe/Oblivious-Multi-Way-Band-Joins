@@ -1,4 +1,5 @@
 #include "../common/debug_util.h"
+#include "../common/types_common.h"
 #include <cstdio>
 #include <cstdarg>
 #include <ctime>
@@ -15,6 +16,8 @@
 
 // Thread-safe output mutex
 static std::mutex debug_mutex;
+// Separate mutex for file dump operations to avoid deadlock
+static std::mutex dump_mutex;
 
 // Debug session state
 static std::string debug_session_name;
@@ -194,7 +197,7 @@ void debug_dump_table(const Table& table, const char* label, const char* step_na
     
     std::string filename_str;
     {
-        std::lock_guard<std::mutex> lock(debug_mutex);
+        std::lock_guard<std::mutex> lock(dump_mutex);
         
         // Generate filename
         std::stringstream filename;
@@ -254,6 +257,122 @@ void debug_dump_table(const Table& table, const char* label, const char* step_na
     // Also log to main debug log (no longer holding the lock)
     DEBUG_INFO("Dumped table '%s' at step '%s': %zu entries to %s", 
                label, step_name, table.size(), filename_str.c_str());
+}
+
+void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
+                                 uint32_t eid, const std::vector<std::string>& columns) {
+    DEBUG_INFO("debug_dump_selected_columns START: label=%s, table_size=%zu", label, table.size());
+    
+    if (!debug_session_active || !DEBUG_DUMP_TABLES) {
+        DEBUG_INFO("debug_dump_selected_columns EXIT EARLY: active=%d, dump=%d", 
+                   debug_session_active, DEBUG_DUMP_TABLES);
+        return;
+    }
+    
+    std::string filename_str;
+    {
+        // Use dump_mutex instead of debug_mutex to avoid deadlock with DEBUG_INFO
+        std::lock_guard<std::mutex> lock(dump_mutex);
+        
+        // Generate filename
+        std::stringstream filename;
+        filename << step_name << "_" << label << "_selected.csv";
+        filename_str = filename.str();
+        
+        // Open file
+        std::string filepath = debug_session_dir + "/" + filename_str;
+        DEBUG_INFO("Opening file: %s", filepath.c_str());
+        std::ofstream file(filepath, std::ios::out);
+        
+        if (!file.is_open()) {
+            DEBUG_INFO("Failed to open file");
+            return;
+        }
+        
+        // Write header with selected columns
+        file << "Index";
+        for (const auto& col : columns) {
+            file << "," << col;
+        }
+        file << std::endl;
+        
+        DEBUG_INFO("Starting to write %zu rows", table.size());
+        
+        // Write data rows
+        for (size_t i = 0; i < table.size(); i++) {
+            if (i % 100 == 0) {
+                DEBUG_INFO("Writing row %zu/%zu", i, table.size());
+            }
+            Entry entry = decrypt_entry_for_debug(table[i], eid);
+            file << i;
+            
+            // Output selected columns
+            for (const auto& col : columns) {
+                // Check for special metadata columns
+                if (col == "original_index") {
+                    file << "," << entry.original_index;
+                } else if (col == "local_mult") {
+                    file << "," << entry.local_mult;
+                } else if (col == "final_mult") {
+                    file << "," << entry.final_mult;
+                } else if (col == "field_type") {
+                    // Convert field_type to string
+                    const char* type_str = "UNKNOWN";
+                    switch (entry.field_type) {
+                        case SORT_PADDING: type_str = "SORT_PADDING"; break;
+                        case SOURCE: type_str = "SOURCE"; break;
+                        case START: type_str = "START"; break;
+                        case END: type_str = "END"; break;
+                        case TARGET: type_str = "TARGET"; break;
+                        case DIST_PADDING: type_str = "DIST_PADDING"; break;
+                        default: 
+                            file << "," << static_cast<int32_t>(entry.field_type);
+                            continue;
+                    }
+                    file << "," << type_str;
+                } else if (col == "equality_type") {
+                    file << "," << entry.equality_type;
+                } else if (col == "join_attr") {
+                    file << "," << entry.join_attr;
+                } else if (col == "dst_idx") {
+                    file << "," << entry.dst_idx;
+                } else if (col == "local_cumsum") {
+                    file << "," << entry.local_cumsum;
+                } else if (col == "local_interval") {
+                    file << "," << entry.local_interval;
+                } else if (col == "foreign_sum") {
+                    file << "," << entry.foreign_sum;
+                } else if (col == "ALL_ATTRIBUTES") {
+                    // Special keyword to dump all attribute values
+                    for (size_t j = 0; j < entry.attributes.size(); j++) {
+                        file << ",attr" << j << "=" << entry.attributes[j];
+                    }
+                } else {
+                    // Check if it's a data column by name
+                    bool found = false;
+                    for (size_t j = 0; j < entry.column_names.size(); j++) {
+                        if (entry.column_names[j] == col) {
+                            file << "," << entry.attributes[j];
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        file << ",N/A";
+                    }
+                }
+            }
+            file << std::endl;
+        }
+        
+        file.close();
+        DEBUG_INFO("File closed successfully");
+        
+        // Log the dump
+        DEBUG_DEBUG("Dumped selected columns to %s (size=%zu)", filename_str.c_str(), table.size());
+    }
+    
+    DEBUG_INFO("debug_dump_selected_columns COMPLETE: label=%s", label);
 }
 
 void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid) {

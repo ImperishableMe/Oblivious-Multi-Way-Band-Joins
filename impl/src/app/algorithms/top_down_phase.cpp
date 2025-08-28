@@ -4,6 +4,10 @@
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
 
+// Forward declaration for selective debug dumping
+void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
+                                 uint32_t eid, const std::vector<std::string>& columns);
+
 void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     std::cout << "Starting Top-Down Phase..." << std::endl;
     
@@ -42,9 +46,10 @@ void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
                        node->get_table_name().c_str(), 
                        first.field_type, first.equality_type);
             
-            // Dump table for final check
+            // Targeted debug: Dump only final_mult and key fields after top-down
+            std::vector<std::string> key_columns = {"original_index", "local_mult", "final_mult", "field_type"};
             std::string label = "topdown_final_" + node->get_table_name();
-            debug_dump_table(node->get_table(), label.c_str(), "topdown_final_check", eid);
+            debug_dump_selected_columns(node->get_table(), label.c_str(), "topdown_final", eid, key_columns);
         }
     }
 }
@@ -143,7 +148,6 @@ void TopDownPhase::ComputeForeignMultiplicities(
     // Step 1: Create combined table for foreign computation
     DEBUG_INFO("Creating combined table for foreign computation");
     Table combined = CombineTableForForeign(parent, child, constraint, eid);
-    debug_dump_table(combined, "combined_foreign", "topdown_step1_combined", eid);
     
     // Step 2: Initialize foreign temporary fields
     DEBUG_INFO("Initializing foreign temporary fields");
@@ -151,7 +155,6 @@ void TopDownPhase::ComputeForeignMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e) {
             return ecall_transform_init_foreign_temps(eid, e);
         });
-    debug_dump_table(combined, "combined_foreign", "topdown_step2_init", eid);
     
     // Step 3: Sort by join attribute
     DEBUG_INFO("Sorting by join attribute");
@@ -159,7 +162,6 @@ void TopDownPhase::ComputeForeignMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_join_attr(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined_foreign", "topdown_step3_sorted", eid);
     
     // Step 4: Compute foreign cumulative sums and weights
     DEBUG_INFO("Computing foreign cumulative sums");
@@ -167,7 +169,6 @@ void TopDownPhase::ComputeForeignMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_window_compute_foreign_sum(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined_foreign", "topdown_step4_foreign_sum", eid);
     
     // Step 5: Sort for pairwise processing
     DEBUG_INFO("Sorting for pairwise processing");
@@ -175,7 +176,6 @@ void TopDownPhase::ComputeForeignMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_pairwise(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined_foreign", "topdown_step5_pairwise", eid);
     
     // Step 6: Compute foreign intervals
     DEBUG_INFO("Computing foreign intervals");
@@ -183,7 +183,6 @@ void TopDownPhase::ComputeForeignMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_window_compute_foreign_interval(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined_foreign", "topdown_step6_intervals", eid);
     
     // Step 7: Sort END entries first to extract computed intervals
     DEBUG_INFO("Sorting END entries first");
@@ -191,7 +190,6 @@ void TopDownPhase::ComputeForeignMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_end_first(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined_foreign", "topdown_step7_end_first", eid);
     
     // Step 8: Truncate to child size
     DEBUG_INFO("Truncating to %zu entries (child size)", child.size());
@@ -201,12 +199,9 @@ void TopDownPhase::ComputeForeignMultiplicities(
     for (size_t i = 0; i < child.size() && i < combined.size(); i++) {
         truncated.add_entry(combined[i]);
     }
-    debug_dump_table(truncated, "truncated_foreign", "topdown_step8_truncated", eid);
     
     // Step 9: Update child's final multiplicities
     DEBUG_INFO("Updating child's final multiplicities");
-    debug_dump_table(child, "child_before", "topdown_step9a_child_before", eid);
-    debug_dump_table(truncated, "truncated_before", "topdown_step9a_truncated_before", eid);
     
     // Debug: Check field types before update
     DEBUG_INFO("Before parallel_pass - checking first entry field types");
@@ -232,7 +227,6 @@ void TopDownPhase::ComputeForeignMultiplicities(
     }
     
     DEBUG_INFO("Child final multiplicities updated");
-    debug_dump_table(child, "child_after", "topdown_step9b_child_after", eid);
 }
 
 std::vector<JoinTreeNodePtr> TopDownPhase::PreOrderTraversal(JoinTreeNodePtr root) {

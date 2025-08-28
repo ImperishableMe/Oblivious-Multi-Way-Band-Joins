@@ -17,9 +17,9 @@
  */
 class Entry {
 public:
-    // Entry metadata
-    entry_type_t field_type;
-    equality_type_t equality_type;
+    // Entry metadata (using int32_t for consistency with enclave struct)
+    int32_t field_type;      // entry_type_t
+    int32_t equality_type;   // equality_type_t
     bool is_encrypted;
     
     // Encryption nonce for AES-CTR mode

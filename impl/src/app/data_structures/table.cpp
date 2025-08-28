@@ -350,26 +350,3 @@ Table Table::oblivious_expand(sgx_enclave_id_t eid) const {
     return expanded;
 }
 
-Table Table::horizontal_concatenate(const Table& left, const Table& right) {
-    if (left.size() != right.size()) {
-        throw std::runtime_error("HorizontalConcatenate: Tables must have same number of rows");
-    }
-    
-    Table result;
-    result.set_table_name(left.get_table_name() + "_" + right.get_table_name());
-    
-    // Concatenate each row
-    for (size_t i = 0; i < left.size(); i++) {
-        Entry combined = left.entries[i];
-        
-        // Add all attributes from right table
-        auto right_attrs = right.entries[i].get_attributes_map();
-        for (const auto& [col_name, value] : right_attrs) {
-            combined.add_attribute(col_name, value);
-        }
-        
-        result.add_entry(combined);
-    }
-    
-    return result;
-}

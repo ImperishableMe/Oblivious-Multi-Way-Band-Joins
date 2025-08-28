@@ -77,6 +77,7 @@ int32_t obtain_output_size(const entry_t* last_entry);
 void transform_init_copy_index(entry_t* entry);
 void transform_compute_alignment_key(entry_t* entry);
 void window_update_copy_index(entry_t* e1, entry_t* e2);
+void concat_attributes(entry_t* left, entry_t* right);
 
 /**
  * Join attribute setting

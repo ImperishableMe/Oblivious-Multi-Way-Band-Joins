@@ -5,7 +5,6 @@
 #include "../Enclave_u.h"
 
 // Forward declaration for table debugging
-void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid);
 
 Table AlignConcat::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     DEBUG_INFO("Starting Align-Concat Phase...");
@@ -26,7 +25,6 @@ Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root, sgx_enclave_id_t ei
     Table accumulator = root->get_table();
     
     // Debug the initial accumulator
-    debug_dump_table(accumulator, "accumulator_initial", "aligncat_step0_root", eid);
     
     // Process each child in pre-order
     for (const auto& child : root->get_children()) {
@@ -71,17 +69,14 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_join_then_other(eid, e1, e2);
         });
-    debug_dump_table(sorted_accumulator, "accumulator", "aligncat_step1_sorted", eid);
     
     // Step 2: Compute copy indices for child table
     DEBUG_INFO("Step 2: Computing copy indices");
     Table indexed_child = ComputeCopyIndices(child, eid);
-    debug_dump_table(indexed_child, "child", "aligncat_step2_copy_indices", eid);
     
     // Step 3: Compute alignment keys
     DEBUG_INFO("Step 3: Computing alignment keys");
     Table aligned_child = ComputeAlignmentKeys(indexed_child, eid);
-    debug_dump_table(aligned_child, "child", "aligncat_step3_alignment_keys", eid);
     
     // Step 4: Sort child by alignment key
     DEBUG_INFO("Step 4: Sorting child by alignment key");
@@ -89,12 +84,20 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_alignment_key(eid, e1, e2);
         });
-    debug_dump_table(aligned_child, "child", "aligncat_step4_sorted", eid);
     
-    // Step 5: Horizontal concatenation
-    DEBUG_INFO("Step 5: Horizontal concatenation");
-    Table result = Table::horizontal_concatenate(sorted_accumulator, aligned_child);
-    debug_dump_table(result, "result", "aligncat_step5_concatenated", eid);
+    // Step 5: Horizontal concatenation using parallel pass
+    DEBUG_INFO("Step 5: Horizontal concatenation via parallel pass");
+    
+    // The result starts as a copy of the sorted accumulator
+    Table result = sorted_accumulator;
+    
+    // Use parallel_pass to concatenate attributes from aligned_child
+    result.parallel_pass(aligned_child, eid,
+        [](sgx_enclave_id_t eid, entry_t* left, entry_t* right) {
+            // This ecall will concatenate attributes from right into left
+            return ecall_concat_attributes(eid, left, right);
+        });
+    
     
     DEBUG_INFO("Alignment and concatenation complete. Result size: %zu", result.size());
     

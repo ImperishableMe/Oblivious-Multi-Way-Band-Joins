@@ -4,21 +4,21 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// Entry type enumeration
-typedef enum {
-    SORT_PADDING = 0,   // Padding for bitonic sort (always sorts to end)
-    SOURCE = 1,         // Source table entry
-    START = 2,          // Target start boundary
-    END = 3,            // Target end boundary
-    TARGET = 4,         // Target table entry
-    DIST_PADDING = 5    // Padding for distribution (Phase 3)
-} entry_type_t;
+// Entry type constants (using int32_t for consistency with other metadata)
+#define SORT_PADDING 0   // Padding for bitonic sort (always sorts to end)
+#define SOURCE       1   // Source table entry
+#define START        2   // Target start boundary
+#define END          3   // Target end boundary
+#define TARGET       4   // Target table entry
+#define DIST_PADDING 5   // Padding for distribution (Phase 3)
 
-// Equality type for boundary conditions
-typedef enum {
-    NONE = 0,       // No equality constraint
-    EQ = 1,         // Closed boundary (d or e)
-    NEQ = 2         // Open boundary (< or >)
-} equality_type_t;
+// Equality type constants for boundary conditions
+#define NONE  0   // No equality constraint
+#define EQ    1   // Closed boundary (d or e)
+#define NEQ   2   // Open boundary (< or >)
+
+// Type aliases for clarity (both map to int32_t)
+typedef int32_t entry_type_t;
+typedef int32_t equality_type_t;
 
 #endif // TYPES_COMMON_H

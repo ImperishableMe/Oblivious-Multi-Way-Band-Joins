@@ -18,7 +18,7 @@ sgx_enclave_id_t global_eid = 0;
 int initialize_enclave() {
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     
-    ret = sgx_create_enclave("../../enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
+    ret = sgx_create_enclave("/home/r33wei/omwj/memory_const/impl/src/enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
         std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
         return -1;
@@ -158,18 +158,32 @@ Table execute_sqlite_join(sqlite3* db, const std::string& join_query) {
     return result.table;
 }
 
-/* Parse join specification to create SQL query */
-std::string create_join_query(const std::string& spec_file) {
-    // For now, return a simple join query
-    // TODO: Parse spec file properly
-    return "SELECT * FROM customer INNER JOIN orders ON customer.id = orders.customer_id";
+/* Read SQL query from file */
+std::string read_sql_query(const std::string& sql_file) {
+    std::ifstream file(sql_file);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open SQL file: " + sql_file);
+    }
+    
+    std::string query;
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip comment lines
+        if (line.find("--") == 0) continue;
+        if (!line.empty()) {
+            query += line + " ";
+        }
+    }
+    
+    file.close();
+    return query;
 }
 
 /* Print usage information */
 void print_usage(const char* program_name) {
-    std::cout << "Usage: " << program_name << " <input_dir> <join_spec> <output_file>" << std::endl;
+    std::cout << "Usage: " << program_name << " <sql_file> <input_dir> <output_file>" << std::endl;
+    std::cout << "  sql_file    : SQL file containing the query" << std::endl;
     std::cout << "  input_dir   : Directory containing encrypted CSV table files" << std::endl;
-    std::cout << "  join_spec   : Join specification file" << std::endl;
     std::cout << "  output_file : Output file for encrypted join result" << std::endl;
 }
 
@@ -179,13 +193,13 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    std::string input_dir = argv[1];
-    std::string join_spec = argv[2];
+    std::string sql_file = argv[1];
+    std::string input_dir = argv[2];
     std::string output_file = argv[3];
     
     std::cout << "\n=== SQLite Baseline Join ===" << std::endl;
+    std::cout << "SQL file: " << sql_file << std::endl;
     std::cout << "Input directory: " << input_dir << std::endl;
-    std::cout << "Join specification: " << join_spec << std::endl;
     std::cout << "Output file: " << output_file << std::endl;
     
     sqlite3* db = nullptr;
@@ -238,10 +252,40 @@ int main(int argc, char* argv[]) {
             throw std::runtime_error("No CSV files found in input directory");
         }
         
-        // Create and execute join query
-        std::cout << "\nExecuting join query..." << std::endl;
-        std::string join_query = create_join_query(join_spec);
+        // Read and execute SQL query
+        std::cout << "\nReading SQL query..." << std::endl;
+        std::string join_query = read_sql_query(sql_file);
         std::cout << "Query: " << join_query << std::endl;
+        
+        // Debug: Check supplier table contents for tb1 query
+        if (join_query.find("supplier1") != std::string::npos && join_query.find("supplier2") != std::string::npos) {
+            char* err_msg = nullptr;
+            std::cout << "\nDEBUG: Checking supplier tables for tb1 query:" << std::endl;
+            
+            std::string check_query = "SELECT S1_S_SUPPKEY, S1_S_ACCTBAL FROM supplier1 LIMIT 5";
+            std::cout << "supplier1 (first 5 rows):" << std::endl;
+            sqlite3_exec(db, check_query.c_str(),
+                [](void*, int argc, char** argv, char** col_names) -> int {
+                    std::cout << "  ";
+                    for (int i = 0; i < argc; i++) {
+                        std::cout << col_names[i] << "=" << (argv[i] ? argv[i] : "NULL") << " ";
+                    }
+                    std::cout << std::endl;
+                    return 0;
+                }, nullptr, &err_msg);
+                
+            check_query = "SELECT S2_S_SUPPKEY, S2_S_ACCTBAL FROM supplier2 LIMIT 5";
+            std::cout << "supplier2 (first 5 rows):" << std::endl;
+            sqlite3_exec(db, check_query.c_str(),
+                [](void*, int argc, char** argv, char** col_names) -> int {
+                    std::cout << "  ";
+                    for (int i = 0; i < argc; i++) {
+                        std::cout << col_names[i] << "=" << (argv[i] ? argv[i] : "NULL") << " ";
+                    }
+                    std::cout << std::endl;
+                    return 0;
+                }, nullptr, &err_msg);
+        }
         
         Table join_result = execute_sqlite_join(db, join_query);
         
@@ -249,9 +293,9 @@ int main(int argc, char* argv[]) {
         std::cout << "\nEncrypting result..." << std::endl;
         Table encrypted_result = encrypt_table(join_result);
         
-        // Save result
+        // Save result (encrypted with nonce)
         std::cout << "Saving result to " << output_file << "..." << std::endl;
-        TableIO::save_csv(encrypted_result, output_file);
+        TableIO::save_encrypted_csv(encrypted_result, output_file, global_eid);
         std::cout << "Result saved (" << encrypted_result.size() << " rows)" << std::endl;
         
         // Cleanup

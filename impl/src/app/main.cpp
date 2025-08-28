@@ -22,7 +22,7 @@ int initialize_enclave() {
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     
     /* Call sgx_create_enclave to initialize an enclave instance */
-    ret = sgx_create_enclave("enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
+    ret = sgx_create_enclave("/home/r33wei/omwj/memory_const/impl/src/enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
         std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
         return -1;
@@ -81,9 +81,9 @@ JoinTreeNodePtr parse_sql_query(const std::string& query_file,
 
 /* Print usage information */
 void print_usage(const char* program_name) {
-    std::cout << "Usage: " << program_name << " <input_dir> <query_file> <output_file>" << std::endl;
-    std::cout << "  input_dir   : Directory containing encrypted CSV table files" << std::endl;
+    std::cout << "Usage: " << program_name << " <query_file> <input_dir> <output_file>" << std::endl;
     std::cout << "  query_file  : SQL query file (.sql)" << std::endl;
+    std::cout << "  input_dir   : Directory containing encrypted CSV table files" << std::endl;
     std::cout << "  output_file : Output file for encrypted join result" << std::endl;
 }
 
@@ -93,13 +93,13 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    std::string input_dir = argv[1];
-    std::string query_file = argv[2];
+    std::string query_file = argv[1];
+    std::string input_dir = argv[2];
     std::string output_file = argv[3];
     
     std::cout << "\n=== SGX Oblivious Join ===" << std::endl;
-    std::cout << "Input directory: " << input_dir << std::endl;
     std::cout << "Query file: " << query_file << std::endl;
+    std::cout << "Input directory: " << input_dir << std::endl;
     std::cout << "Output file: " << output_file << std::endl;
     
     try {
@@ -146,9 +146,9 @@ int main(int argc, char* argv[]) {
         std::cout << "\nExecuting oblivious join..." << std::endl;
         Table result = ObliviousJoin::ExecuteWithDebug(join_tree, global_eid, "oblivious_join");
         
-        // Save result
+        // Save result (encrypted with nonce)
         std::cout << "\nSaving result to " << output_file << "..." << std::endl;
-        TableIO::save_csv(result, output_file);
+        TableIO::save_encrypted_csv(result, output_file, global_eid);
         std::cout << "Result saved (" << result.size() << " rows)" << std::endl;
         
         // Cleanup

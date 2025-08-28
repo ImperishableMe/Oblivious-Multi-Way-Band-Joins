@@ -1,0 +1,50 @@
+=== Test Summary ===
+Query File: three_table_chain.sql
+Dataset: encrypted
+
+=== SQL Query ===
+-- Three-table chain band join test (A -> B -> C)
+-- Tests multi-level join with accumulated multiplicities
+-- 
+-- Expected multiplicities:
+-- table_a row 1 (value=100): matches b rows 1,2 (95,105) -> mult = 2
+--   b row 1 (95): matches c rows 1,2 (93,97) -> mult = 2
+--   b row 2 (105): matches c rows 3,4 (103,107) -> mult = 2
+--   Total for a row 1: 2 * 2 = 4 (each b match has 2 c matches)
+--
+-- table_a row 2 (value=200): matches b rows 3,4 (195,205) -> mult = 2
+--   b row 3 (195): matches c rows 5,6 (193,197) -> mult = 2
+--   b row 4 (205): matches c rows 7,8 (203,207) -> mult = 2
+--   Total for a row 2: 2 * 2 = 4
+
+SELECT *
+FROM table_a, table_b, table_c
+WHERE table_b.b_value >= table_a.a_value - 10
+  AND table_b.b_value <= table_a.a_value + 10
+  AND table_c.c_value >= table_b.b_value - 5
+  AND table_c.c_value <= table_b.b_value + 5;
+
+=== Input Table Sizes ===
+center1: 2 rows
+center2: 2 rows
+child1: 2 rows
+child2: 2 rows
+child3: 2 rows
+child4: 2 rows
+left_table: 2 rows
+right_table: 4 rows
+table_a: 2 rows
+table_b: 4 rows
+table_c: 8 rows
+
+=== Output ===
+SGX Output Size: 8 rows
+SQLite Output Size: 8 rows
+
+=== Results ===
+Match: YES
+
+=== Performance ===
+SGX Time: 0.461825 seconds
+SQLite Time: 0.332006 seconds
+Overhead: 1.39102x

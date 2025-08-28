@@ -105,6 +105,14 @@ Table TableIO::load_csv(const std::string& filepath) {
 }
 
 void TableIO::save_csv(const Table& table, const std::string& filepath) {
+    // Check that all entries are NOT encrypted
+    for (size_t i = 0; i < table.size(); i++) {
+        if (table.get_entry(i).is_encrypted) {
+            throw std::runtime_error("save_csv called with encrypted data at entry " + std::to_string(i) + 
+                                   ". Use save_encrypted_csv for encrypted data.");
+        }
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot create CSV file: " + filepath);
@@ -136,6 +144,22 @@ void TableIO::save_csv(const Table& table, const std::string& filepath) {
 void TableIO::save_encrypted_csv(const Table& table, 
                                  const std::string& filepath,
                                  sgx_enclave_id_t eid) {
+    // Check that all entries are encrypted (or will be encrypted)
+    bool has_encrypted = false;
+    bool has_unencrypted = false;
+    for (size_t i = 0; i < table.size(); i++) {
+        if (table.get_entry(i).is_encrypted) {
+            has_encrypted = true;
+        } else {
+            has_unencrypted = true;
+        }
+    }
+    
+    if (has_encrypted && has_unencrypted) {
+        std::cout << "Warning: save_encrypted_csv called with mixed encrypted/unencrypted data. "
+                  << "Encrypting unencrypted entries." << std::endl;
+    }
+    
     // Work with a copy of the table to allow encryption if needed
     Table table_copy = table;
     
@@ -147,6 +171,14 @@ void TableIO::save_encrypted_csv(const Table& table,
             if (ret != CRYPTO_SUCCESS) {
                 throw std::runtime_error("Encryption failed at entry " + std::to_string(i));
             }
+        }
+    }
+    
+    // Verify all entries are now encrypted
+    for (size_t i = 0; i < table_copy.size(); i++) {
+        if (!table_copy.get_entry(i).is_encrypted) {
+            throw std::runtime_error("Internal error: Entry " + std::to_string(i) + 
+                                   " is still not encrypted after encryption attempt.");
         }
     }
     

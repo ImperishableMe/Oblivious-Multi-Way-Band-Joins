@@ -104,6 +104,9 @@ FULL_JOIN_TEST_SRCS = ../test/unit/test_full_join.cpp \
 DISTRIBUTE_TEST_SRCS = ../test/unit/test_distribute_expand.cpp \
                        $(ENCLAVE_PATH)/app/algorithms/distribute_expand.cpp
 
+# Comprehensive encryption test
+ENCRYPTION_COMP_TEST_SRCS = test_encryption_comprehensive.cpp
+
 # Object files needed from main build
 MAIN_OBJS = $(ENCLAVE_U_O)
 
@@ -116,9 +119,10 @@ BOTTOM_UP_TEST_TARGET = test_bottom_up
 TOP_DOWN_TEST_TARGET = test_top_down
 FULL_JOIN_TEST_TARGET = test_full_join
 DISTRIBUTE_TEST_TARGET = test_distribute_expand
+ENCRYPTION_COMP_TEST_TARGET = test_encryption_comprehensive
 
 # Default target
-all: check-enclave $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET) $(TOP_DOWN_TEST_TARGET) $(FULL_JOIN_TEST_TARGET) $(DISTRIBUTE_TEST_TARGET)
+all: check-enclave $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET) $(TOP_DOWN_TEST_TARGET) $(FULL_JOIN_TEST_TARGET) $(DISTRIBUTE_TEST_TARGET) $(ENCRYPTION_COMP_TEST_TARGET)
 
 # Check if enclave is built and create symlink for testing
 check-enclave:
@@ -181,6 +185,12 @@ $(DISTRIBUTE_TEST_TARGET): check-enclave $(DISTRIBUTE_TEST_SRCS) $(INFRA_SRCS)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(DISTRIBUTE_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
 	@echo "Build complete. Run with: ./$(DISTRIBUTE_TEST_TARGET)"
 
+# Build comprehensive encryption test executable
+$(ENCRYPTION_COMP_TEST_TARGET): check-enclave $(ENCRYPTION_COMP_TEST_SRCS) $(INFRA_SRCS)
+	@echo "Building comprehensive encryption tests..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(ENCRYPTION_COMP_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
+	@echo "Build complete. Run with: ./$(ENCRYPTION_COMP_TEST_TARGET)"
+
 # Run tests
 run: $(TEST_TARGET)
 	@echo "==================================="
@@ -225,7 +235,7 @@ run-bottom-up: $(BOTTOM_UP_TEST_TARGET)
 # Clean test files only (not the main build)
 clean:
 	@echo "Cleaning unit test files..."
-	rm -f $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET) $(TOP_DOWN_TEST_TARGET) $(FULL_JOIN_TEST_TARGET) $(DISTRIBUTE_TEST_TARGET) *.o
+	rm -f $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET) $(TOP_DOWN_TEST_TARGET) $(FULL_JOIN_TEST_TARGET) $(DISTRIBUTE_TEST_TARGET) $(ENCRYPTION_COMP_TEST_TARGET) *.o
 	rm -f enclave.signed.so  # Remove symlink
 	@echo "Note: Main enclave files are preserved"
 

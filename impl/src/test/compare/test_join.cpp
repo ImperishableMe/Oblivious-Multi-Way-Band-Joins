@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <set>
+#include <map>
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -21,7 +22,7 @@ sgx_enclave_id_t global_eid = 0;
 int initialize_enclave() {
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     
-    ret = sgx_create_enclave("../../enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
+    ret = sgx_create_enclave("/home/r33wei/omwj/memory_const/impl/src/enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
         std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
         return -1;
@@ -123,20 +124,23 @@ double run_timed_command(const std::string& command) {
 
 /* Print usage information */
 void print_usage(const char* program_name) {
-    std::cout << "Usage: " << program_name << " <test_case_dir>" << std::endl;
-    std::cout << "  test_case_dir : Directory containing test case (input tables and join spec)" << std::endl;
+    std::cout << "Usage: " << program_name << " <sql_file> <data_dir>" << std::endl;
+    std::cout << "  sql_file : SQL file containing the query" << std::endl;
+    std::cout << "  data_dir : Directory containing encrypted input tables" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
+    if (argc != 3) {
         print_usage(argv[0]);
         return 1;
     }
     
-    std::string test_dir = argv[1];
+    std::string sql_file = argv[1];
+    std::string data_dir = argv[2];
     
     std::cout << "\n=== Join Test Comparator ===" << std::endl;
-    std::cout << "Test directory: " << test_dir << std::endl;
+    std::cout << "SQL file: " << sql_file << std::endl;
+    std::cout << "Data directory: " << data_dir << std::endl;
     
     try {
         // Initialize enclave for decryption
@@ -145,31 +149,30 @@ int main(int argc, char* argv[]) {
             return -1;
         }
         
-        // Create output directory for results
-        std::string output_dir = test_dir + "/output";
+        // Create temporary directory for outputs
+        std::string output_dir = "/tmp/join_compare_" + std::to_string(time(nullptr));
         mkdir(output_dir.c_str(), 0755);
         
         // Define output files
         std::string sgx_output = output_dir + "/sgx_result.csv";
         std::string sqlite_output = output_dir + "/sqlite_result.csv";
-        std::string join_spec = test_dir + "/join_spec.txt";
         
-        // Check if join spec exists
+        // Check if SQL file exists
         struct stat buffer;
-        if (stat(join_spec.c_str(), &buffer) != 0) {
-            std::cerr << "Join specification not found: " << join_spec << std::endl;
+        if (stat(sql_file.c_str(), &buffer) != 0) {
+            std::cerr << "SQL file not found: " << sql_file << std::endl;
             return 1;
         }
         
         // Run SGX oblivious join
         std::cout << "\n--- Running SGX Oblivious Join ---" << std::endl;
-        std::string sgx_cmd = "../../sgx_app " + test_dir + " " + join_spec + " " + sgx_output;
+        std::string sgx_cmd = "/home/r33wei/omwj/memory_const/impl/src/sgx_app " + sql_file + " " + data_dir + " " + sgx_output;
         double sgx_time = run_timed_command(sgx_cmd);
         std::cout << "SGX join completed in " << sgx_time << " seconds" << std::endl;
         
         // Run SQLite baseline
         std::cout << "\n--- Running SQLite Baseline ---" << std::endl;
-        std::string sqlite_cmd = "../baseline/sqlite_baseline " + test_dir + " " + join_spec + " " + sqlite_output;
+        std::string sqlite_cmd = "/home/r33wei/omwj/memory_const/impl/src/test/sqlite_baseline " + sql_file + " " + data_dir + " " + sqlite_output;
         double sqlite_time = run_timed_command(sqlite_cmd);
         std::cout << "SQLite join completed in " << sqlite_time << " seconds" << std::endl;
         
@@ -178,11 +181,17 @@ int main(int argc, char* argv[]) {
         
         std::cout << "Loading SGX result..." << std::endl;
         Table sgx_encrypted = TableIO::load_csv(sgx_output);
+        std::cout << "  Loaded " << sgx_encrypted.size() << " encrypted rows" << std::endl;
+        std::cout << "  First entry encrypted: " << sgx_encrypted[0].is_encrypted << std::endl;
         Table sgx_result = decrypt_table(sgx_encrypted);
+        std::cout << "  After decrypt, first entry encrypted: " << sgx_result[0].is_encrypted << std::endl;
         
         std::cout << "Loading SQLite result..." << std::endl;
         Table sqlite_encrypted = TableIO::load_csv(sqlite_output);
+        std::cout << "  Loaded " << sqlite_encrypted.size() << " encrypted rows" << std::endl;
+        std::cout << "  First entry encrypted: " << sqlite_encrypted[0].is_encrypted << std::endl;
         Table sqlite_result = decrypt_table(sqlite_encrypted);
+        std::cout << "  After decrypt, first entry encrypted: " << sqlite_result[0].is_encrypted << std::endl;
         
         // Compare results
         ComparisonResult comparison = compare_tables(sgx_result, sqlite_result);
@@ -224,6 +233,89 @@ int main(int argc, char* argv[]) {
         std::cout << "SGX time: " << sgx_time << " seconds" << std::endl;
         std::cout << "SQLite time: " << sqlite_time << " seconds" << std::endl;
         std::cout << "Overhead: " << (sgx_time / sqlite_time) << "x" << std::endl;
+        
+        // Write summary to file
+        // Extract base names from paths
+        std::string query_basename = sql_file.substr(sql_file.find_last_of("/\\") + 1);
+        if (query_basename.size() > 4 && query_basename.substr(query_basename.size() - 4) == ".sql") {
+            query_basename = query_basename.substr(0, query_basename.size() - 4);
+        }
+        std::string data_basename = data_dir.substr(data_dir.find_last_of("/\\") + 1);
+        if (data_basename.empty()) {
+            // Handle case where path ends with /
+            std::string temp = data_dir.substr(0, data_dir.find_last_of("/\\"));
+            data_basename = temp.substr(temp.find_last_of("/\\") + 1);
+        }
+        
+        // Create output directory if it doesn't exist
+        std::string summary_dir = "/home/r33wei/omwj/memory_const/output";
+        mkdir(summary_dir.c_str(), 0755);
+        
+        std::string summary_filename = summary_dir + "/" + query_basename + "_" + data_basename + "_summary.txt";
+        std::ofstream summary_file(summary_filename);
+        if (summary_file.is_open()) {
+            // Read the SQL query
+            std::ifstream sql_in(sql_file);
+            std::string sql_content;
+            if (sql_in.is_open()) {
+                std::string line;
+                while (std::getline(sql_in, line)) {
+                    sql_content += line + "\n";
+                }
+                sql_in.close();
+            }
+            
+            // Count input table sizes
+            std::map<std::string, size_t> table_sizes;
+            DIR* dir = opendir(data_dir.c_str());
+            if (dir) {
+                struct dirent* entry;
+                while ((entry = readdir(dir)) != nullptr) {
+                    std::string filename = entry->d_name;
+                    if (filename.size() > 4 && filename.substr(filename.size() - 4) == ".csv") {
+                        std::string filepath = data_dir + "/" + filename;
+                        std::string table_name = filename.substr(0, filename.size() - 4);
+                        Table temp_table = TableIO::load_csv(filepath);
+                        table_sizes[table_name] = temp_table.size();
+                    }
+                }
+                closedir(dir);
+            }
+            
+            // Write summary
+            summary_file << "=== Test Summary ===" << std::endl;
+            summary_file << "Query File: " << query_basename << ".sql" << std::endl;
+            summary_file << "Dataset: " << data_basename << std::endl;
+            summary_file << "\n=== SQL Query ===" << std::endl;
+            summary_file << sql_content << std::endl;
+            
+            summary_file << "=== Input Table Sizes ===" << std::endl;
+            for (const auto& pair : table_sizes) {
+                summary_file << pair.first << ": " << pair.second << " rows" << std::endl;
+            }
+            
+            summary_file << "\n=== Output ===" << std::endl;
+            summary_file << "SGX Output Size: " << comparison.sgx_rows << " rows" << std::endl;
+            summary_file << "SQLite Output Size: " << comparison.sqlite_rows << " rows" << std::endl;
+            
+            summary_file << "\n=== Results ===" << std::endl;
+            summary_file << "Match: " << (comparison.are_equivalent ? "YES" : "NO") << std::endl;
+            if (!comparison.are_equivalent) {
+                summary_file << "  Matching rows: " << comparison.matching_rows << std::endl;
+                summary_file << "  SGX-only rows: " << comparison.sgx_only.size() << std::endl;
+                summary_file << "  SQLite-only rows: " << comparison.sqlite_only.size() << std::endl;
+            }
+            
+            summary_file << "\n=== Performance ===" << std::endl;
+            summary_file << "SGX Time: " << sgx_time << " seconds" << std::endl;
+            summary_file << "SQLite Time: " << sqlite_time << " seconds" << std::endl;
+            summary_file << "Overhead: " << (sgx_time / sqlite_time) << "x" << std::endl;
+            
+            summary_file.close();
+            std::cout << "\nSummary written to: " << summary_filename << std::endl;
+        } else {
+            std::cerr << "Warning: Could not write summary file: " << summary_filename << std::endl;
+        }
         
         // Cleanup
         destroy_enclave();

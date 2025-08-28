@@ -4,6 +4,10 @@
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
 
+// Forward declaration for selective debug dumping
+void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
+                                 uint32_t eid, const std::vector<std::string>& columns);
+
 void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     std::cout << "Starting Bottom-Up Phase..." << std::endl;
     
@@ -32,6 +36,22 @@ void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
                     eid);
             }
         }
+    }
+    
+    // Debug: Dump final local_mult values after bottom-up phase
+    std::vector<JoinTreeNodePtr> all_nodes;
+    std::function<void(JoinTreeNodePtr)> collect = [&](JoinTreeNodePtr node) {
+        all_nodes.push_back(node);
+        for (auto& child : node->get_children()) {
+            collect(child);
+        }
+    };
+    collect(root);
+    
+    for (const auto& node : all_nodes) {
+        std::vector<std::string> key_columns = {"original_index", "local_mult"};
+        std::string step_name = "bottomup_step12_final_" + node->get_table_name();
+        debug_dump_selected_columns(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), eid, key_columns);
     }
     
     std::cout << "Bottom-Up Phase completed." << std::endl;
@@ -81,6 +101,7 @@ Table BottomUpPhase::CombineTable(
     DEBUG_INFO("CombineTable: target=%zu entries, source=%zu entries", 
                target.size(), source.size());
     
+    
     // Get constraint parameters
     auto params = constraint.get_params();
     int32_t dev1 = params.deviation1;
@@ -90,6 +111,10 @@ Table BottomUpPhase::CombineTable(
     
     DEBUG_INFO("Constraint params: dev1=%d, dev2=%d, eq1=%d, eq2=%d", 
                dev1, dev2, eq1, eq2);
+    DEBUG_INFO("INT_MAX=%d, INT_MAX/2=%d, INT_MIN=%d, INT_MIN/2=%d", 
+               INT_MAX, INT_MAX/2, INT_MIN, INT_MIN/2);
+    DEBUG_INFO("Is dev2 meant to be infinity? dev2=%d vs INT_MAX/2=%d", 
+               dev2, INT_MAX/2);
     
     // Transform source entries to SOURCE type
     DEBUG_INFO("Transforming source entries to SOURCE type");
@@ -138,6 +163,7 @@ Table BottomUpPhase::CombineTable(
     
     DEBUG_INFO("Combined table created with %zu entries", combined.size());
     
+    
     return combined;
 }
 
@@ -154,12 +180,20 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     DEBUG_INFO("Setting join_attr for child using column: %s", constraint.get_source_column().c_str());
     JoinAttributeSetter::SetJoinAttributesForTable(child, constraint.get_source_column(), eid);
     
+    // Debug: Dump parent and child tables before combining  
+    std::vector<std::string> debug_columns = {"original_index", "local_mult", "join_attr", "ALL_ATTRIBUTES"};
+    debug_dump_selected_columns(parent, "parent", "bottomup_step1_inputs", eid, debug_columns);
+    debug_dump_selected_columns(child, "child", "bottomup_step1_inputs", eid, debug_columns);
+    
     // Step 1: Create combined table with dual-entry technique
     DEBUG_INFO("Creating combined table from parent (%zu) and child (%zu)", 
                parent.size(), child.size());
     Table combined = CombineTable(parent, child, constraint, eid);
     DEBUG_INFO("Combined table has %zu entries", combined.size());
-    debug_dump_table(combined, "combined", "bottomup_step1_combined", eid);
+    
+    // Debug: Dump combined table after creation
+    std::vector<std::string> combined_columns = {"original_index", "local_mult", "field_type", "join_attr", "ALL_ATTRIBUTES"};
+    debug_dump_selected_columns(combined, "combined", "bottomup_step2_combine", eid, combined_columns);
     
     // Step 2: Initialize temporary fields (local_cumsum = local_mult, local_interval = 0)
     DEBUG_INFO("Initializing temporary fields");
@@ -168,7 +202,10 @@ void BottomUpPhase::ComputeLocalMultiplicities(
             return ecall_transform_init_local_temps(eid, e);
         });
     DEBUG_INFO("Temporary fields initialized");
-    debug_dump_table(combined, "combined", "bottomup_step2_init_temps", eid);
+    
+    // Debug: Dump after initializing temps
+    std::vector<std::string> init_columns = {"original_index", "field_type", "join_attr", "local_mult", "local_cumsum", "local_interval"};
+    debug_dump_selected_columns(combined, "initialized", "bottomup_step3_init_temps", eid, init_columns);
     
     // Step 3: Sort by join attribute and precedence
     DEBUG_INFO("Sorting combined table by join attribute");
@@ -177,7 +214,9 @@ void BottomUpPhase::ComputeLocalMultiplicities(
             return ecall_comparator_join_attr(eid, e1, e2);
         });
     DEBUG_INFO("Sort completed");
-    debug_dump_table(combined, "combined", "bottomup_step3_sorted", eid);
+    
+    // Debug: Dump after sorting by join attribute
+    debug_dump_selected_columns(combined, "sorted_by_join", "bottomup_step4_sorted", eid, init_columns);
     
     // Step 4: Compute local cumulative sums
     DEBUG_INFO("Computing local cumulative sums");
@@ -185,7 +224,9 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_window_compute_local_sum(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined", "bottomup_step4_cumsum", eid);
+    
+    // Debug: Dump after computing cumulative sums
+    debug_dump_selected_columns(combined, "with_cumsum", "bottomup_step5_cumsum", eid, init_columns);
     
     // Step 5: Sort for pairwise processing (group START/END pairs)
     DEBUG_INFO("Sorting for pairwise processing");
@@ -193,7 +234,9 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_pairwise(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined", "bottomup_step5_pairwise", eid);
+    
+    // Debug: Dump after sorting for pairwise
+    debug_dump_selected_columns(combined, "sorted_pairwise", "bottomup_step6_pairwise", eid, init_columns);
     
     // Step 6: Compute intervals between START/END pairs
     DEBUG_INFO("Computing intervals between START/END pairs");
@@ -201,7 +244,9 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_window_compute_local_interval(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined", "bottomup_step6_intervals", eid);
+    
+    // Debug: Dump after computing intervals
+    debug_dump_selected_columns(combined, "with_intervals", "bottomup_step7_intervals", eid, init_columns);
     
     // Step 7: Sort END entries first for final update
     DEBUG_INFO("Sorting END entries first");
@@ -209,7 +254,9 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             return ecall_comparator_end_first(eid, e1, e2);
         });
-    debug_dump_table(combined, "combined", "bottomup_step7_end_first", eid);
+    
+    // Debug: Dump after sorting END first
+    debug_dump_selected_columns(combined, "sorted_end_first", "bottomup_step8_end_first", eid, init_columns);
     
     // Step 8: Truncate to parent size - now we have END entries with computed intervals
     // The first parent.size() entries are now the END entries with computed intervals
@@ -220,19 +267,27 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     for (size_t i = 0; i < parent.size() && i < combined.size(); i++) {
         truncated.add_entry(combined[i]);
     }
-    debug_dump_table(truncated, "truncated", "bottomup_step8_truncated", eid);
+    
+    // Debug: Dump truncated END entries with intervals
+    std::vector<std::string> key_columns = {"original_index", "local_mult", "local_interval", "field_type"};
+    debug_dump_selected_columns(truncated, "truncated_ends", "bottomup_step9_truncated", eid, key_columns);
     
     // Step 9: Update parent multiplicities using parallel pass
     // This multiplies parent's local_mult by the computed interval from END entries
     DEBUG_INFO("Updating parent multiplicities");
-    debug_dump_table(parent, "parent_before", "bottomup_step9a_parent_before", eid);
+    
+    // Debug: Parent before update
+    debug_dump_selected_columns(parent, "parent_before", "bottomup_step10_parent_before", eid, key_columns);
+    
     truncated.parallel_pass(parent, eid,
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
             // e1 is from truncated (source with intervals), e2 is from parent (target to update)
             return ecall_update_target_multiplicity(eid, e2, e1);
         });
+    
+    // Debug: Parent after update
+    debug_dump_selected_columns(parent, "parent_after", "bottomup_step11_parent_after", eid, key_columns);
     DEBUG_INFO("Parent multiplicities updated");
-    debug_dump_table(parent, "parent_after", "bottomup_step9b_parent_after", eid);
 }
 
 std::vector<JoinTreeNodePtr> BottomUpPhase::PostOrderTraversal(JoinTreeNodePtr root) {

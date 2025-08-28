@@ -21,9 +21,9 @@
 
 // Entry structure for enclave processing
 typedef struct {
-    // Entry metadata
-    entry_type_t field_type;      // SORT_PADDING, SOURCE, START, END, TARGET, DIST_PADDING
-    equality_type_t equality_type; // EQ, NEQ, NONE
+    // Entry metadata (using int32_t for consistency across encrypt/decrypt)
+    int32_t field_type;           // SORT_PADDING, SOURCE, START, END, TARGET, DIST_PADDING
+    int32_t equality_type;        // EQ, NEQ, NONE
     uint8_t is_encrypted;         // Whether data is encrypted (0 or 1)
     
     // Encryption nonce for AES-CTR mode

@@ -266,40 +266,11 @@ TableIO::load_csv_directory(const std::string& dir_path) {
 std::unordered_map<std::string, Table> 
 TableIO::load_tables_from_directory(const std::string& dir_path,
                                    bool encrypted) {
-    if (encrypted) {
-        std::unordered_map<std::string, Table> tables;
-        
-        DIR* dir = opendir(dir_path.c_str());
-        if (dir == nullptr) {
-            throw std::runtime_error("Cannot open directory: " + dir_path);
-        }
-        
-        struct dirent* entry;
-        while ((entry = readdir(dir)) != nullptr) {
-            std::string filename = entry->d_name;
-            
-            // Skip . and ..
-            if (filename == "." || filename == "..") continue;
-            
-            // Check if it's a regular file and CSV
-            std::string full_path = dir_path + "/" + filename;
-            struct stat file_stat;
-            if (stat(full_path.c_str(), &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
-                if (is_csv_file(filename)) {
-                    std::string table_name = extract_table_name(filename);
-                    // load_csv auto-detects encryption by checking for nonce column
-                    tables[table_name] = load_csv(full_path);
-                    std::cout << "Loaded CSV table: " << table_name 
-                             << " (" << tables[table_name].size() << " rows)" << std::endl;
-                }
-            }
-        }
-        
-        closedir(dir);
-        return tables;
-    } else {
-        return load_csv_directory(dir_path);
-    }
+    // The encrypted parameter is kept for API compatibility but is now ignored
+    // load_csv auto-detects encryption by checking for nonce column
+    (void)encrypted; // Suppress unused parameter warning
+    
+    return load_csv_directory(dir_path);
 }
 
 bool TableIO::file_exists(const std::string& filepath) {

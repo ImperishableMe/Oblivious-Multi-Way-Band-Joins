@@ -7,17 +7,8 @@
 // Note: Entry conversion functions have been moved to Entry class methods
 // Use Entry::to_entry_t() and Entry::from_entry_t() instead
 
-// Convert entire Table to vector of entry_t structures
-std::vector<entry_t> table_to_entry_t_vector(const Table& table) {
-    std::vector<entry_t> c_entries;
-    c_entries.reserve(table.size());
-    
-    for (size_t i = 0; i < table.size(); i++) {
-        c_entries.push_back(table.get_entry(i).to_entry_t());
-    }
-    
-    return c_entries;
-}
+// Note: Table::to_entry_t_vector() has been moved to Table class
+// Use Table::to_entry_t_vector() instead
 
 // Convert vector of entry_t structures back to Table
 Table entry_t_vector_to_table(const std::vector<entry_t>& entries) {

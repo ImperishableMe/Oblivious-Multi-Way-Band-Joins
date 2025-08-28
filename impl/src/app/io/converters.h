@@ -14,11 +14,8 @@ class Table;
 // Note: Entry conversion functions moved to Entry class methods
 // Use Entry::to_entry_t() and Entry::from_entry_t() instead
 
-/**
- * Convert entire Table to vector of entry_t structures
- * Used for batch processing in SGX enclave
- */
-std::vector<entry_t> table_to_entry_t_vector(const Table& table);
+// Note: Table conversion functions moved to Table class methods
+// Use Table::to_entry_t_vector() and Table constructor/methods instead
 
 /**
  * Convert vector of entry_t structures back to Table

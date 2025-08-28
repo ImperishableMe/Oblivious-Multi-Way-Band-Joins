@@ -120,16 +120,6 @@ void Entry::clear() {
     *this = Entry();  // Reset to default values
 }
 
-void Entry::encrypt() {
-    // Placeholder - actual encryption happens in SGX
-    is_encrypted = true;
-}
-
-void Entry::decrypt() {
-    // Placeholder - actual decryption happens in SGX
-    is_encrypted = false;
-}
-
 int32_t Entry::get_attribute(const std::string& column_name) const {
     // Find the column index
     for (size_t i = 0; i < column_names.size(); i++) {

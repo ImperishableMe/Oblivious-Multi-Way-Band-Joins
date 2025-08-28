@@ -63,8 +63,7 @@ public:
     
     // Utility methods
     void clear();
-    void encrypt();
-    void decrypt();
+    // NOTE: Use CryptoUtils::encrypt_entry() and CryptoUtils::decrypt_entry() for actual encryption/decryption
     
     // Attribute access by column name
     int32_t get_attribute(const std::string& column_name) const;

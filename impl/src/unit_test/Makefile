@@ -107,6 +107,9 @@ DISTRIBUTE_TEST_SRCS = ../test/unit/test_distribute_expand.cpp \
 # Comprehensive encryption test
 ENCRYPTION_COMP_TEST_SRCS = test_encryption_comprehensive.cpp
 
+# Simple encryption test
+ENCRYPTION_SIMPLE_TEST_SRCS = test_encryption_simple.cpp
+
 # Object files needed from main build
 MAIN_OBJS = $(ENCLAVE_U_O)
 
@@ -120,6 +123,7 @@ TOP_DOWN_TEST_TARGET = test_top_down
 FULL_JOIN_TEST_TARGET = test_full_join
 DISTRIBUTE_TEST_TARGET = test_distribute_expand
 ENCRYPTION_COMP_TEST_TARGET = test_encryption_comprehensive
+ENCRYPTION_SIMPLE_TEST_TARGET = test_encryption_simple
 
 # Default target
 all: check-enclave $(TEST_TARGET) $(TABLE_IO_TEST_TARGET) $(AES_TEST_TARGET) $(JOIN_TEST_TARGET) $(BOTTOM_UP_TEST_TARGET) $(TOP_DOWN_TEST_TARGET) $(FULL_JOIN_TEST_TARGET) $(DISTRIBUTE_TEST_TARGET) $(ENCRYPTION_COMP_TEST_TARGET)
@@ -190,6 +194,12 @@ $(ENCRYPTION_COMP_TEST_TARGET): check-enclave $(ENCRYPTION_COMP_TEST_SRCS) $(INF
 	@echo "Building comprehensive encryption tests..."
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(ENCRYPTION_COMP_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
 	@echo "Build complete. Run with: ./$(ENCRYPTION_COMP_TEST_TARGET)"
+
+# Build simple encryption test executable
+$(ENCRYPTION_SIMPLE_TEST_TARGET): check-enclave $(ENCRYPTION_SIMPLE_TEST_SRCS) $(INFRA_SRCS)
+	@echo "Building simple encryption test..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(ENCRYPTION_SIMPLE_TEST_SRCS) $(INFRA_SRCS) $(MAIN_OBJS) $(LDFLAGS) -o $@
+	@echo "Build complete. Run with: ./$(ENCRYPTION_SIMPLE_TEST_TARGET)"
 
 # Run tests
 run: $(TEST_TARGET)

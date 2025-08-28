@@ -1,5 +1,5 @@
 #include "crypto_utils.h"
-#include "../io/converters.h"
+#include "../data_structures/entry.h"
 #include "../Enclave_u.h"
 #include <iostream>
 #include <random>
@@ -13,7 +13,7 @@ crypto_status_t CryptoUtils::encrypt_entry(Entry& entry, sgx_enclave_id_t eid) {
     }
     
     // Convert to entry_t
-    entry_t c_entry = entry_to_entry_t(entry);
+    entry_t c_entry = entry.to_entry_t();
     
     // Call SGX ecall (uses secure key inside enclave)
     crypto_status_t status;
@@ -26,7 +26,7 @@ crypto_status_t CryptoUtils::encrypt_entry(Entry& entry, sgx_enclave_id_t eid) {
     
     if (status == CRYPTO_SUCCESS) {
         // Convert back only if successful
-        entry = entry_t_to_entry(c_entry);
+        entry.from_entry_t(c_entry);
     } else {
         log_crypto_error(status, "encrypt_entry (in enclave)");
     }
@@ -42,7 +42,7 @@ crypto_status_t CryptoUtils::decrypt_entry(Entry& entry, sgx_enclave_id_t eid) {
     }
     
     // Convert to entry_t
-    entry_t c_entry = entry_to_entry_t(entry);
+    entry_t c_entry = entry.to_entry_t();
     
     // Call SGX ecall (uses secure key inside enclave)
     crypto_status_t status;
@@ -55,7 +55,7 @@ crypto_status_t CryptoUtils::decrypt_entry(Entry& entry, sgx_enclave_id_t eid) {
     
     if (status == CRYPTO_SUCCESS) {
         // Convert back only if successful
-        entry = entry_t_to_entry(c_entry);
+        entry.from_entry_t(c_entry);
     } else {
         log_crypto_error(status, "decrypt_entry (in enclave)");
     }

@@ -11,17 +11,8 @@
 class Entry;
 class Table;
 
-/**
- * Convert C++ Entry to C entry_t structure
- * Copies all fields and converts std::vector to fixed arrays
- */
-entry_t entry_to_entry_t(const Entry& entry);
-
-/**
- * Convert C entry_t structure to C++ Entry
- * Copies all fields and converts fixed arrays to std::vector
- */
-Entry entry_t_to_entry(const entry_t& c_entry);
+// Note: Entry conversion functions moved to Entry class methods
+// Use Entry::to_entry_t() and Entry::from_entry_t() instead
 
 /**
  * Convert entire Table to vector of entry_t structures

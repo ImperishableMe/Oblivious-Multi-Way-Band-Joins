@@ -1,93 +1,11 @@
 #include "converters.h"
+#include "../data_structures/entry.h"
+#include "../data_structures/table.h"
 #include <algorithm>
 #include <cstring>
 
-// Convert C++ Entry to C entry_t structure
-entry_t entry_to_entry_t(const Entry& entry) {
-    entry_t c_entry;
-    
-    // Copy metadata fields
-    c_entry.field_type = entry.field_type;
-    c_entry.equality_type = entry.equality_type;
-    c_entry.is_encrypted = entry.is_encrypted;
-    c_entry.nonce = entry.nonce;
-    
-    // Copy join attribute
-    c_entry.join_attr = entry.join_attr;
-    
-    // Copy persistent metadata
-    c_entry.original_index = entry.original_index;
-    c_entry.local_mult = entry.local_mult;
-    c_entry.final_mult = entry.final_mult;
-    c_entry.foreign_sum = entry.foreign_sum;
-    
-    // Copy temporary metadata
-    c_entry.local_cumsum = entry.local_cumsum;
-    c_entry.local_interval = entry.local_interval;
-    c_entry.foreign_cumsum = entry.foreign_cumsum;
-    c_entry.foreign_interval = entry.foreign_interval;
-    c_entry.local_weight = entry.local_weight;
-    
-    // Copy expansion metadata
-    c_entry.copy_index = entry.copy_index;
-    c_entry.alignment_key = entry.alignment_key;
-    
-    // Convert attributes vector to array
-    int32_to_array(entry.attributes, c_entry.attributes, MAX_ATTRIBUTES);
-    
-    // Convert column names vector to 2D char array
-    strings_to_char_array_2d(entry.column_names, c_entry.column_names, MAX_ATTRIBUTES);
-    
-    return c_entry;
-}
-
-// Convert C entry_t structure to C++ Entry
-Entry entry_t_to_entry(const entry_t& c_entry) {
-    Entry entry;
-    
-    // Copy metadata fields
-    entry.field_type = c_entry.field_type;
-    entry.equality_type = c_entry.equality_type;
-    entry.is_encrypted = c_entry.is_encrypted;
-    entry.nonce = c_entry.nonce;
-    
-    // Copy join attribute
-    entry.join_attr = c_entry.join_attr;
-    
-    // Copy persistent metadata
-    entry.original_index = c_entry.original_index;
-    entry.local_mult = c_entry.local_mult;
-    entry.final_mult = c_entry.final_mult;
-    entry.foreign_sum = c_entry.foreign_sum;
-    
-    // Copy temporary metadata
-    entry.local_cumsum = c_entry.local_cumsum;
-    entry.local_interval = c_entry.local_interval;
-    entry.foreign_cumsum = c_entry.foreign_cumsum;
-    entry.foreign_interval = c_entry.foreign_interval;
-    entry.local_weight = c_entry.local_weight;
-    
-    // Copy expansion metadata
-    entry.copy_index = c_entry.copy_index;
-    entry.alignment_key = c_entry.alignment_key;
-    
-    // Convert column names first to determine actual column count
-    // Count actual number of column names (stop at first empty)
-    size_t num_cols = 0;
-    for (size_t i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (strlen(c_entry.column_names[i]) == 0) {
-            break;  // Stop at first empty column name
-        }
-        num_cols++;
-    }
-    entry.column_names = char_array_2d_to_strings(c_entry.column_names, num_cols);
-    
-    // Convert attributes array to vector using column count
-    // Only copy as many attributes as we have columns
-    entry.attributes = array_to_int32(c_entry.attributes, num_cols);
-    
-    return entry;
-}
+// Note: Entry conversion functions have been moved to Entry class methods
+// Use Entry::to_entry_t() and Entry::from_entry_t() instead
 
 // Convert entire Table to vector of entry_t structures
 std::vector<entry_t> table_to_entry_t_vector(const Table& table) {
@@ -95,7 +13,7 @@ std::vector<entry_t> table_to_entry_t_vector(const Table& table) {
     c_entries.reserve(table.size());
     
     for (size_t i = 0; i < table.size(); i++) {
-        c_entries.push_back(entry_to_entry_t(table.get_entry(i)));
+        c_entries.push_back(table.get_entry(i).to_entry_t());
     }
     
     return c_entries;
@@ -106,7 +24,9 @@ Table entry_t_vector_to_table(const std::vector<entry_t>& entries) {
     Table table;
     
     for (const auto& c_entry : entries) {
-        table.add_entry(entry_t_to_entry(c_entry));
+        Entry entry;
+        entry.from_entry_t(c_entry);
+        table.add_entry(entry);
     }
     
     return table;

@@ -246,6 +246,14 @@ $(Encrypt_Tool): $(Encrypt_Tool_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags) -lstdc++fs
 	@echo "LINK =>  $@"
 
+# Test programs
+Test_Minimal_Objects := test_minimal.cpp app/data_structures/entry.o app/data_structures/table.o \
+                        app/crypto/crypto_utils.o app/debug_util.o $(Gen_Untrusted_Object)
+
+test_minimal: $(Test_Minimal_Objects)
+	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
 ######## Enclave Build ########
 
 $(Gen_Trusted_Source): $(SGX_EDGER8R) enclave/Enclave.edl

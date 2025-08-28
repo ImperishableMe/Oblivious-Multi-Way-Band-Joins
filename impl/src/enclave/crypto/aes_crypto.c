@@ -78,7 +78,7 @@ crypto_status_t aes_encrypt_entry(entry_t* entry) {
         size_t start;
         size_t end;
     } regions[] = {
-        {0, is_encrypted_offset},  // Before is_encrypted
+        {0, is_encrypted_offset},  // Before is_encrypted (includes field_type, equality_type)
         {is_encrypted_offset + sizeof(uint8_t), nonce_offset},  // Between is_encrypted and nonce
         {nonce_offset + sizeof(uint64_t), column_names_offset}  // Between nonce and column_names
     };

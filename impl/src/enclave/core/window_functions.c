@@ -26,7 +26,12 @@ void window_set_original_index(entry_t* e1, entry_t* e2) {
 
 static void update_target_multiplicity_op(entry_t* target, entry_t* source) {
     // Multiply target's local_mult by computed interval from combined table
+    int32_t old_mult = target->local_mult;
+    int32_t interval = source->local_interval;
     target->local_mult = target->local_mult * source->local_interval;
+    
+    // Debug: Check for negative multiplicity
+    // Note: Cannot use DEBUG_ENCLAVE in enclave code - would need OCALL for logging
 }
 
 /**
@@ -84,6 +89,9 @@ static void compute_local_interval_op(entry_t* e1, entry_t* e2) {
     // Compute interval difference
     int32_t interval = e2->local_cumsum - e1->local_cumsum;
     uint32_t old_interval = e2->local_interval;
+    
+    // Debug: Check for negative interval
+    // Note: Cannot use DEBUG_ENCLAVE in enclave code - would need OCALL for logging
     
     // Set interval only if we have a pair, otherwise preserve existing value
     e2->local_interval = (is_pair * interval) + ((1 - is_pair) * e2->local_interval);

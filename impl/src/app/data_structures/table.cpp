@@ -146,14 +146,34 @@ Table Table::map(sgx_enclave_id_t eid,
     // Apply transform to each entry independently
     for (size_t i = 0; i < output.size(); i++) {
         DEBUG_TRACE("Map: Processing entry %zu/%zu", i, output.size());
+        
+        // Log the Entry before conversion
+        const Entry& orig_entry = output.entries[i];
+        DEBUG_DEBUG("  Before: field_type=%d, is_encrypted=%d, join_attr=%d, original_index=%u",
+                    orig_entry.field_type, orig_entry.is_encrypted, 
+                    orig_entry.join_attr, orig_entry.original_index);
+        
         entry_t entry = output.entries[i].to_entry_t();
+        
+        // Log the entry_t before ecall
+        DEBUG_DEBUG("  entry_t before ecall: field_type=%d, is_encrypted=%d, join_attr=%d",
+                    entry.field_type, entry.is_encrypted, entry.join_attr);
         
         // Apply the transform ecall
         sgx_status_t status = transform_func(eid, &entry);
         check_sgx_status(status, "Map transform");
         
+        // Log the entry_t after ecall
+        DEBUG_DEBUG("  entry_t after ecall: field_type=%d, is_encrypted=%d, join_attr=%d",
+                    entry.field_type, entry.is_encrypted, entry.join_attr);
+        
         // Store back the transformed entry
         output.entries[i].from_entry_t(entry);
+        
+        // Log the Entry after conversion
+        DEBUG_DEBUG("  After: field_type=%d, is_encrypted=%d, join_attr=%d, original_index=%u",
+                    output.entries[i].field_type, output.entries[i].is_encrypted,
+                    output.entries[i].join_attr, output.entries[i].original_index);
     }
     DEBUG_DEBUG("Map: Complete");
     

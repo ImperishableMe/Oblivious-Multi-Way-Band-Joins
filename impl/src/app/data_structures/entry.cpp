@@ -142,10 +142,6 @@ bool Entry::has_attribute(const std::string& column_name) const {
     return false;
 }
 
-bool Entry::has_column(const std::string& column_name) const {
-    return has_attribute(column_name);
-}
-
 void Entry::set_attribute(const std::string& column_name, int32_t value) {
     // Find the column index
     for (size_t i = 0; i < column_names.size(); i++) {

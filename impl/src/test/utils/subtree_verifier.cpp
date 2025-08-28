@@ -37,11 +37,11 @@ bool SubtreeVerifier::RowMatchesOriginal(
     // Check if result row contains all original attributes
     for (const auto& [col_name, value] : orig_attrs) {
         // Try with and without table prefix
-        if (result_row.has_column(col_name)) {
+        if (result_row.has_attribute(col_name)) {
             if (result_row.get_attribute(col_name) != value) {
                 return false;
             }
-        } else if (result_row.has_column(table_name + "." + col_name)) {
+        } else if (result_row.has_attribute(table_name + "." + col_name)) {
             if (result_row.get_attribute(table_name + "." + col_name) != value) {
                 return false;
             }

@@ -39,9 +39,12 @@ public:
     static Table load_csv(const std::string& filepath);
     
     /**
-     * Save a Table to CSV format
+     * Save a Table to CSV format (PLAINTEXT ONLY)
+     * IMPORTANT: This enforces that ALL entries must have is_encrypted=false.
+     *            Use this for debugging or when you explicitly need plaintext output.
      * @param table Table to save
      * @param filepath Output CSV file path
+     * @throws runtime_error if any entry has is_encrypted=true
      */
     static void save_csv(const Table& table, const std::string& filepath);
     
@@ -49,11 +52,14 @@ public:
     
     /**
      * Save a table as encrypted CSV with nonce column
+     * IMPORTANT: Ensures ALL entries are encrypted before saving.
+     *            Any unencrypted entries will be automatically encrypted.
+     *            Output CSV contains ciphertext values and a nonce column.
      * The encryption key is stored securely inside the enclave
-     * Adds a "nonce" column containing the unique nonce for each entry
      * @param table Table to encrypt and save
      * @param filepath Output CSV file path
      * @param eid Enclave ID for encryption
+     * @throws runtime_error if encryption fails
      */
     static void save_encrypted_csv(const Table& table, 
                                    const std::string& filepath,
@@ -74,8 +80,11 @@ public:
     /**
      * Load all tables from a directory (plain CSV or encrypted CSV)
      * @param dir_path Directory path
-     * @param encrypted Whether files are encrypted CSVs
+     * @param encrypted [DEPRECATED] This parameter is ignored. 
+     *                 The function auto-detects encryption by checking for nonce column.
+     *                 Kept for API compatibility, will be removed in future version.
      * @return Map of table name to Table object
+     * @deprecated The encrypted parameter is no longer used. Use load_csv_directory() directly.
      */
     static std::unordered_map<std::string, Table> 
         load_tables_from_directory(const std::string& dir_path,

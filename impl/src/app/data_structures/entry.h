@@ -68,7 +68,6 @@ public:
     // Attribute access by column name
     int32_t get_attribute(const std::string& column_name) const;
     bool has_attribute(const std::string& column_name) const;
-    bool has_column(const std::string& column_name) const; // Alias for has_attribute
     void set_attribute(const std::string& column_name, int32_t value);
     void add_attribute(const std::string& column_name, int32_t value);
     std::map<std::string, int32_t> get_attributes_map() const;

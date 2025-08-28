@@ -157,7 +157,7 @@ Entry SimpleJoinExecutor::concatenate_entries(
 
 int32_t SimpleJoinExecutor::get_column_value(const Entry& entry, const std::string& column_name) {
     // Try exact match first
-    if (entry.has_column(column_name)) {
+    if (entry.has_attribute(column_name)) {
         return entry.get_attribute(column_name);
     }
     

@@ -275,12 +275,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
                    first.field_type, first.equality_type);
     }
     
-    truncated.parallel_pass(child, eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            // e1 is from truncated (source with foreign intervals)
-            // e2 is from child (target to update)
-            return ecall_update_target_final_multiplicity(eid, e2, e1);
-        });
+    truncated.batched_parallel_pass(child, eid, OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY);
     
     // Debug: Check field types after update
     DEBUG_INFO("After parallel_pass - checking first entry field types");

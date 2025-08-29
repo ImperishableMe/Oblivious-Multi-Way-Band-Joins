@@ -100,10 +100,12 @@ void ecall_window_propagate_foreign_interval(entry_t* e1, entry_t* e2) {
 }
 
 void ecall_update_target_multiplicity(entry_t* e1, entry_t* e2) {
+    // e1 is source (with intervals), e2 is target (to update)
     update_target_multiplicity(e1, e2);
 }
 
 void ecall_update_target_final_multiplicity(entry_t* e1, entry_t* e2) {
+    // e1 is source (with foreign intervals), e2 is target (to update)
     update_target_final_multiplicity(e1, e2);
 }
 

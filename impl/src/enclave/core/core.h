@@ -48,10 +48,10 @@ void transform_create_dist_padding_op(entry_t* entry);  // Raw operation without
  */
 void window_set_original_index(entry_t* e1, entry_t* e2);
 void window_set_original_index_op(entry_t* e1, entry_t* e2);  // Raw operation without decrypt/encrypt
-void update_target_multiplicity(entry_t* target, const entry_t* source);
-void update_target_multiplicity_op(entry_t* target, entry_t* source);  // Raw operation without decrypt/encrypt
-void update_target_final_multiplicity(entry_t* target, const entry_t* source);
-void update_target_final_multiplicity_op(entry_t* target, entry_t* source);  // Raw operation without decrypt/encrypt
+void update_target_multiplicity(entry_t* source, entry_t* target);
+void update_target_multiplicity_op(entry_t* source, entry_t* target);  // Raw operation without decrypt/encrypt
+void update_target_final_multiplicity(entry_t* source, entry_t* target);
+void update_target_final_multiplicity_op(entry_t* source, entry_t* target);  // Raw operation without decrypt/encrypt
 void window_compute_local_sum(entry_t* e1, entry_t* e2);
 void window_compute_local_sum_op(entry_t* e1, entry_t* e2);  // Raw operation without decrypt/encrypt
 void window_compute_local_interval(entry_t* e1, entry_t* e2);

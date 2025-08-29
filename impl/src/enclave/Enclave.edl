@@ -62,10 +62,12 @@ enclave {
         public void ecall_window_compute_foreign_interval([in,out] entry_t* e1, [in,out] entry_t* e2);
         public void ecall_window_propagate_foreign_interval([in,out] entry_t* e1, [in,out] entry_t* e2);
         
-        // Bottom-up parallel: multiply local_mult by computed interval
+        // Bottom-up parallel: multiply target's local_mult by source's interval
+        // e1 = source (with intervals), e2 = target (to update)
         public void ecall_update_target_multiplicity([in,out] entry_t* e1, [in,out] entry_t* e2);
         
-        // Top-down parallel: set final_mult and foreign_sum
+        // Top-down parallel: set target's final_mult and foreign_sum from source
+        // e1 = source (with foreign intervals), e2 = target (to update)
         public void ecall_update_target_final_multiplicity([in,out] entry_t* e1, [in,out] entry_t* e2);
         
         /* Comparator functions for oblivious sorting */

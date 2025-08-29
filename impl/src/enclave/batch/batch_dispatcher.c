@@ -221,6 +221,7 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
         case OP_ECALL_UPDATE_TARGET_MULTIPLICITY:
             for (size_t i = 0; i < ops_count; i++) {
                 if (ops_array[i].idx2 != BATCH_NO_PARAM) {
+                    // idx1 = source (with intervals), idx2 = target (to update)
                     update_target_multiplicity(&data_array[ops_array[i].idx1],
                                              &data_array[ops_array[i].idx2]);
                 }
@@ -230,6 +231,7 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
         case OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY:
             for (size_t i = 0; i < ops_count; i++) {
                 if (ops_array[i].idx2 != BATCH_NO_PARAM) {
+                    // idx1 = source (with foreign intervals), idx2 = target (to update)
                     update_target_final_multiplicity(&data_array[ops_array[i].idx1],
                                                    &data_array[ops_array[i].idx2]);
                 }

@@ -4,29 +4,30 @@
 This document tracks which ecall operations have been converted to use the batch dispatcher and which still use individual ecalls.
 
 **Generated**: 2025-08-29  
-**Current Status**: 1/41 operations batched (2.4%)
+**Current Status**: 7/41 operations batched (17.1%)
 
 ## ✅ BATCHED Operations (Using Batch Dispatcher)
 
-Currently, only **1 operation** has been converted to use batching:
+Currently, **7 operations** have been converted to use batching:
 
 ### Bottom-Up Phase (bottom_up_phase.cpp)
-- [x] Line 228: `combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR)`
+- [x] Line 68: `batched_map(eid, OP_ECALL_INIT_METADATA_NULL)` - Initialize metadata to NULL
+- [x] Line 71: `batched_map(eid, OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE)` - Set local_mult to 1
+- [x] Line 83: `batched_linear_pass(eid, OP_ECALL_WINDOW_SET_ORIGINAL_INDEX)` - Set original indices
+- [x] Line 194: `batched_map(eid, OP_ECALL_TRANSFORM_INIT_LOCAL_TEMPS)` - Initialize temporary fields
+- [x] Line 205: `batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR)` - Sort by join attribute
+- [x] Line 213: `batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_LOCAL_SUM)` - Compute cumulative sums
+- [x] Line 261: `batched_parallel_pass(parent, eid, OP_ECALL_UPDATE_TARGET_MULTIPLICITY)` - Update multiplicities
 
 ## ❌ NOT BATCHED Operations (Still Using Individual Ecalls)
 
 ### Bottom-Up Phase (bottom_up_phase.cpp)
-- [ ] Line 70: `.map()` - `ecall_init_metadata_null` + `ecall_transform_set_local_mult_one`
-- [ ] Line 93: `.linear_pass()` - `ecall_window_set_original_index`
-- [ ] Line 132: `.map()` - `ecall_transform_to_source`
-- [ ] Line 139: `.map()` - `ecall_transform_to_start`
-- [ ] Line 146: `.map()` - `ecall_transform_to_end`
-- [ ] Line 214: `.map()` - `ecall_transform_init_local_temps`
-- [ ] Line 236: `.linear_pass()` - `ecall_window_compute_local_sum`
-- [ ] Line 246: `.oblivious_sort()` - `ecall_comparator_pairwise`
-- [ ] Line 256: `.linear_pass()` - `ecall_window_compute_local_interval`
-- [ ] Line 266: `.oblivious_sort()` - `ecall_comparator_end_first`
-- [ ] Line 296: `.parallel_pass()` - `ecall_update_target_multiplicity`
+- [ ] Line 119: `.batched_map()` - `ecall_transform_to_source`
+- [ ] Line 124: `.batched_map()` - `ecall_transform_to_start`
+- [ ] Line 129: `.batched_map()` - `ecall_transform_to_end`
+- [ ] Line 220: `.batched_oblivious_sort()` - `ecall_comparator_pairwise`
+- [ ] Line 227: `.batched_linear_pass()` - `ecall_window_compute_local_interval`
+- [ ] Line 234: `.batched_oblivious_sort()` - `ecall_comparator_end_first`
 
 ### Top-Down Phase (top_down_phase.cpp)
 - [ ] Line 69: `.map()` - `ecall_transform_init_final_mult`
@@ -63,11 +64,11 @@ Currently, only **1 operation** has been converted to use batching:
 
 | Operation Type | Count | Batched | Not Batched |
 |---------------|-------|---------|-------------|
-| `.map()` | 17 | 0 | 17 |
+| `.map()` | 17 | 3 | 14 |
 | `.oblivious_sort()` | 8 | 1 | 7 |
-| `.linear_pass()` | 10 | 0 | 10 |
-| `.parallel_pass()` | 4 | 0 | 4 |
-| **TOTAL** | **41** | **1** | **40** |
+| `.linear_pass()` | 10 | 2 | 8 |
+| `.parallel_pass()` | 4 | 1 | 3 |
+| **TOTAL** | **41** | **7** | **34** |
 
 ## Priority for Batching
 

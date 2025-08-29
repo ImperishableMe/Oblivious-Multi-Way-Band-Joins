@@ -24,8 +24,8 @@ void window_set_original_index(entry_t* e1, entry_t* e2) {
     apply_to_decrypted_pair(e1, e2, window_set_original_index_op);
 }
 
-void update_target_multiplicity_op(entry_t* target, entry_t* source) {
-    // Multiply target's local_mult by computed interval from combined table
+void update_target_multiplicity_op(entry_t* source, entry_t* target) {
+    // Multiply target's local_mult by computed interval from source (combined table)
     target->local_mult = target->local_mult * source->local_interval;
     
     // Debug: Check for negative multiplicity
@@ -35,13 +35,14 @@ void update_target_multiplicity_op(entry_t* target, entry_t* source) {
 /**
  * Update target multiplicity (Algorithm 503)
  * Pure arithmetic - already oblivious
+ * Parameters: source (with intervals), target (to update)
  */
-void update_target_multiplicity(entry_t* target, entry_t* source) {
-    apply_to_decrypted_pair(target, source, update_target_multiplicity_op);
+void update_target_multiplicity(entry_t* source, entry_t* target) {
+    apply_to_decrypted_pair(source, target, update_target_multiplicity_op);
 }
 
-void update_target_final_multiplicity_op(entry_t* target, entry_t* source) {
-    // Propagate foreign intervals to compute final multiplicities
+void update_target_final_multiplicity_op(entry_t* source, entry_t* target) {
+    // Propagate foreign intervals from source to compute target's final multiplicities
     target->final_mult = source->foreign_interval * target->local_mult;
     target->foreign_sum = source->foreign_sum;  // For alignment
 }
@@ -49,9 +50,10 @@ void update_target_final_multiplicity_op(entry_t* target, entry_t* source) {
 /**
  * Update target final multiplicity (Algorithm 623)
  * Pure arithmetic - already oblivious
+ * Parameters: source (with foreign intervals), target (to update)
  */
-void update_target_final_multiplicity(entry_t* target, entry_t* source) {
-    apply_to_decrypted_pair(target, source, update_target_final_multiplicity_op);
+void update_target_final_multiplicity(entry_t* source, entry_t* target) {
+    apply_to_decrypted_pair(source, target, update_target_final_multiplicity_op);
 }
 
 void window_compute_local_sum_op(entry_t* e1, entry_t* e2) {

@@ -258,11 +258,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     // Debug: Parent before update
     debug_dump_with_mask(parent, "parent_before", "bottomup_step10_parent_before", eid, key_mask);
     
-    truncated.parallel_pass(parent, eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            // e1 is from truncated (source with intervals), e2 is from parent (target to update)
-            return ecall_update_target_multiplicity(eid, e2, e1);
-        });
+    truncated.batched_parallel_pass(parent, eid, OP_ECALL_UPDATE_TARGET_MULTIPLICITY);
     
     // Debug: Parent after update
     debug_dump_with_mask(parent, "parent_after", "bottomup_step11_parent_after", eid, key_mask);

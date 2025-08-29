@@ -100,17 +100,13 @@ Table TopDownPhase::CombineTableForForeign(
     
     // Transform child entries to START boundaries (child receives multiplicities)
     DEBUG_INFO("Transforming child entries to START boundaries");
-    Table start_entries = child.map(eid,
-        [dev1, eq1](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_to_start(eid, e, dev1, eq1);
-        });
+    int32_t start_params[] = {dev1, eq1};
+    Table start_entries = child.batched_map(eid, OP_ECALL_TRANSFORM_TO_START, start_params);
     
     // Transform child entries to END boundaries
     DEBUG_INFO("Transforming child entries to END boundaries");
-    Table end_entries = child.map(eid,
-        [dev2, eq2](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_to_end(eid, e, dev2, eq2);
-        });
+    int32_t end_params[] = {dev2, eq2};
+    Table end_entries = child.batched_map(eid, OP_ECALL_TRANSFORM_TO_END, end_params);
     
     // Combine all three tables
     Table combined;

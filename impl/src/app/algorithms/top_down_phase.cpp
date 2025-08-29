@@ -96,10 +96,7 @@ Table TopDownPhase::CombineTableForForeign(
     
     // Transform parent entries to SOURCE type (parent provides multiplicities)
     DEBUG_INFO("Transforming parent entries to SOURCE type");
-    Table source_entries = parent.map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_to_source(eid, e);
-        });
+    Table source_entries = parent.batched_map(eid, OP_ECALL_TRANSFORM_TO_SOURCE);
     
     // Transform child entries to START boundaries (child receives multiplicities)
     DEBUG_INFO("Transforming child entries to START boundaries");

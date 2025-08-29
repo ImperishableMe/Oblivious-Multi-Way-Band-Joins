@@ -224,10 +224,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 6: Compute intervals between START/END pairs
     DEBUG_INFO("Computing intervals between START/END pairs");
-    combined.linear_pass(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_window_compute_local_interval(eid, e1, e2);
-        });
+    combined.batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_LOCAL_INTERVAL);
     
     // Debug: Dump after computing intervals
     debug_dump_with_mask(combined, "with_intervals", "bottomup_step7_intervals", eid, init_mask);

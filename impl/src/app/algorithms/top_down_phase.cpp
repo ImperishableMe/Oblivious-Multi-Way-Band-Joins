@@ -205,10 +205,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 7: Sort END entries first to extract computed intervals
     DEBUG_INFO("Sorting END entries first");
-    combined.oblivious_sort(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_comparator_end_first(eid, e1, e2);
-        });
+    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_END_FIRST);
     
     // Debug: Dump after END-first sort
     debug_dump_with_mask(combined, "sorted_end_first", "topdown_step7_end_first", eid, foreign_interval_mask);

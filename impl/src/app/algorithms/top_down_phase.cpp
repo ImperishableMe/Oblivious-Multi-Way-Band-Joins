@@ -61,18 +61,12 @@ void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
 void TopDownPhase::InitializeRootTable(JoinTreeNodePtr node, sgx_enclave_id_t eid) {
     // Initialize root table only: final_mult = local_mult
     // Initialize root table
-    node->set_table(node->get_table().map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_init_final_mult(eid, e);
-        }));
+    node->set_table(node->get_table().batched_map(eid, OP_ECALL_TRANSFORM_INIT_FINAL_MULT));
 }
 
 void TopDownPhase::InitializeForeignFields(JoinTreeNodePtr node, sgx_enclave_id_t eid) {
     // Initialize foreign-related fields to 0
-    node->set_table(node->get_table().map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_init_foreign_temps(eid, e);
-        }));
+    node->set_table(node->get_table().batched_map(eid, OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS));
 }
 
 Table TopDownPhase::CombineTableForForeign(

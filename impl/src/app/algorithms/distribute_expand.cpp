@@ -70,10 +70,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     // Step 1: Initialize dst_idx field to 0
     DEBUG_INFO("Step 1 - Initializing dst_idx");
-    Table working = table.map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_init_dst_idx(eid, e);
-        });
+    Table working = table.batched_map(eid, OP_ECALL_TRANSFORM_INIT_DST_IDX);
     DEBUG_INFO("Step 1 complete");
     
     // Step 2: Compute cumulative sum of final_mult to get dst_idx

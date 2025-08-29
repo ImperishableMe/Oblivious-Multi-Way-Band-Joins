@@ -290,40 +290,39 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
         // ============================================================================
         
         case OP_ECALL_TRANSFORM_TO_START:
-            // extra_param encodes both deviation and equality type
-            // High 16 bits: deviation, Low 16 bits: equality_type
+            // Parameters: extra_params[0] = deviation, extra_params[1] = equality_type
             for (size_t i = 0; i < ops_count; i++) {
-                int32_t deviation = (int32_t)(ops_array[i].extra_param >> 16);
-                equality_type_t equality = (equality_type_t)(ops_array[i].extra_param & 0xFFFF);
+                int32_t deviation = ops_array[i].extra_params[0];
+                equality_type_t equality = (equality_type_t)ops_array[i].extra_params[1];
                 transform_to_start(&data_array[ops_array[i].idx1], deviation, equality);
             }
             break;
             
         case OP_ECALL_TRANSFORM_TO_END:
-            // extra_param encodes both deviation and equality type
+            // Parameters: extra_params[0] = deviation, extra_params[1] = equality_type
             for (size_t i = 0; i < ops_count; i++) {
-                int32_t deviation = (int32_t)(ops_array[i].extra_param >> 16);
-                equality_type_t equality = (equality_type_t)(ops_array[i].extra_param & 0xFFFF);
+                int32_t deviation = ops_array[i].extra_params[0];
+                equality_type_t equality = (equality_type_t)ops_array[i].extra_params[1];
                 transform_to_end(&data_array[ops_array[i].idx1], deviation, equality);
             }
             break;
             
         case OP_ECALL_TRANSFORM_SET_INDEX:
             for (size_t i = 0; i < ops_count; i++) {
-                transform_set_index(&data_array[ops_array[i].idx1], ops_array[i].extra_param);
+                transform_set_index(&data_array[ops_array[i].idx1], ops_array[i].extra_params[0]);
             }
             break;
             
         case OP_ECALL_TRANSFORM_SET_JOIN_ATTR:
             for (size_t i = 0; i < ops_count; i++) {
                 transform_set_join_attr(&data_array[ops_array[i].idx1], 
-                                       (int32_t)ops_array[i].extra_param);
+                                       ops_array[i].extra_params[0]);
             }
             break;
             
         case OP_ECALL_INIT_METADATA_NULL:
             for (size_t i = 0; i < ops_count; i++) {
-                transform_init_metadata_null(&data_array[ops_array[i].idx1], ops_array[i].extra_param);
+                transform_init_metadata_null(&data_array[ops_array[i].idx1], ops_array[i].extra_params[0]);
             }
             break;
             

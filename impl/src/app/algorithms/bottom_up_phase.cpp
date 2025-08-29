@@ -210,10 +210,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 4: Compute local cumulative sums
     DEBUG_INFO("Computing local cumulative sums");
-    combined.linear_pass(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_window_compute_local_sum(eid, e1, e2);
-        });
+    combined.batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_LOCAL_SUM);
     
     // Debug: Dump after computing cumulative sums
     debug_dump_with_mask(combined, "with_cumsum", "bottomup_step5_cumsum", eid, init_mask);

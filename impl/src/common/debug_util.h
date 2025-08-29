@@ -32,7 +32,7 @@
 
 // Table dumping configuration
 #ifndef DEBUG_DUMP_TABLES
-    #define DEBUG_DUMP_TABLES 1  // Enable table dumping for debug
+    #define DEBUG_DUMP_TABLES 0  // Disable table dumping for production
 #endif
 
 // Debug format for table output

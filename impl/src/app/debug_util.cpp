@@ -109,6 +109,7 @@ extern "C" void ocall_debug_print(uint32_t level, const char* file, int line, co
 
 // Debug session management
 void debug_init_session(const char* session_name) {
+#if DEBUG_LEVEL > DEBUG_LEVEL_NONE
     std::lock_guard<std::mutex> lock(debug_mutex);
     
     if (debug_session_active) {
@@ -140,9 +141,14 @@ void debug_init_session(const char* session_name) {
         debug_log_file << "===========================" << std::endl;
         debug_log_file.flush();
     }
+#else
+    // Debug disabled - do nothing
+    (void)session_name;
+#endif
 }
 
 void debug_close_session() {
+#if DEBUG_LEVEL > DEBUG_LEVEL_NONE
     std::lock_guard<std::mutex> lock(debug_mutex);
     
     if (debug_session_active && debug_log_file.is_open()) {
@@ -153,6 +159,7 @@ void debug_close_session() {
     debug_session_active = false;
     debug_session_name.clear();
     debug_session_dir.clear();
+#endif
 }
 
 // File output functions

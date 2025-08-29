@@ -79,7 +79,8 @@ App_Cpp_Files := app/main.cpp \
                  app/algorithms/distribute_expand.cpp \
                  app/algorithms/align_concat.cpp \
                  app/algorithms/oblivious_join.cpp \
-                 app/debug_util.cpp
+                 app/debug_util.cpp \
+                 app/debug_manager.cpp
 App_Include_Paths := -I$(SGX_SDK)/include -Iapp -Ienclave -Icommon
 
 App_Compile_CFlags := -fPIC -Wno-attributes $(App_Include_Paths)
@@ -93,7 +94,15 @@ else
 	App_Compile_CFlags += -DNDEBUG -UEDEBUG -UDEBUG
 endif
 
-App_Compile_CXXFlags := $(App_Compile_CFlags) -std=c++11 -DDEBUG_LEVEL=5
+# Allow override of DEBUG_LEVEL
+ifndef DEBUG_LEVEL
+    ifeq ($(SGX_DEBUG), 1)
+        DEBUG_LEVEL := 5
+    else
+        DEBUG_LEVEL := 0
+    endif
+endif
+App_Compile_CXXFlags := $(App_Compile_CFlags) -std=c++11 -DDEBUG_LEVEL=$(DEBUG_LEVEL)
 App_Link_Flags := -L$(SGX_LIBRARY_PATH) -l$(Urts_Library_Name) -lpthread
 
 ifneq ($(SGX_MODE), HW)
@@ -144,7 +153,7 @@ endif
 
 Enclave_Compile_CFlags += -nostdinc -ffreestanding -fvisibility=hidden -fpie \
                           -ffunction-sections -fdata-sections $(Enclave_Include_Paths) \
-                          -DENCLAVE_BUILD -DDEBUG_LEVEL=5
+                          -DENCLAVE_BUILD -DDEBUG_LEVEL=$(DEBUG_LEVEL)
 Enclave_Compile_CXXFlags := -nostdinc++ -std=c++11 $(Enclave_Compile_CFlags)
 
 # Security flags

@@ -186,10 +186,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 5: Sort for pairwise processing
     DEBUG_INFO("Sorting for pairwise processing");
-    combined.oblivious_sort(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_comparator_pairwise(eid, e1, e2);
-        });
+    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_PAIRWISE);
     
     // Debug: Dump after pairwise sort
     debug_dump_with_mask(combined, "sorted_pairwise", "topdown_step5_pairwise", eid, foreign_sum_mask);

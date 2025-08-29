@@ -7,9 +7,9 @@
 EcallBatchCollector::EcallBatchCollector(sgx_enclave_id_t enclave_id, OpEcall op, size_t max_size)
     : eid(enclave_id), op_type(op), max_batch_size(max_size), stats{0, 0, 0, 0} {
     
-    if (max_size > BATCH_MAX_SIZE) {
+    if (max_size > MAX_BATCH_SIZE) {
         throw std::invalid_argument("Batch size exceeds maximum allowed: " + 
-                                   std::to_string(BATCH_MAX_SIZE));
+                                   std::to_string(MAX_BATCH_SIZE));
     }
     
     // Reserve space to avoid frequent reallocations
@@ -40,46 +40,53 @@ void EcallBatchCollector::check_sgx_status(sgx_status_t status, const std::strin
     }
 }
 
-void EcallBatchCollector::add_operation(Entry& e1, Entry& e2, uint32_t extra_param) {
+void EcallBatchCollector::add_operation(Entry& e1, Entry& e2, int32_t* params) {
     // Deduplicate e1
     Entry* ptr1 = &e1;
     auto it1 = entry_map.find(ptr1);
-    uint32_t idx1;
+    int32_t idx1;
     
     if (it1 == entry_map.end()) {
         // New entry - add to batch data
-        idx1 = static_cast<uint32_t>(batch_data.size());
+        idx1 = static_cast<int32_t>(batch_data.size());
         entry_map[ptr1] = idx1;
         batch_data.push_back(e1.to_entry_t());
-        DEBUG_TRACE("BatchCollector: Added new entry at index %u", idx1);
+        DEBUG_TRACE("BatchCollector: Added new entry at index %d", idx1);
     } else {
         // Existing entry - use its index
         idx1 = it1->second;
-        DEBUG_TRACE("BatchCollector: Reusing entry at index %u", idx1);
+        DEBUG_TRACE("BatchCollector: Reusing entry at index %d", idx1);
     }
     
     // Deduplicate e2
     Entry* ptr2 = &e2;
     auto it2 = entry_map.find(ptr2);
-    uint32_t idx2;
+    int32_t idx2;
     
     if (it2 == entry_map.end()) {
         // New entry - add to batch data
-        idx2 = static_cast<uint32_t>(batch_data.size());
+        idx2 = static_cast<int32_t>(batch_data.size());
         entry_map[ptr2] = idx2;
         batch_data.push_back(e2.to_entry_t());
-        DEBUG_TRACE("BatchCollector: Added new entry at index %u", idx2);
+        DEBUG_TRACE("BatchCollector: Added new entry at index %d", idx2);
     } else {
         // Existing entry - use its index
         idx2 = it2->second;
-        DEBUG_TRACE("BatchCollector: Reusing entry at index %u", idx2);
+        DEBUG_TRACE("BatchCollector: Reusing entry at index %d", idx2);
     }
     
-    // Add operation
-    operations.push_back({idx1, idx2, extra_param});
+    // Add operation with parameters
+    BatchOperation op;
+    op.idx1 = idx1;
+    op.idx2 = idx2;
+    // Copy parameters if provided
+    for (int i = 0; i < MAX_EXTRA_PARAMS; i++) {
+        op.extra_params[i] = params ? params[i] : BATCH_NO_PARAM;
+    }
+    operations.push_back(op);
     stats.total_operations++;
     
-    DEBUG_TRACE("BatchCollector: Added operation (%u, %u) - batch size now %zu", 
+    DEBUG_TRACE("BatchCollector: Added operation (%d, %d) - batch size now %zu", 
                 idx1, idx2, operations.size());
     
     // Auto-flush if needed
@@ -100,18 +107,25 @@ void EcallBatchCollector::add_operation(Entry& e, uint32_t extra_param) {
         idx = static_cast<uint32_t>(batch_data.size());
         entry_map[ptr] = idx;
         batch_data.push_back(e.to_entry_t());
-        DEBUG_TRACE("BatchCollector: Added new entry at index %u", idx);
+        DEBUG_TRACE("BatchCollector: Added new entry at index %d", idx);
     } else {
         // Existing entry - use its index
         idx = it->second;
-        DEBUG_TRACE("BatchCollector: Reusing entry at index %u", idx);
+        DEBUG_TRACE("BatchCollector: Reusing entry at index %d", idx);
     }
     
     // Add single-parameter operation
-    operations.push_back({idx, BATCH_NO_PARAM, extra_param});
+    BatchOperation op;
+    op.idx1 = idx;
+    op.idx2 = BATCH_NO_PARAM;
+    // Copy parameters if provided
+    for (int i = 0; i < MAX_EXTRA_PARAMS; i++) {
+        op.extra_params[i] = params ? params[i] : BATCH_NO_PARAM;
+    }
+    operations.push_back(op);
     stats.total_operations++;
     
-    DEBUG_TRACE("BatchCollector: Added single-param operation (%u) - batch size now %zu", 
+    DEBUG_TRACE("BatchCollector: Added single-param operation (%d) - batch size now %zu", 
                 idx, operations.size());
     
     // Auto-flush if needed

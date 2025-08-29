@@ -34,7 +34,7 @@
 class EcallBatchCollector {
 private:
     // Deduplication map: Entry pointer -> batch array index
-    std::unordered_map<Entry*, uint32_t> entry_map;
+    std::unordered_map<Entry*, int32_t> entry_map;
     
     // Batch data to send to enclave (converted to entry_t format)
     std::vector<entry_t> batch_data;
@@ -58,24 +58,24 @@ public:
      * Constructor
      * @param eid SGX enclave ID
      * @param op Operation type to batch
-     * @param max_size Maximum batch size before auto-flush (default: BATCH_MAX_SIZE)
+     * @param max_size Maximum batch size before auto-flush (default: MAX_BATCH_SIZE)
      */
-    EcallBatchCollector(sgx_enclave_id_t eid, OpEcall op, size_t max_size = BATCH_MAX_SIZE);
+    EcallBatchCollector(sgx_enclave_id_t eid, OpEcall op, size_t max_size = MAX_BATCH_SIZE);
     
     /**
      * Add a two-parameter operation to the batch
      * @param e1 First entry
      * @param e2 Second entry
-     * @param extra_param Optional extra parameter for ops that need it
+     * @param params Optional parameters array (up to 4 values)
      */
-    void add_operation(Entry& e1, Entry& e2, uint32_t extra_param = 0);
+    void add_operation(Entry& e1, Entry& e2, int32_t* params = nullptr);
     
     /**
      * Add a single-parameter operation to the batch
      * @param e Entry to operate on
-     * @param extra_param Optional extra parameter for ops that need it
+     * @param params Optional parameters array (up to 4 values)
      */
-    void add_operation(Entry& e, uint32_t extra_param = 0);
+    void add_operation(Entry& e, int32_t* params = nullptr);
     
     /**
      * Execute all pending operations

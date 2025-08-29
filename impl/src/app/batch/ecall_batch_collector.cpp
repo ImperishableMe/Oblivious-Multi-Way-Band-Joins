@@ -50,6 +50,7 @@ void EcallBatchCollector::add_operation(Entry& e1, Entry& e2, int32_t* params) {
         // New entry - add to batch data
         idx1 = static_cast<int32_t>(batch_data.size());
         entry_map[ptr1] = idx1;
+        entry_pointers.push_back(ptr1);  // Track pointer for write-back
         batch_data.push_back(e1.to_entry_t());
         DEBUG_TRACE("BatchCollector: Added new entry at index %d", idx1);
     } else {
@@ -67,6 +68,7 @@ void EcallBatchCollector::add_operation(Entry& e1, Entry& e2, int32_t* params) {
         // New entry - add to batch data
         idx2 = static_cast<int32_t>(batch_data.size());
         entry_map[ptr2] = idx2;
+        entry_pointers.push_back(ptr2);  // Track pointer for write-back
         batch_data.push_back(e2.to_entry_t());
         DEBUG_TRACE("BatchCollector: Added new entry at index %d", idx2);
     } else {
@@ -96,16 +98,17 @@ void EcallBatchCollector::add_operation(Entry& e1, Entry& e2, int32_t* params) {
     }
 }
 
-void EcallBatchCollector::add_operation(Entry& e, uint32_t extra_param) {
+void EcallBatchCollector::add_operation(Entry& e, int32_t* params) {
     // Deduplicate entry
     Entry* ptr = &e;
     auto it = entry_map.find(ptr);
-    uint32_t idx;
+    int32_t idx;
     
     if (it == entry_map.end()) {
         // New entry - add to batch data
-        idx = static_cast<uint32_t>(batch_data.size());
+        idx = static_cast<int32_t>(batch_data.size());
         entry_map[ptr] = idx;
+        entry_pointers.push_back(ptr);  // Track pointer for write-back
         batch_data.push_back(e.to_entry_t());
         DEBUG_TRACE("BatchCollector: Added new entry at index %d", idx);
     } else {
@@ -135,6 +138,16 @@ void EcallBatchCollector::add_operation(Entry& e, uint32_t extra_param) {
     }
 }
 
+
+void EcallBatchCollector::write_back_results() {
+    // Write back modified batch_data to original Entry objects using pointers
+    for (size_t i = 0; i < entry_pointers.size(); i++) {
+        Entry* entry_ptr = entry_pointers[i];
+        entry_ptr->from_entry_t(batch_data[i]);
+        DEBUG_TRACE("BatchCollector: Wrote back entry at index %zu", i);
+    }
+}
+
 void EcallBatchCollector::flush() {
     if (operations.empty()) {
         DEBUG_TRACE("BatchCollector: Flush called but no operations pending");
@@ -156,6 +169,7 @@ void EcallBatchCollector::flush() {
         batch_data.size(),
         operations.data(),
         operations.size(),
+        operations.size() * sizeof(BatchOperation),  // ops_size in bytes
         op_type
     );
     
@@ -164,15 +178,7 @@ void EcallBatchCollector::flush() {
     DEBUG_DEBUG("BatchCollector: Batch dispatcher returned successfully");
     
     // Write back results to original Entry objects
-    for (const auto& pair : entry_map) {
-        Entry* entry_ptr = pair.first;
-        uint32_t batch_idx = pair.second;
-        
-        // Copy modified data back to original Entry
-        entry_ptr->from_entry_t(batch_data[batch_idx]);
-        
-        DEBUG_TRACE("BatchCollector: Wrote back entry at batch index %u", batch_idx);
-    }
+    write_back_results();
     
     // Update statistics
     stats.total_flushes++;
@@ -182,6 +188,7 @@ void EcallBatchCollector::flush() {
     
     // Clear for next batch
     entry_map.clear();
+    entry_pointers.clear();
     batch_data.clear();
     operations.clear();
 }

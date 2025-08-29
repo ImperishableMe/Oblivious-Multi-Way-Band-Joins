@@ -74,6 +74,7 @@ Shared_Cpp_Files := ../app/io/table_io.cpp \
                    ../app/data_structures/entry.cpp \
                    ../app/data_structures/table.cpp \
                    ../app/data_structures/join_condition.cpp \
+                   ../app/batch/ecall_batch_collector.cpp \
                    ../app/debug_util.cpp
 
 # Generated untrusted source

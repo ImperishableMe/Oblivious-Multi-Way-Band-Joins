@@ -79,6 +79,7 @@ App_Cpp_Files := app/main.cpp \
                  app/algorithms/distribute_expand.cpp \
                  app/algorithms/align_concat.cpp \
                  app/algorithms/oblivious_join.cpp \
+                 app/batch/ecall_batch_collector.cpp \
                  app/debug_util.cpp \
                  app/debug_manager.cpp
 App_Include_Paths := -I$(SGX_SDK)/include -Iapp -Ienclave -Icommon
@@ -138,6 +139,7 @@ Enclave_C_Files := enclave/crypto/aes_crypto.c \
                    enclave/core/comparators.c \
                    enclave/core/transform_functions.c \
                    enclave/core/distribute_functions.c \
+                   enclave/batch/batch_dispatcher.c \
                    enclave/debug_wrapper.c
 
 Enclave_Include_Paths := -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc \
@@ -245,7 +247,8 @@ $(App_Name): $(App_Objects)
 # Build encrypt_tables utility
 Encrypt_Tool_Objects := app/tools/encrypt_tables.o app/io/table_io.o app/data_structures/join_constraint.o \
                        app/io/converters.o app/crypto/crypto_utils.o app/data_structures/entry.o \
-                       app/data_structures/table.o app/data_structures/join_condition.o app/debug_util.o $(Gen_Untrusted_Object)
+                       app/data_structures/table.o app/data_structures/join_condition.o app/debug_util.o \
+                       app/batch/ecall_batch_collector.o $(Gen_Untrusted_Object)
 
 app/tools/encrypt_tables.o: app/tools/encrypt_tables.cpp $(Gen_Untrusted_Source)
 	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -std=c++17 -c $< -o $@

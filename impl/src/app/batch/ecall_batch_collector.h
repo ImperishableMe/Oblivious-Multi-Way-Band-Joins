@@ -11,6 +11,14 @@
 #include "../../common/types_common.h"
 #include "../data_structures/entry.h"
 
+// Statistics for performance monitoring
+struct BatchStats {
+    size_t total_operations;
+    size_t total_flushes;
+    size_t total_entries_processed;
+    size_t max_batch_size_reached;
+};
+
 /**
  * EcallBatchCollector - Batches multiple ecall operations to reduce SGX overhead
  * 
@@ -33,8 +41,11 @@
  */
 class EcallBatchCollector {
 private:
-    // Deduplication map: Entry pointer -> batch array index
+    // Forward mapping: Entry pointer -> batch array index
     std::unordered_map<Entry*, int32_t> entry_map;
+    
+    // Reverse mapping: batch array index -> Entry pointer (for write-back)
+    std::vector<Entry*> entry_pointers;
     
     // Batch data to send to enclave (converted to entry_t format)
     std::vector<entry_t> batch_data;
@@ -77,11 +88,18 @@ public:
      */
     void add_operation(Entry& e, int32_t* params = nullptr);
     
+    
     /**
      * Execute all pending operations
      * Called automatically when batch is full or on destruction
      */
     void flush();
+    
+    /**
+     * Write back results from batch_data to original Entry objects
+     * Called after batch dispatcher modifies the data
+     */
+    void write_back_results();
     
     /**
      * Check if batch needs flushing

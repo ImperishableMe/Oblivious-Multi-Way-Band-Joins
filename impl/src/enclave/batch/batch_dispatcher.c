@@ -14,8 +14,12 @@
  * This eliminates per-operation crypto overhead (up to 2000x reduction)
  */
 void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
-                           BatchOperation* ops_array, size_t ops_count,
-                           OpEcall op_type) {
+                           void* ops_array_void, size_t ops_count, size_t ops_size,
+                           int32_t op_type_int) {
+    
+    // Cast to proper types
+    BatchOperation* ops_array = (BatchOperation*)ops_array_void;
+    OpEcall op_type = (OpEcall)op_type_int;
     
     // Validate inputs
     if (!data_array || !ops_array || data_count == 0 || ops_count == 0) {
@@ -309,7 +313,7 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
             
         case OP_ECALL_TRANSFORM_SET_INDEX:
             for (size_t i = 0; i < ops_count; i++) {
-                transform_set_index(&data_array[ops_array[i].idx1], ops_array[i].extra_params[0]);
+                transform_set_index(&data_array[ops_array[i].idx1], (uint32_t)ops_array[i].extra_params[0]);
             }
             break;
             
@@ -322,7 +326,7 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
             
         case OP_ECALL_INIT_METADATA_NULL:
             for (size_t i = 0; i < ops_count; i++) {
-                transform_init_metadata_null(&data_array[ops_array[i].idx1], ops_array[i].extra_params[0]);
+                transform_init_metadata_null(&data_array[ops_array[i].idx1], (uint32_t)ops_array[i].extra_params[0]);
             }
             break;
             

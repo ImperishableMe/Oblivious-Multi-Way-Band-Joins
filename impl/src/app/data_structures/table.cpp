@@ -3,6 +3,7 @@
 #include <climits>
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
+#include "../batch/ecall_batch_collector.h"
 
 Table::Table() : num_columns(0) {
 }
@@ -380,5 +381,122 @@ Table Table::oblivious_expand(sgx_enclave_id_t eid) const {
     }
     
     return expanded;
+}
+
+// ============================================================================
+// Batched Operations Implementation
+// ============================================================================
+
+Table Table::batched_map(sgx_enclave_id_t eid, OpEcall op_type, int32_t* params) const {
+    DEBUG_TRACE("Table::batched_map: Starting with %zu entries, op_type=%d", entries.size(), op_type);
+    
+    Table result(table_name + "_mapped");
+    result.set_num_columns(num_columns);
+    
+    // Copy entries to result first (since we can't modify const entries)
+    for (const auto& entry : entries) {
+        result.add_entry(entry);
+    }
+    
+    // Create batch collector
+    EcallBatchCollector collector(eid, op_type);
+    
+    // Add all operations for map (single entry operations)
+    for (size_t i = 0; i < result.entries.size(); i++) {
+        collector.add_operation(result.entries[i], params);
+    }
+    
+    // Flush the batch - this writes back to result.entries
+    collector.flush();
+    
+    DEBUG_TRACE("Table::batched_map: Complete with %zu entries", result.size());
+    return result;
+}
+
+void Table::batched_linear_pass(sgx_enclave_id_t eid, OpEcall op_type, int32_t* params) {
+    if (entries.size() < 2) return;
+    
+    DEBUG_TRACE("Table::batched_linear_pass: Starting with %zu entries, op_type=%d", entries.size(), op_type);
+    
+    // Create batch collector
+    EcallBatchCollector collector(eid, op_type);
+    
+    // Add all window operations - work directly with Entry objects
+    for (size_t i = 0; i < entries.size() - 1; i++) {
+        collector.add_operation(entries[i], entries[i+1], params);
+    }
+    
+    // Flush the batch - this writes back to entries
+    collector.flush();
+    
+    DEBUG_TRACE("Table::batched_linear_pass: Complete");
+}
+
+void Table::batched_parallel_pass(Table& other, sgx_enclave_id_t eid, OpEcall op_type, int32_t* params) {
+    if (entries.size() != other.entries.size()) {
+        throw std::runtime_error("Tables must have the same size for parallel pass");
+    }
+    
+    DEBUG_TRACE("Table::batched_parallel_pass: Starting with %zu entries, op_type=%d", entries.size(), op_type);
+    
+    // Create batch collector
+    EcallBatchCollector collector(eid, op_type);
+    
+    // Add all parallel operations - work directly with Entry objects
+    for (size_t i = 0; i < entries.size(); i++) {
+        collector.add_operation(entries[i], other.entries[i], params);
+    }
+    
+    // Flush the batch - this writes back to both tables' entries
+    collector.flush();
+    
+    DEBUG_TRACE("Table::batched_parallel_pass: Complete");
+}
+
+void Table::batched_oblivious_sort(sgx_enclave_id_t eid, OpEcall op_type) {
+    if (entries.size() <= 1) return;
+    
+    DEBUG_TRACE("Table::batched_oblivious_sort: Starting with %zu entries, op_type=%d", entries.size(), op_type);
+    
+    // Pad to power of 2 for bitonic sort
+    size_t original_size = entries.size();
+    size_t padded_size = next_power_of_two(original_size);
+    
+    // Add padding entries if needed
+    while (entries.size() < padded_size) {
+        Entry padding;
+        padding.field_type = SORT_PADDING;
+        add_entry(padding);
+    }
+    
+    // Bitonic sort implementation with batching - work directly with Entry objects
+    for (size_t k = 2; k <= padded_size; k *= 2) {
+        for (size_t j = k / 2; j > 0; j /= 2) {
+            // Create batch collector for this pass
+            EcallBatchCollector collector(eid, op_type);
+            
+            // Add all comparisons for this pass
+            for (size_t i = 0; i < padded_size; i++) {
+                size_t ij = i ^ j;
+                if (ij > i) {
+                    if ((i & k) == 0) {
+                        // Ascending
+                        collector.add_operation(entries[i], entries[ij], nullptr);
+                    } else {
+                        // Descending
+                        collector.add_operation(entries[ij], entries[i], nullptr);
+                    }
+                }
+            }
+            
+            // Flush this pass - writes back to original Entry objects
+            collector.flush();
+        }
+    }
+    
+    // Remove padding entries
+    entries.resize(original_size);
+    
+    DEBUG_TRACE("Table::batched_oblivious_sort: Complete");
 }
 

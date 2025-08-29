@@ -191,10 +191,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 2: Initialize temporary fields (local_cumsum = local_mult, local_interval = 0)
     DEBUG_INFO("Initializing temporary fields");
-    combined = combined.map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_init_local_temps(eid, e);
-        });
+    combined = combined.batched_map(eid, OP_ECALL_TRANSFORM_INIT_LOCAL_TEMPS);
     DEBUG_INFO("Temporary fields initialized");
     
     // Debug: Dump after initializing temps

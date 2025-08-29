@@ -3,45 +3,42 @@
 ## Overview
 This document tracks which ecall operations have been converted to use the batch dispatcher and which still use individual ecalls.
 
-**Generated**: 2025-08-29  
-**Current Status**: 7/41 operations batched (17.1%)
+**Last Updated**: 2025-08-29  
+**Current Status**: 25/41 operations batched (61.0%)
 
 ## ✅ BATCHED Operations (Using Batch Dispatcher)
 
-Currently, **7 operations** have been converted to use batching:
+Currently, **25 operations** have been converted to use batching:
 
-### Bottom-Up Phase (bottom_up_phase.cpp)
-- [x] Line 68: `batched_map(eid, OP_ECALL_INIT_METADATA_NULL)` - Initialize metadata to NULL
-- [x] Line 71: `batched_map(eid, OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE)` - Set local_mult to 1
-- [x] Line 83: `batched_linear_pass(eid, OP_ECALL_WINDOW_SET_ORIGINAL_INDEX)` - Set original indices
-- [x] Line 194: `batched_map(eid, OP_ECALL_TRANSFORM_INIT_LOCAL_TEMPS)` - Initialize temporary fields
-- [x] Line 205: `batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR)` - Sort by join attribute
-- [x] Line 213: `batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_LOCAL_SUM)` - Compute cumulative sums
-- [x] Line 261: `batched_parallel_pass(parent, eid, OP_ECALL_UPDATE_TARGET_MULTIPLICITY)` - Update multiplicities
+### Bottom-Up Phase (bottom_up_phase.cpp) - FULLY CONVERTED ✅
+- [x] `batched_map(eid, OP_ECALL_INIT_METADATA_NULL)` - Initialize metadata to NULL
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE)` - Set local_mult to 1
+- [x] `batched_linear_pass(eid, OP_ECALL_WINDOW_SET_ORIGINAL_INDEX)` - Set original indices
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_TO_SOURCE)` - Transform to SOURCE
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_TO_START, params)` - Transform to START
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_TO_END, params)` - Transform to END
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_INIT_LOCAL_TEMPS)` - Initialize temporary fields
+- [x] `batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR)` - Sort by join attribute
+- [x] `batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_LOCAL_SUM)` - Compute cumulative sums
+- [x] `batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_PAIRWISE)` - Pairwise sort
+- [x] `batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_LOCAL_INTERVAL)` - Compute intervals
+- [x] `batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_END_FIRST)` - Sort END entries first
+- [x] `batched_parallel_pass(parent, eid, OP_ECALL_UPDATE_TARGET_MULTIPLICITY)` - Update multiplicities
+
+### Top-Down Phase (top_down_phase.cpp) - FULLY CONVERTED ✅
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_INIT_FINAL_MULT)` - Initialize final_mult
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS)` - Initialize foreign temps (2 locations)
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_TO_SOURCE)` - Transform to SOURCE
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_TO_START, params)` - Transform to START
+- [x] `batched_map(eid, OP_ECALL_TRANSFORM_TO_END, params)` - Transform to END
+- [x] `batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR)` - Sort by join attribute
+- [x] `batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_FOREIGN_SUM)` - Compute foreign sums
+- [x] `batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_PAIRWISE)` - Pairwise sort
+- [x] `batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_FOREIGN_INTERVAL)` - Compute foreign intervals
+- [x] `batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_END_FIRST)` - Sort END entries first
+- [x] `batched_parallel_pass(child, eid, OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY)` - Update final multiplicities
 
 ## ❌ NOT BATCHED Operations (Still Using Individual Ecalls)
-
-### Bottom-Up Phase (bottom_up_phase.cpp)
-- [ ] Line 119: `.batched_map()` - `ecall_transform_to_source`
-- [ ] Line 124: `.batched_map()` - `ecall_transform_to_start`
-- [ ] Line 129: `.batched_map()` - `ecall_transform_to_end`
-- [ ] Line 220: `.batched_oblivious_sort()` - `ecall_comparator_pairwise`
-- [ ] Line 227: `.batched_linear_pass()` - `ecall_window_compute_local_interval`
-- [ ] Line 234: `.batched_oblivious_sort()` - `ecall_comparator_end_first`
-
-### Top-Down Phase (top_down_phase.cpp)
-- [ ] Line 69: `.map()` - `ecall_transform_init_final_mult`
-- [ ] Line 77: `.map()` - `ecall_transform_init_foreign_temps`
-- [ ] Line 110: `.map()` - `ecall_transform_to_source`
-- [ ] Line 117: `.map()` - `ecall_transform_to_start`
-- [ ] Line 124: `.map()` - `ecall_transform_to_end`
-- [ ] Line 178: `.map()` - `ecall_transform_init_foreign_temps`
-- [ ] Line 192: `.oblivious_sort()` - `ecall_comparator_join_attr`
-- [ ] Line 202: `.linear_pass()` - `ecall_window_compute_foreign_sum`
-- [ ] Line 216: `.oblivious_sort()` - `ecall_comparator_pairwise`
-- [ ] Line 226: `.linear_pass()` - `ecall_window_compute_foreign_interval`
-- [ ] Line 241: `.oblivious_sort()` - `ecall_comparator_end_first`
-- [ ] Line 283: `.parallel_pass()` - `ecall_update_target_final_multiplicity`
 
 ### Distribute-Expand Phase (distribute_expand.cpp)
 - [ ] Line 77: `.map()` - `ecall_transform_init_dst_idx`
@@ -62,13 +59,13 @@ Currently, **7 operations** have been converted to use batching:
 
 ## Summary Statistics
 
-| Operation Type | Count | Batched | Not Batched |
-|---------------|-------|---------|-------------|
-| `.map()` | 17 | 3 | 14 |
-| `.oblivious_sort()` | 8 | 1 | 7 |
-| `.linear_pass()` | 10 | 2 | 8 |
-| `.parallel_pass()` | 4 | 1 | 3 |
-| **TOTAL** | **41** | **7** | **34** |
+| Phase | Total Operations | Batched | Remaining | % Complete |
+|-------|-----------------|---------|-----------|------------|
+| Bottom-Up | 13 | 13 | 0 | 100% ✅ |
+| Top-Down | 12 | 12 | 0 | 100% ✅ |
+| Distribute-Expand | 10 | 0 | 10 | 0% |
+| Align-Concat | 6 | 0 | 6 | 0% |
+| **TOTAL** | **41** | **25** | **16** | **61.0%** |
 
 ## Priority for Batching
 

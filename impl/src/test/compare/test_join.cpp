@@ -14,6 +14,7 @@
 #include "../../app/crypto/crypto_utils.h"
 #include "sgx_urts.h"
 #include "../../app/Enclave_u.h"
+#include "../../common/debug_util.h"
 
 /* Global enclave ID for decryption */
 sgx_enclave_id_t global_eid = 0;
@@ -28,7 +29,7 @@ int initialize_enclave() {
         return -1;
     }
     
-    std::cout << "SGX Enclave initialized for result comparison" << std::endl;
+    // Enclave initialized
     return 0;
 }
 
@@ -123,7 +124,7 @@ ComparisonResult compare_tables(const Table& sgx_table, const Table& sqlite_tabl
 
 /* Run a command and measure time */
 double run_timed_command(const std::string& command) {
-    std::cout << "Executing: " << command << std::endl;
+    // Executing command
     
     auto start = std::chrono::high_resolution_clock::now();
     int ret = std::system(command.c_str());
@@ -153,9 +154,7 @@ int main(int argc, char* argv[]) {
     std::string sql_file = argv[1];
     std::string data_dir = argv[2];
     
-    std::cout << "\n=== Join Test Comparator ===" << std::endl;
-    std::cout << "SQL file: " << sql_file << std::endl;
-    std::cout << "Data directory: " << data_dir << std::endl;
+    // Starting test comparison
     
     try {
         // Initialize enclave for decryption
@@ -180,67 +179,35 @@ int main(int argc, char* argv[]) {
         }
         
         // Run SGX oblivious join
-        std::cout << "\n--- Running SGX Oblivious Join ---" << std::endl;
+        // Running SGX
         std::string sgx_cmd = "/home/r33wei/omwj/memory_const/impl/src/sgx_app " + sql_file + " " + data_dir + " " + sgx_output;
         double sgx_time = run_timed_command(sgx_cmd);
-        std::cout << "SGX join completed in " << sgx_time << " seconds" << std::endl;
+        // SGX done
         
         // Run SQLite baseline
-        std::cout << "\n--- Running SQLite Baseline ---" << std::endl;
+        // Running SQLite
         std::string sqlite_cmd = "/home/r33wei/omwj/memory_const/impl/src/test/sqlite_baseline " + sql_file + " " + data_dir + " " + sqlite_output;
         double sqlite_time = run_timed_command(sqlite_cmd);
-        std::cout << "SQLite join completed in " << sqlite_time << " seconds" << std::endl;
+        // SQLite done
         
         // Load and decrypt results
-        std::cout << "\n--- Comparing Results ---" << std::endl;
-        
-        std::cout << "Loading SGX result..." << std::endl;
+        // Comparing results
         Table sgx_encrypted = TableIO::load_csv(sgx_output);
-        std::cout << "  Loaded " << sgx_encrypted.size() << " encrypted rows" << std::endl;
-        std::cout << "  First entry encrypted: " << sgx_encrypted[0].is_encrypted << std::endl;
         Table sgx_result = decrypt_table(sgx_encrypted);
-        std::cout << "  After decrypt, first entry encrypted: " << sgx_result[0].is_encrypted << std::endl;
         
-        std::cout << "Loading SQLite result..." << std::endl;
         Table sqlite_encrypted = TableIO::load_csv(sqlite_output);
-        std::cout << "  Loaded " << sqlite_encrypted.size() << " encrypted rows" << std::endl;
-        std::cout << "  First entry encrypted: " << sqlite_encrypted[0].is_encrypted << std::endl;
         Table sqlite_result = decrypt_table(sqlite_encrypted);
-        std::cout << "  After decrypt, first entry encrypted: " << sqlite_result[0].is_encrypted << std::endl;
         
         // Compare results
         ComparisonResult comparison = compare_tables(sgx_result, sqlite_result);
         
-        // Print comparison results
-        std::cout << "\n=== Comparison Results ===" << std::endl;
-        std::cout << "SGX rows: " << comparison.sgx_rows << std::endl;
-        std::cout << "SQLite rows: " << comparison.sqlite_rows << std::endl;
-        std::cout << "Matching rows: " << comparison.matching_rows << std::endl;
+        // Print minimal output
+        printf("Output: SGX=%zu rows, SQLite=%zu rows\n", comparison.sgx_rows, comparison.sqlite_rows);
         
-        if (comparison.are_equivalent) {
-            std::cout << "\n✓ PASS: Results are equivalent!" << std::endl;
-        } else {
-            std::cout << "\n✗ FAIL: Results differ!" << std::endl;
-            
-            if (!comparison.sgx_only.empty()) {
-                std::cout << "\nRows only in SGX result (" << comparison.sgx_only.size() << "):" << std::endl;
-                for (size_t i = 0; i < comparison.sgx_only.size(); i++) {
-                    std::cout << "  " << comparison.sgx_only[i] << std::endl;
-                }
-            }
-            
-            if (!comparison.sqlite_only.empty()) {
-                std::cout << "\nRows only in SQLite result (" << comparison.sqlite_only.size() << "):" << std::endl;
-                for (size_t i = 0; i < comparison.sqlite_only.size(); i++) {
-                    std::cout << "  " << comparison.sqlite_only[i] << std::endl;
-                }
-            }
-        }
+        printf("Match: %s\n", comparison.are_equivalent ? "YES" : "NO");
         
         // Performance comparison
-        std::cout << "\n=== Performance ===" << std::endl;
-        std::cout << "SGX time: " << sgx_time << " seconds" << std::endl;
-        std::cout << "SQLite time: " << sqlite_time << " seconds" << std::endl;
+        printf("Time: SGX=%.6fs, SQLite=%.6fs\n", sgx_time, sqlite_time);
         
         // Write summary to file
         // Extract base names from paths
@@ -320,7 +287,7 @@ int main(int argc, char* argv[]) {
             summary_file << "SQLite Time: " << sqlite_time << " seconds" << std::endl;
             
             summary_file.close();
-            std::cout << "\nSummary written to: " << summary_filename << std::endl;
+            // Summary written
         } else {
             std::cerr << "Warning: Could not write summary file: " << summary_filename << std::endl;
         }

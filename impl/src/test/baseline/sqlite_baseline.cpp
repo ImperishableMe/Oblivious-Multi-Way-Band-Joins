@@ -9,6 +9,7 @@
 #include "../../app/io/table_io.h"
 #include "../../app/crypto/crypto_utils.h"
 #include "sgx_urts.h"
+#include "../../common/debug_util.h"
 #include "../../app/Enclave_u.h"
 
 /* Global enclave ID for decryption/encryption */
@@ -24,7 +25,7 @@ int initialize_enclave() {
         return -1;
     }
     
-    std::cout << "SGX Enclave initialized for encryption/decryption" << std::endl;
+    // Enclave initialized
     return 0;
 }
 
@@ -32,7 +33,7 @@ int initialize_enclave() {
 void destroy_enclave() {
     if (global_eid != 0) {
         sgx_destroy_enclave(global_eid);
-        std::cout << "SGX Enclave destroyed" << std::endl;
+        // Enclave destroyed
     }
 }
 
@@ -107,8 +108,7 @@ void create_sqlite_table(sqlite3* db, const std::string& table_name, const Table
         }
     }
     
-    std::cout << "  Created SQLite table " << table_name << " with " 
-              << table.size() << " rows" << std::endl;
+    // Table created
 }
 
 /* Callback for SQLite query results */
@@ -153,7 +153,7 @@ Table execute_sqlite_join(sqlite3* db, const std::string& join_query) {
         throw std::runtime_error(error);
     }
     
-    std::cout << "Join query executed, result has " << result.table.size() << " rows" << std::endl;
+    // Query executed
     
     return result.table;
 }
@@ -197,10 +197,7 @@ int main(int argc, char* argv[]) {
     std::string input_dir = argv[2];
     std::string output_file = argv[3];
     
-    std::cout << "\n=== SQLite Baseline Join ===" << std::endl;
-    std::cout << "SQL file: " << sql_file << std::endl;
-    std::cout << "Input directory: " << input_dir << std::endl;
-    std::cout << "Output file: " << output_file << std::endl;
+    // Starting SQLite baseline
     
     sqlite3* db = nullptr;
     
@@ -216,10 +213,10 @@ int main(int argc, char* argv[]) {
         if (rc != SQLITE_OK) {
             throw std::runtime_error("Cannot open SQLite database");
         }
-        std::cout << "\nSQLite database created" << std::endl;
+        // Database created
         
         // Load and decrypt all CSV files
-        std::cout << "\nLoading and decrypting tables..." << std::endl;
+        // Loading tables
         std::map<std::string, Table> tables;
         
         DIR* dir = opendir(input_dir.c_str());
@@ -234,10 +231,10 @@ int main(int argc, char* argv[]) {
                 std::string filepath = input_dir + "/" + filename;
                 std::string table_name = filename.substr(0, filename.size() - 4);
                 
-                std::cout << "  Loading " << filename << "..." << std::endl;
+                // Loading file
                 Table encrypted_table = TableIO::load_csv(filepath);
                 
-                std::cout << "  Decrypting " << table_name << "..." << std::endl;
+                // Decrypting
                 Table decrypted_table = decrypt_table(encrypted_table);
                 
                 // Create SQLite table
@@ -253,56 +250,28 @@ int main(int argc, char* argv[]) {
         }
         
         // Read and execute SQL query
-        std::cout << "\nReading SQL query..." << std::endl;
+        // Reading query
         std::string join_query = read_sql_query(sql_file);
-        std::cout << "Query: " << join_query << std::endl;
+        // Query loaded
         
-        // Debug: Check supplier table contents for tb1 query
-        if (join_query.find("supplier1") != std::string::npos && join_query.find("supplier2") != std::string::npos) {
-            char* err_msg = nullptr;
-            std::cout << "\nDEBUG: Checking supplier tables for tb1 query:" << std::endl;
-            
-            std::string check_query = "SELECT S1_S_SUPPKEY, S1_S_ACCTBAL FROM supplier1 LIMIT 5";
-            std::cout << "supplier1 (first 5 rows):" << std::endl;
-            sqlite3_exec(db, check_query.c_str(),
-                [](void*, int argc, char** argv, char** col_names) -> int {
-                    std::cout << "  ";
-                    for (int i = 0; i < argc; i++) {
-                        std::cout << col_names[i] << "=" << (argv[i] ? argv[i] : "NULL") << " ";
-                    }
-                    std::cout << std::endl;
-                    return 0;
-                }, nullptr, &err_msg);
-                
-            check_query = "SELECT S2_S_SUPPKEY, S2_S_ACCTBAL FROM supplier2 LIMIT 5";
-            std::cout << "supplier2 (first 5 rows):" << std::endl;
-            sqlite3_exec(db, check_query.c_str(),
-                [](void*, int argc, char** argv, char** col_names) -> int {
-                    std::cout << "  ";
-                    for (int i = 0; i < argc; i++) {
-                        std::cout << col_names[i] << "=" << (argv[i] ? argv[i] : "NULL") << " ";
-                    }
-                    std::cout << std::endl;
-                    return 0;
-                }, nullptr, &err_msg);
-        }
+        // Debug output removed for cleaner output
         
         Table join_result = execute_sqlite_join(db, join_query);
         
         // Encrypt the result
-        std::cout << "\nEncrypting result..." << std::endl;
+        // Encrypting result
         Table encrypted_result = encrypt_table(join_result);
         
         // Save result (encrypted with nonce)
-        std::cout << "Saving result to " << output_file << "..." << std::endl;
+        // Saving result
         TableIO::save_encrypted_csv(encrypted_result, output_file, global_eid);
-        std::cout << "Result saved (" << encrypted_result.size() << " rows)" << std::endl;
+        printf("Result: %zu rows\n", encrypted_result.size());
         
         // Cleanup
         sqlite3_close(db);
         destroy_enclave();
         
-        std::cout << "\n=== SQLite Join Complete ===" << std::endl;
+        // Join complete
         return 0;
         
     } catch (const std::exception& e) {

@@ -75,10 +75,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     // Step 2: Compute cumulative sum of final_mult to get dst_idx
     DEBUG_INFO("Step 2 - Computing cumulative sum");
-    working.linear_pass(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_window_compute_dst_idx(eid, e1, e2);
-        });
+    working.batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_DST_IDX);
     DEBUG_INFO("Step 2 complete");
     
     // Debug: Show dst_idx values after cumulative sum

@@ -11,6 +11,7 @@
 #include "data_structures/join_tree_node.h"
 #include "data_structures/join_tree_builder.h"
 #include "query/query_parser.h"
+#include "../common/debug_util.h"
 #include "io/table_io.h"
 #include "../common/debug_util.h"
 
@@ -28,7 +29,7 @@ int initialize_enclave() {
         return -1;
     }
     
-    std::cout << "SGX Enclave initialized (ID: " << global_eid << ")" << std::endl;
+    // Enclave initialized
     return 0;
 }
 
@@ -36,7 +37,7 @@ int initialize_enclave() {
 void destroy_enclave() {
     if (global_eid != 0) {
         sgx_destroy_enclave(global_eid);
-        std::cout << "SGX Enclave destroyed" << std::endl;
+        // Enclave destroyed
     }
 }
 
@@ -54,19 +55,13 @@ JoinTreeNodePtr parse_sql_query(const std::string& query_file,
     std::string sql_query = buffer.str();
     file.close();
     
-    std::cout << "\nSQL Query:\n" << sql_query << std::endl;
+    // SQL Query loaded
     
     // Parse SQL query
     QueryParser parser;
     ParsedQuery parsed_query = parser.parse(sql_query);
     
-    std::cout << "\nParsed query:" << std::endl;
-    std::cout << "  Tables: ";
-    for (const auto& table : parsed_query.tables) {
-        std::cout << table << " ";
-    }
-    std::cout << std::endl;
-    std::cout << "  Join conditions: " << parsed_query.join_conditions.size() << std::endl;
+    // Query parsed
     
     // Build join tree from parsed query
     JoinTreeBuilder builder;
@@ -97,10 +92,7 @@ int main(int argc, char* argv[]) {
     std::string input_dir = argv[2];
     std::string output_file = argv[3];
     
-    std::cout << "\n=== SGX Oblivious Join ===" << std::endl;
-    std::cout << "Query file: " << query_file << std::endl;
-    std::cout << "Input directory: " << input_dir << std::endl;
-    std::cout << "Output file: " << output_file << std::endl;
+    // Starting SGX oblivious join
     
     try {
         // Initialize the enclave
@@ -143,12 +135,12 @@ int main(int argc, char* argv[]) {
         
         // Save result (encrypted with nonce)
         TableIO::save_encrypted_csv(result, output_file, global_eid);
-        std::cout << "Result: " << result.size() << " rows" << std::endl;
+        printf("Result: %zu rows\n", result.size());
         
         // Cleanup
         destroy_enclave();
         
-        std::cout << "\n=== Join Complete ===" << std::endl;
+        // Join complete
         return 0;
         
     } catch (const std::exception& e) {

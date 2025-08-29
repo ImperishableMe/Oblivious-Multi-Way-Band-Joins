@@ -214,6 +214,42 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
             }
             break;
             
+        case OP_ECALL_WINDOW_COMPUTE_DST_IDX:
+            for (size_t i = 0; i < ops_count; i++) {
+                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
+                    window_compute_dst_idx_op(&data_array[ops_array[i].idx1],
+                                             &data_array[ops_array[i].idx2]);
+                }
+            }
+            break;
+            
+        case OP_ECALL_WINDOW_INCREMENT_INDEX:
+            for (size_t i = 0; i < ops_count; i++) {
+                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
+                    window_increment_index_op(&data_array[ops_array[i].idx1],
+                                            &data_array[ops_array[i].idx2]);
+                }
+            }
+            break;
+            
+        case OP_ECALL_WINDOW_EXPAND_COPY:
+            for (size_t i = 0; i < ops_count; i++) {
+                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
+                    window_expand_copy_op(&data_array[ops_array[i].idx1],
+                                        &data_array[ops_array[i].idx2]);
+                }
+            }
+            break;
+            
+        case OP_ECALL_WINDOW_UPDATE_COPY_INDEX:
+            for (size_t i = 0; i < ops_count; i++) {
+                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
+                    window_update_copy_index_op(&data_array[ops_array[i].idx1],
+                                              &data_array[ops_array[i].idx2]);
+                }
+            }
+            break;
+            
         // ============================================================================
         // Update Operations (two parameters)
         // ============================================================================
@@ -360,7 +396,8 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
             break;
             
         default:
-            // Unknown operation type - do nothing
+            // Fatal error - unknown operation type
+            assert(false && "Unknown batch operation type - operation not implemented in dispatcher");
             break;
     }
     

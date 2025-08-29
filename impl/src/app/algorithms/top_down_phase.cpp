@@ -157,10 +157,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 2: Initialize foreign temporary fields
     DEBUG_INFO("Initializing foreign temporary fields");
-    combined = combined.map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_init_foreign_temps(eid, e);
-        });
+    combined = combined.batched_map(eid, OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS);
     
     // Debug: Dump after initializing foreign temps
     uint32_t foreign_init_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE |

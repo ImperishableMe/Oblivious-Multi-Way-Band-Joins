@@ -175,10 +175,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 4: Compute foreign cumulative sums and weights
     DEBUG_INFO("Computing foreign cumulative sums");
-    combined.linear_pass(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_window_compute_foreign_sum(eid, e1, e2);
-        });
+    combined.batched_linear_pass(eid, OP_ECALL_WINDOW_COMPUTE_FOREIGN_SUM);
     
     // Debug: Dump after computing foreign cumulative sums
     uint32_t foreign_sum_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE |

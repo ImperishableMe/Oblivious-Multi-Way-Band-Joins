@@ -149,7 +149,7 @@ enclave {
         // Batch dispatcher for executing multiple operations in a single ecall
         // Note: BatchOperation and OpEcall types must be included separately in untrusted code
         // ops_array is passed as byte buffer with size in bytes
-        public void ecall_batch_dispatcher([in, count=data_count] entry_t* data_array, size_t data_count,
+        public void ecall_batch_dispatcher([in, out, count=data_count] entry_t* data_array, size_t data_count,
                                           [in, size=ops_size] void* ops_array, size_t ops_count, size_t ops_size,
                                           int32_t op_type);
         

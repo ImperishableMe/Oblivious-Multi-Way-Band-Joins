@@ -13,13 +13,8 @@
  * Operations are oblivious (branchless where possible) to prevent leakage
  */
 
-// Static variables for parameter passing to operation functions
-static int32_t g_deviation;
-static equality_type_t g_equality;
-static uint32_t g_index;
-
 // Operation functions for transforms
-static void set_local_mult_one_op(entry_t* entry) {
+void transform_set_local_mult_one_op(entry_t* entry) {
     entry->local_mult = 1;
     entry->final_mult = 0;  // Initialize to 0
 }
@@ -28,10 +23,10 @@ static void set_local_mult_one_op(entry_t* entry) {
  * Set local_mult = 1 for all tables in bottom-up phase initialization
  */
 void transform_set_local_mult_one(entry_t* entry) {
-    apply_to_decrypted_entry(entry, set_local_mult_one_op);
+    apply_to_decrypted_entry(entry, transform_set_local_mult_one_op);
 }
 
-static void add_metadata_op(entry_t* entry) {
+void transform_add_metadata_op(entry_t* entry) {
     // Initialize persistent metadata
     entry->original_index = 0;
     entry->local_mult = 0;
@@ -54,11 +49,11 @@ static void add_metadata_op(entry_t* entry) {
  * Initializes all metadata fields to prepare for algorithm phases
  */
 void transform_add_metadata(entry_t* entry) {
-    apply_to_decrypted_entry(entry, add_metadata_op);
+    apply_to_decrypted_entry(entry, transform_add_metadata_op);
 }
 
-static void set_index_op(entry_t* entry) {
-    entry->original_index = g_index;
+void transform_set_index_op(entry_t* entry, uint32_t index) {
+    entry->original_index = (int32_t)index;
 }
 
 /**
@@ -66,11 +61,23 @@ static void set_index_op(entry_t* entry) {
  * Used during initialization to assign sequential indices
  */
 void transform_set_index(entry_t* entry, uint32_t index) {
-    g_index = index;
-    apply_to_decrypted_entry(entry, set_index_op);
+    // Can't use apply_to_decrypted_entry with parameters, so decrypt/encrypt manually
+    crypto_status_t status;
+    uint8_t was_encrypted = entry->is_encrypted;
+    
+    if (was_encrypted) {
+        status = aes_decrypt_entry(entry);
+        if (status != CRYPTO_SUCCESS) return;
+    }
+    
+    transform_set_index_op(entry, index);
+    
+    if (was_encrypted) {
+        aes_encrypt_entry(entry);
+    }
 }
 
-static void init_local_temps_op(entry_t* entry) {
+void transform_init_local_temps_op(entry_t* entry) {
     // Initialize for bottom-up phase
     entry->local_cumsum = entry->local_mult;
     entry->local_interval = 0;
@@ -81,10 +88,10 @@ static void init_local_temps_op(entry_t* entry) {
  * Sets local_cumsum = local_mult, local_interval = 0
  */
 void transform_init_local_temps(entry_t* entry) {
-    apply_to_decrypted_entry(entry, init_local_temps_op);
+    apply_to_decrypted_entry(entry, transform_init_local_temps_op);
 }
 
-static void to_source_op(entry_t* entry) {
+void transform_to_source_op(entry_t* entry) {
     // Set type to SOURCE
     entry->field_type = SOURCE;
     entry->equality_type = NONE;  // SOURCE entries have no equality type
@@ -95,17 +102,17 @@ static void to_source_op(entry_t* entry) {
  * Used when creating combined table from source (child) entries
  */
 void transform_to_source(entry_t* entry) {
-    apply_to_decrypted_entry(entry, to_source_op);
+    apply_to_decrypted_entry(entry, transform_to_source_op);
 }
 
-static void to_start_op(entry_t* entry) {
+void transform_to_start_op(entry_t* entry, int32_t deviation, equality_type_t equality) {
     // Transform to START boundary
     entry->field_type = START;
-    entry->equality_type = g_equality;
+    entry->equality_type = equality;
     
     // Debug: Check if values are within expected range
     int32_t original_join_attr = entry->join_attr;
-    int32_t new_join_attr = entry->join_attr + g_deviation;
+    int32_t new_join_attr = entry->join_attr + deviation;
     
     // Check if original value is within design constraint
     if (entry->join_attr < INT32_MIN/2 || entry->join_attr > INT32_MAX/2) {
@@ -116,7 +123,7 @@ static void to_start_op(entry_t* entry) {
     entry->join_attr = new_join_attr;
     
     DEBUG_TRACE("to_start_op: original=%d, deviation=%d, new=%d", 
-                original_join_attr, g_deviation, new_join_attr);
+                original_join_attr, deviation, new_join_attr);
     
     // Preserve final_mult if already set (for top-down phase)
     // final_mult remains unchanged
@@ -127,24 +134,35 @@ static void to_start_op(entry_t* entry) {
  * Creates the start of a matching range for band joins
  */
 void transform_to_start(entry_t* entry, int32_t deviation, equality_type_t equality) {
-    g_deviation = deviation;
-    g_equality = equality;
-    apply_to_decrypted_entry(entry, to_start_op);
+    // Can't use apply_to_decrypted_entry with parameters, so decrypt/encrypt manually
+    crypto_status_t status;
+    uint8_t was_encrypted = entry->is_encrypted;
+    
+    if (was_encrypted) {
+        status = aes_decrypt_entry(entry);
+        if (status != CRYPTO_SUCCESS) return;
+    }
+    
+    transform_to_start_op(entry, deviation, equality);
+    
+    if (was_encrypted) {
+        aes_encrypt_entry(entry);
+    }
 }
 
-static void to_end_op(entry_t* entry) {
+void transform_to_end_op(entry_t* entry, int32_t deviation, equality_type_t equality) {
     // Transform to END boundary
     entry->field_type = END;
-    entry->equality_type = g_equality;
+    entry->equality_type = equality;
     
     // Debug: Check if values are within expected range
     int32_t original_join_attr = entry->join_attr;
-    int32_t new_join_attr = entry->join_attr + g_deviation;
+    int32_t new_join_attr = entry->join_attr + deviation;
     
     // Check for overflow/underflow
-    if (g_deviation > 0 && entry->join_attr > INT32_MAX - g_deviation) {
+    if (deviation > 0 && entry->join_attr > INT32_MAX - deviation) {
         DEBUG_WARN("to_end_op overflow detected! join_attr=%d + deviation=%d would overflow", 
-                   entry->join_attr, g_deviation);
+                   entry->join_attr, deviation);
     }
     
     // Check if original value is within design constraint
@@ -156,7 +174,7 @@ static void to_end_op(entry_t* entry) {
     entry->join_attr = new_join_attr;
     
     DEBUG_TRACE("to_end_op: original=%d, deviation=%d, new=%d", 
-                original_join_attr, g_deviation, new_join_attr);
+                original_join_attr, deviation, new_join_attr);
     
     // Preserve final_mult if already set (for top-down phase)
     // final_mult remains unchanged
@@ -167,18 +185,29 @@ static void to_end_op(entry_t* entry) {
  * Creates the end of a matching range for band joins
  */
 void transform_to_end(entry_t* entry, int32_t deviation, equality_type_t equality) {
-    g_deviation = deviation;
-    g_equality = equality;
-    apply_to_decrypted_entry(entry, to_end_op);
+    // Can't use apply_to_decrypted_entry with parameters, so decrypt/encrypt manually
+    crypto_status_t status;
+    uint8_t was_encrypted = entry->is_encrypted;
+    
+    if (was_encrypted) {
+        status = aes_decrypt_entry(entry);
+        if (status != CRYPTO_SUCCESS) return;
+    }
+    
+    transform_to_end_op(entry, deviation, equality);
+    
+    if (was_encrypted) {
+        aes_encrypt_entry(entry);
+    }
 }
 
 /**
  * Transform entry to SORT_PADDING type (for bitonic sort padding)
  */
-static void set_sort_padding_op(entry_t* entry) {
+void transform_set_sort_padding_op(entry_t* entry) {
     entry->field_type = SORT_PADDING;
     entry->join_attr = INT32_MAX;  // Sort to end
-    entry->original_index = UINT32_MAX;
+    entry->original_index = NULL_VALUE;  // Use NULL_VALUE to indicate padding
     entry->local_mult = 0;
     entry->final_mult = 0;
     // Clear other fields
@@ -190,13 +219,13 @@ static void set_sort_padding_op(entry_t* entry) {
 }
 
 void transform_set_sort_padding(entry_t* entry) {
-    apply_to_decrypted_entry(entry, set_sort_padding_op);
+    apply_to_decrypted_entry(entry, transform_set_sort_padding_op);
 }
 
 /**
  * Initialize final_mult from local_mult (for root table in top-down)
  */
-static void init_final_mult_op(entry_t* entry) {
+void transform_init_final_mult_op(entry_t* entry) {
     entry->final_mult = entry->local_mult;
     // Also initialize foreign fields
     entry->foreign_sum = 0;
@@ -205,13 +234,13 @@ static void init_final_mult_op(entry_t* entry) {
 }
 
 void transform_init_final_mult(entry_t* entry) {
-    apply_to_decrypted_entry(entry, init_final_mult_op);
+    apply_to_decrypted_entry(entry, transform_init_final_mult_op);
 }
 
 /**
  * Initialize foreign temporary fields for top-down computation
  */
-static void init_foreign_temps_op(entry_t* entry) {
+void transform_init_foreign_temps_op(entry_t* entry) {
     // Initialize foreign tracking fields
     entry->foreign_sum = 0;
     entry->foreign_interval = 0;
@@ -221,7 +250,7 @@ static void init_foreign_temps_op(entry_t* entry) {
 }
 
 void transform_init_foreign_temps(entry_t* entry) {
-    apply_to_decrypted_entry(entry, init_foreign_temps_op);
+    apply_to_decrypted_entry(entry, transform_init_foreign_temps_op);
 }
 
 // ============================================================================
@@ -231,42 +260,42 @@ void transform_init_foreign_temps(entry_t* entry) {
 /**
  * Initialize destination index to 0
  */
-static void init_dst_idx_op(entry_t* entry) {
+void transform_init_dst_idx_op(entry_t* entry) {
     entry->dst_idx = 0;
 }
 
 void transform_init_dst_idx(entry_t* entry) {
-    apply_to_decrypted_entry(entry, init_dst_idx_op);
+    apply_to_decrypted_entry(entry, transform_init_dst_idx_op);
 }
 
 /**
  * Initialize index field to 0
  */
-static void init_index_op(entry_t* entry) {
+void transform_init_index_op(entry_t* entry) {
     entry->index = 0;
 }
 
 void transform_init_index(entry_t* entry) {
-    apply_to_decrypted_entry(entry, init_index_op);
+    apply_to_decrypted_entry(entry, transform_init_index_op);
 }
 
 /**
  * Mark entries with final_mult = 0 as DIST_PADDING
  */
-static void mark_zero_mult_padding_op(entry_t* entry) {
+void transform_mark_zero_mult_padding_op(entry_t* entry) {
     // Use oblivious selection to avoid branching
     int is_zero = (entry->final_mult == 0);
     entry->field_type = is_zero * DIST_PADDING + (1 - is_zero) * entry->field_type;
 }
 
 void transform_mark_zero_mult_padding(entry_t* entry) {
-    apply_to_decrypted_entry(entry, mark_zero_mult_padding_op);
+    apply_to_decrypted_entry(entry, transform_mark_zero_mult_padding_op);
 }
 
 /**
  * Create a distribution padding entry
  */
-static void create_dist_padding_op(entry_t* entry) {
+void transform_create_dist_padding_op(entry_t* entry) {
     // Initialize a padding entry
     entry->field_type = DIST_PADDING;
     entry->final_mult = 0;
@@ -278,7 +307,7 @@ static void create_dist_padding_op(entry_t* entry) {
 }
 
 void transform_create_dist_padding(entry_t* entry) {
-    apply_to_decrypted_entry(entry, create_dist_padding_op);
+    apply_to_decrypted_entry(entry, transform_create_dist_padding_op);
 }
 
 // ============================================================================
@@ -288,32 +317,32 @@ void transform_create_dist_padding(entry_t* entry) {
 /**
  * Initialize copy index to 0
  */
-static void init_copy_index_op(entry_t* entry) {
+void transform_init_copy_index_op(entry_t* entry) {
     entry->copy_index = 0;
 }
 
 void transform_init_copy_index(entry_t* entry) {
-    apply_to_decrypted_entry(entry, init_copy_index_op);
+    apply_to_decrypted_entry(entry, transform_init_copy_index_op);
 }
 
 /**
  * Compute alignment key = foreign_sum + (copy_index / local_mult)
  */
-static void compute_alignment_key_op(entry_t* entry) {
+void transform_compute_alignment_key_op(entry_t* entry) {
     // Avoid division by zero obliviously
     int32_t safe_local_mult = entry->local_mult + (entry->local_mult == 0);
     entry->alignment_key = entry->foreign_sum + (entry->copy_index / safe_local_mult);
 }
 
 void transform_compute_alignment_key(entry_t* entry) {
-    apply_to_decrypted_entry(entry, compute_alignment_key_op);
+    apply_to_decrypted_entry(entry, transform_compute_alignment_key_op);
 }
 
 /**
  * Set join_attr from a specific column (Algorithm 999)
  * Extract the value from attributes[column_index] and set as join_attr
  */
-static void set_join_attr_op(entry_t* entry, int32_t column_index) {
+void transform_set_join_attr_op(entry_t* entry, int32_t column_index) {
     // Validate column index
     if (column_index >= 0 && column_index < MAX_ATTRIBUTES) {
         entry->join_attr = entry->attributes[column_index];
@@ -345,7 +374,7 @@ void transform_set_join_attr(entry_t* entry, int32_t column_index) {
     }
     
     // Apply the operation
-    set_join_attr_op(entry, column_index);
+    transform_set_join_attr_op(entry, column_index);
     
     // Re-encrypt if it was encrypted
     if (was_encrypted) {
@@ -357,58 +386,56 @@ void transform_set_join_attr(entry_t* entry, int32_t column_index) {
  * Initialize metadata fields to NULL_VALUE based on field mask
  * This provides fine-grained control over which fields to initialize
  */
-static uint32_t g_field_mask;
-
-static void init_metadata_null_op(entry_t* entry) {
+void transform_init_metadata_null_op(entry_t* entry, uint32_t field_mask) {
     // Check each individual mask bit and initialize corresponding fields
     // This allows any subset of fields to be set to NULL_VALUE
     
     // Persistent metadata fields
-    if (g_field_mask & METADATA_ORIGINAL_INDEX) {
+    if (field_mask & METADATA_ORIGINAL_INDEX) {
         entry->original_index = NULL_VALUE;
     }
-    if (g_field_mask & METADATA_LOCAL_MULT) {
+    if (field_mask & METADATA_LOCAL_MULT) {
         entry->local_mult = NULL_VALUE;
     }
-    if (g_field_mask & METADATA_FINAL_MULT) {
+    if (field_mask & METADATA_FINAL_MULT) {
         entry->final_mult = NULL_VALUE;
     }
-    if (g_field_mask & METADATA_FOREIGN_SUM) {
+    if (field_mask & METADATA_FOREIGN_SUM) {
         entry->foreign_sum = NULL_VALUE;
     }
     
     // Temporary metadata fields
-    if (g_field_mask & METADATA_LOCAL_CUMSUM) {
+    if (field_mask & METADATA_LOCAL_CUMSUM) {
         entry->local_cumsum = NULL_VALUE;
     }
-    if (g_field_mask & METADATA_LOCAL_INTERVAL) {
+    if (field_mask & METADATA_LOCAL_INTERVAL) {
         entry->local_interval = NULL_VALUE;
     }
-    if (g_field_mask & METADATA_FOREIGN_INTERVAL) {
+    if (field_mask & METADATA_FOREIGN_INTERVAL) {
         entry->foreign_interval = NULL_VALUE;
     }
-    if (g_field_mask & METADATA_LOCAL_WEIGHT) {
+    if (field_mask & METADATA_LOCAL_WEIGHT) {
         entry->local_weight = NULL_VALUE;
     }
     
     // Distribution metadata fields
-    if (g_field_mask & METADATA_DST_IDX) {
+    if (field_mask & METADATA_DST_IDX) {
         entry->dst_idx = NULL_VALUE;
     }
-    if (g_field_mask & METADATA_INDEX) {
+    if (field_mask & METADATA_INDEX) {
         entry->index = NULL_VALUE;
     }
     
     // Alignment metadata fields
-    if (g_field_mask & METADATA_COPY_INDEX) {
+    if (field_mask & METADATA_COPY_INDEX) {
         entry->copy_index = NULL_VALUE;
     }
-    if (g_field_mask & METADATA_ALIGNMENT_KEY) {
+    if (field_mask & METADATA_ALIGNMENT_KEY) {
         entry->alignment_key = NULL_VALUE;
     }
     
     // Type field - set to NULL_VALUE like other metadata
-    if (g_field_mask & METADATA_FIELD_TYPE) {
+    if (field_mask & METADATA_FIELD_TYPE) {
         // Set to NULL_VALUE for clarity in debugging
         // The algorithm will explicitly set these when needed
         entry->field_type = NULL_VALUE;
@@ -417,6 +444,18 @@ static void init_metadata_null_op(entry_t* entry) {
 }
 
 void transform_init_metadata_null(entry_t* entry, uint32_t field_mask) {
-    g_field_mask = field_mask;
-    apply_to_decrypted_entry(entry, init_metadata_null_op);
+    // Can't use apply_to_decrypted_entry with parameters, so decrypt/encrypt manually
+    crypto_status_t status;
+    uint8_t was_encrypted = entry->is_encrypted;
+    
+    if (was_encrypted) {
+        status = aes_decrypt_entry(entry);
+        if (status != CRYPTO_SUCCESS) return;
+    }
+    
+    transform_init_metadata_null_op(entry, field_mask);
+    
+    if (was_encrypted) {
+        aes_encrypt_entry(entry);
+    }
 }

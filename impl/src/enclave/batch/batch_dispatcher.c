@@ -2,6 +2,7 @@
 #include "../core/core.h"
 #include "../crypto/aes_crypto.h"
 #include "../Enclave_t.h"
+#include <assert.h>
 
 /**
  * Batch dispatcher implementation
@@ -69,73 +70,89 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
         
         case OP_ECALL_COMPARATOR_JOIN_ATTR:
             for (size_t i = 0; i < ops_count; i++) {
-                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
-                    comparator_join_attr(&data_array[ops_array[i].idx1],
+                // Comparators always have two parameters - assert this invariant
+                assert(ops_array[i].idx2 != BATCH_NO_PARAM);
+                
+                // Call the raw comparator operation directly (data is already decrypted)
+                comparator_join_attr_op(&data_array[ops_array[i].idx1],
                                        &data_array[ops_array[i].idx2]);
-                }
             }
             break;
             
         case OP_ECALL_COMPARATOR_PAIRWISE:
             for (size_t i = 0; i < ops_count; i++) {
-                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
-                    comparator_pairwise(&data_array[ops_array[i].idx1],
+                // Comparators always have two parameters - assert this invariant
+                assert(ops_array[i].idx2 != BATCH_NO_PARAM);
+                
+                // Call the raw comparator operation directly (data is already decrypted)
+                comparator_pairwise_op(&data_array[ops_array[i].idx1],
                                       &data_array[ops_array[i].idx2]);
-                }
             }
             break;
             
         case OP_ECALL_COMPARATOR_END_FIRST:
             for (size_t i = 0; i < ops_count; i++) {
-                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
-                    comparator_end_first(&data_array[ops_array[i].idx1],
+                // Comparators always have two parameters - assert this invariant
+                assert(ops_array[i].idx2 != BATCH_NO_PARAM);
+                
+                // Call the raw comparator operation directly (data is already decrypted)
+                comparator_end_first_op(&data_array[ops_array[i].idx1],
                                        &data_array[ops_array[i].idx2]);
-                }
             }
             break;
             
         case OP_ECALL_COMPARATOR_JOIN_THEN_OTHER:
             for (size_t i = 0; i < ops_count; i++) {
-                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
-                    comparator_join_then_other(&data_array[ops_array[i].idx1],
+                // Comparators always have two parameters - assert this invariant
+                assert(ops_array[i].idx2 != BATCH_NO_PARAM);
+                
+                // Call the raw comparator operation directly (data is already decrypted)
+                comparator_join_then_other_op(&data_array[ops_array[i].idx1],
                                               &data_array[ops_array[i].idx2]);
-                }
             }
             break;
             
         case OP_ECALL_COMPARATOR_ORIGINAL_INDEX:
             for (size_t i = 0; i < ops_count; i++) {
-                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
-                    comparator_original_index(&data_array[ops_array[i].idx1],
+                // Comparators always have two parameters - assert this invariant
+                assert(ops_array[i].idx2 != BATCH_NO_PARAM);
+                
+                // Call the raw comparator operation directly (data is already decrypted)
+                comparator_original_index_op(&data_array[ops_array[i].idx1],
                                              &data_array[ops_array[i].idx2]);
-                }
             }
             break;
             
         case OP_ECALL_COMPARATOR_ALIGNMENT_KEY:
             for (size_t i = 0; i < ops_count; i++) {
-                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
-                    comparator_alignment_key(&data_array[ops_array[i].idx1],
+                // Comparators always have two parameters - assert this invariant
+                assert(ops_array[i].idx2 != BATCH_NO_PARAM);
+                
+                // Call the raw comparator operation directly (data is already decrypted)
+                comparator_alignment_key_op(&data_array[ops_array[i].idx1],
                                            &data_array[ops_array[i].idx2]);
-                }
             }
             break;
             
         case OP_ECALL_COMPARATOR_PADDING_LAST:
             for (size_t i = 0; i < ops_count; i++) {
-                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
-                    comparator_padding_last(&data_array[ops_array[i].idx1],
+                // Comparators always have two parameters - assert this invariant
+                assert(ops_array[i].idx2 != BATCH_NO_PARAM);
+                
+                // Call the raw comparator operation directly (data is already decrypted)
+                comparator_padding_last_op(&data_array[ops_array[i].idx1],
                                           &data_array[ops_array[i].idx2]);
-                }
             }
             break;
             
         case OP_ECALL_COMPARATOR_DISTRIBUTE:
             for (size_t i = 0; i < ops_count; i++) {
-                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
-                    comparator_distribute(&data_array[ops_array[i].idx1],
+                // Comparators always have two parameters - assert this invariant
+                assert(ops_array[i].idx2 != BATCH_NO_PARAM);
+                
+                // Call the raw comparator operation directly (data is already decrypted)
+                comparator_distribute_op(&data_array[ops_array[i].idx1],
                                         &data_array[ops_array[i].idx2]);
-                }
             }
             break;
             
@@ -225,7 +242,12 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
         
         case OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE:
             for (size_t i = 0; i < ops_count; i++) {
-                transform_set_local_mult_one(&data_array[ops_array[i].idx1]);
+                // Call the raw operation directly - data is already decrypted
+                int32_t idx = ops_array[i].idx1;
+                if (idx >= 0 && idx < data_count) {
+                    data_array[idx].local_mult = 1;
+                    data_array[idx].final_mult = 0;
+                }
             }
             break;
             
@@ -298,7 +320,8 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
             for (size_t i = 0; i < ops_count; i++) {
                 int32_t deviation = ops_array[i].extra_params[0];
                 equality_type_t equality = (equality_type_t)ops_array[i].extra_params[1];
-                transform_to_start(&data_array[ops_array[i].idx1], deviation, equality);
+                // Call the raw operation directly (data is already decrypted)
+                transform_to_start_op(&data_array[ops_array[i].idx1], deviation, equality);
             }
             break;
             
@@ -307,26 +330,30 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
             for (size_t i = 0; i < ops_count; i++) {
                 int32_t deviation = ops_array[i].extra_params[0];
                 equality_type_t equality = (equality_type_t)ops_array[i].extra_params[1];
-                transform_to_end(&data_array[ops_array[i].idx1], deviation, equality);
+                // Call the raw operation directly (data is already decrypted)
+                transform_to_end_op(&data_array[ops_array[i].idx1], deviation, equality);
             }
             break;
             
         case OP_ECALL_TRANSFORM_SET_INDEX:
             for (size_t i = 0; i < ops_count; i++) {
-                transform_set_index(&data_array[ops_array[i].idx1], (uint32_t)ops_array[i].extra_params[0]);
+                // Call the raw operation directly (data is already decrypted)
+                transform_set_index_op(&data_array[ops_array[i].idx1], (uint32_t)ops_array[i].extra_params[0]);
             }
             break;
             
         case OP_ECALL_TRANSFORM_SET_JOIN_ATTR:
             for (size_t i = 0; i < ops_count; i++) {
-                transform_set_join_attr(&data_array[ops_array[i].idx1], 
-                                       ops_array[i].extra_params[0]);
+                // Call the raw operation directly (data is already decrypted)
+                transform_set_join_attr_op(&data_array[ops_array[i].idx1], 
+                                          ops_array[i].extra_params[0]);
             }
             break;
             
         case OP_ECALL_INIT_METADATA_NULL:
             for (size_t i = 0; i < ops_count; i++) {
-                transform_init_metadata_null(&data_array[ops_array[i].idx1], (uint32_t)ops_array[i].extra_params[0]);
+                // Call the raw operation directly (data is already decrypted)
+                transform_init_metadata_null_op(&data_array[ops_array[i].idx1], (uint32_t)ops_array[i].extra_params[0]);
             }
             break;
             

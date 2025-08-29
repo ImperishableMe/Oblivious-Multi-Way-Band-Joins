@@ -67,18 +67,13 @@ void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
 void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node, sgx_enclave_id_t eid) {
     // Initialize ALL metadata fields to NULL_VALUE for clarity in debugging
     // Then set specific values as needed
-    node->set_table(node->get_table().map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            // First, set all metadata to NULL_VALUE (INT32_MAX)
-            // This makes it clear in debug which fields are actually used
-            sgx_status_t status = ecall_init_metadata_null(eid, e, METADATA_ALL);
-            if (status == SGX_SUCCESS) {
-                // Now set local_mult to 1 for all tables (both leaf and non-leaf)
-                // This overrides the NULL_VALUE for local_mult specifically
-                status = ecall_transform_set_local_mult_one(eid, e);
-            }
-            return status;
-        }));
+    
+    // First batch: Initialize all metadata to NULL_VALUE
+    int32_t params[1] = { METADATA_ALL };
+    Table temp = node->get_table().batched_map(eid, OP_ECALL_INIT_METADATA_NULL, params);
+    
+    // Second batch: Set local_mult to 1
+    node->set_table(temp.batched_map(eid, OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE));
     
     // Set original indices using LinearPass with window function
     Table& table = node->get_table();
@@ -88,12 +83,9 @@ void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node, sgx_enclave_id_t e
         ecall_transform_set_index(eid, &first, 0);
         table[0].from_entry_t(first);
         
-        // Use window function to set consecutive indices
+        // Use batched window function to set consecutive indices
         if (table.size() > 1) {
-            table.linear_pass(eid,
-                [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-                    return ecall_window_set_original_index(eid, e1, e2);
-                });
+            table.batched_linear_pass(eid, OP_ECALL_WINDOW_SET_ORIGINAL_INDEX);
         }
     }
     
@@ -224,11 +216,8 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     debug_dump_with_mask(combined, "initialized", "bottomup_step3_init_temps", eid, init_mask);
     
     // Step 3: Sort by join attribute and precedence
-    DEBUG_INFO("Sorting combined table by join attribute");
-    combined.oblivious_sort(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_comparator_join_attr(eid, e1, e2);
-        });
+    DEBUG_INFO("Sorting combined table by join attribute - BATCHED");
+    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
     DEBUG_INFO("Sort completed");
     
     // Debug: Dump after sorting by join attribute

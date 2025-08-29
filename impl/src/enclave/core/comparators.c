@@ -29,7 +29,7 @@ static inline int32_t oblivious_ternary(int32_t condition, int32_t true_val, int
 }
 
 static inline uint8_t oblivious_ternary_u8(int32_t condition, uint8_t true_val, uint8_t false_val) {
-    return condition * true_val + (1 - condition) * false_val;
+    return (uint8_t)(condition * true_val + (1 - condition) * false_val);
 }
 
 /**
@@ -105,7 +105,7 @@ void oblivious_swap(entry_t* e1, entry_t* e2, int should_swap) {
  * Core operation for comparator by join attribute (Algorithm 399)
  * Primary: join_attr, Secondary: entry type precedence
  */
-static void comparator_join_attr_op(entry_t* e1, entry_t* e2) {
+void comparator_join_attr_op(entry_t* e1, entry_t* e2) {
     // Compare join attributes (both are int32_t)
     int32_t diff = e1->join_attr - e2->join_attr;
     int32_t cmp = oblivious_sign(diff);
@@ -139,7 +139,7 @@ void comparator_join_attr(entry_t* e1, entry_t* e2) {
  * Core operation for comparator for pairwise processing (Algorithm 438)
  * Priority: 1) TARGET before SOURCE, 2) by original_index, 3) START before END
  */
-static void comparator_pairwise_op(entry_t* e1, entry_t* e2) {
+void comparator_pairwise_op(entry_t* e1, entry_t* e2) {
     // Check if entries are TARGET type (START or END)
     int32_t is_target1 = ((e1->field_type == START) | (e1->field_type == END));
     int32_t is_target2 = ((e2->field_type == START) | (e2->field_type == END));
@@ -182,7 +182,7 @@ void comparator_pairwise(entry_t* e1, entry_t* e2) {
  * Core operation for comparator with END entries first (Algorithm 479)
  * Priority: 1) END before others, 2) by original_index
  */
-static void comparator_end_first_op(entry_t* e1, entry_t* e2) {
+void comparator_end_first_op(entry_t* e1, entry_t* e2) {
     // Check if entries are END type
     int32_t is_end1 = (e1->field_type == END);
     int32_t is_end2 = (e2->field_type == END);
@@ -217,7 +217,7 @@ void comparator_end_first(entry_t* e1, entry_t* e2) {
  * Core operation for comparator by join attribute then all attributes (Algorithm 697)
  * Primary: join_attr, Secondary: all attributes in sequence
  */
-static void comparator_join_then_other_op(entry_t* e1, entry_t* e2) {
+void comparator_join_then_other_op(entry_t* e1, entry_t* e2) {
     // Compare join attributes (both are int32_t)
     int32_t diff = e1->join_attr - e2->join_attr;
     int32_t cmp = oblivious_sign(diff);
@@ -257,7 +257,7 @@ void comparator_join_then_other(entry_t* e1, entry_t* e2) {
  * Core operation for comparator by original index only
  * Simple comparison for maintaining original order
  */
-static void comparator_original_index_op(entry_t* e1, entry_t* e2) {
+void comparator_original_index_op(entry_t* e1, entry_t* e2) {
     // Compare original indices
     int32_t normal_result = oblivious_sign(e1->original_index - e2->original_index);
     
@@ -280,7 +280,7 @@ void comparator_original_index(entry_t* e1, entry_t* e2) {
  * Used in final alignment phase
  * Priority: 1) alignment_key, 2) join_attr, 3) copy_index
  */
-static void comparator_alignment_key_op(entry_t* e1, entry_t* e2) {
+void comparator_alignment_key_op(entry_t* e1, entry_t* e2) {
     // Primary: Compare alignment keys
     int32_t align_cmp = oblivious_sign(e1->alignment_key - e2->alignment_key);
     
@@ -319,7 +319,7 @@ void comparator_alignment_key(entry_t* e1, entry_t* e2) {
  * Core operation for comparator to put DIST_PADDING entries last
  * Sorts non-padding entries before padding entries
  */
-static void comparator_padding_last_op(entry_t* e1, entry_t* e2) {
+void comparator_padding_last_op(entry_t* e1, entry_t* e2) {
     // Check if entries are DIST_PADDING
     int32_t is_padding1 = (e1->field_type == DIST_PADDING);
     int32_t is_padding2 = (e2->field_type == DIST_PADDING);
@@ -355,7 +355,7 @@ void comparator_padding_last(entry_t* e1, entry_t* e2) {
  * Checks if e1's dst_idx >= e2's index AND e1 is not DIST_PADDING
  * Swaps content while preserving index
  */
-static void comparator_distribute_op(entry_t* e1, entry_t* e2) {
+void comparator_distribute_op(entry_t* e1, entry_t* e2) {
     // Check if we should swap: e1.dst_idx >= e2.index AND e1 is not DIST_PADDING
     int32_t dst_condition = (e1->dst_idx >= e2->index);
     int32_t not_padding = (e1->field_type != DIST_PADDING);

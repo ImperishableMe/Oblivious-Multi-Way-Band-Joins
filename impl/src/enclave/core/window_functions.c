@@ -12,7 +12,7 @@
  */
 
 // Operation functions for window operations
-static void set_original_index_op(entry_t* e1, entry_t* e2) {
+void window_set_original_index_op(entry_t* e1, entry_t* e2) {
     e2->original_index = e1->original_index + 1;
 }
 
@@ -21,13 +21,11 @@ static void set_original_index_op(entry_t* e1, entry_t* e2) {
  * Sets consecutive indices as the window slides through the table
  */
 void window_set_original_index(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, set_original_index_op);
+    apply_to_decrypted_pair(e1, e2, window_set_original_index_op);
 }
 
-static void update_target_multiplicity_op(entry_t* target, entry_t* source) {
+void update_target_multiplicity_op(entry_t* target, entry_t* source) {
     // Multiply target's local_mult by computed interval from combined table
-    int32_t old_mult = target->local_mult;
-    int32_t interval = source->local_interval;
     target->local_mult = target->local_mult * source->local_interval;
     
     // Debug: Check for negative multiplicity
@@ -42,7 +40,7 @@ void update_target_multiplicity(entry_t* target, entry_t* source) {
     apply_to_decrypted_pair(target, source, update_target_multiplicity_op);
 }
 
-static void update_target_final_multiplicity_op(entry_t* target, entry_t* source) {
+void update_target_final_multiplicity_op(entry_t* target, entry_t* source) {
     // Propagate foreign intervals to compute final multiplicities
     target->final_mult = source->foreign_interval * target->local_mult;
     target->foreign_sum = source->foreign_sum;  // For alignment
@@ -56,7 +54,7 @@ void update_target_final_multiplicity(entry_t* target, entry_t* source) {
     apply_to_decrypted_pair(target, source, update_target_final_multiplicity_op);
 }
 
-static void compute_local_sum_op(entry_t* e1, entry_t* e2) {
+void window_compute_local_sum_op(entry_t* e1, entry_t* e2) {
     // Check if e2 (window[1]) is SOURCE type (obliviously)
     int32_t is_source = (e2->field_type == SOURCE);
     
@@ -67,7 +65,7 @@ static void compute_local_sum_op(entry_t* e1, entry_t* e2) {
     int32_t skip_source = is_start_neq & same_join_attr & is_source;
     
     // Add local_mult only if SOURCE and not skipped
-    uint32_t old_cumsum = e2->local_cumsum;
+    uint32_t old_cumsum = (uint32_t)e2->local_cumsum;
     e2->local_cumsum = e1->local_cumsum + (is_source * (1 - skip_source) * e2->local_mult);
     
     // Debug log to verify the operation
@@ -83,10 +81,10 @@ static void compute_local_sum_op(entry_t* e1, entry_t* e2) {
  * e1 is window[0], e2 is window[1] in the sliding window
  */
 void window_compute_local_sum(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, compute_local_sum_op);
+    apply_to_decrypted_pair(e1, e2, window_compute_local_sum_op);
 }
 
-static void compute_local_interval_op(entry_t* e1, entry_t* e2) {
+void window_compute_local_interval_op(entry_t* e1, entry_t* e2) {
     // Check if we have a START/END pair (obliviously)
     int32_t is_start = (e1->field_type == START);
     int32_t is_end = (e2->field_type == END);
@@ -94,7 +92,7 @@ static void compute_local_interval_op(entry_t* e1, entry_t* e2) {
     
     // Compute interval difference
     int32_t interval = e2->local_cumsum - e1->local_cumsum;
-    uint32_t old_interval = e2->local_interval;
+    uint32_t old_interval = (uint32_t)e2->local_interval;
     
     // Debug: Check for negative interval
     // Note: Cannot use DEBUG_ENCLAVE in enclave code - would need OCALL for logging
@@ -115,10 +113,10 @@ static void compute_local_interval_op(entry_t* e1, entry_t* e2) {
  * e1 is window[0], e2 is window[1] in the sliding window
  */
 void window_compute_local_interval(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, compute_local_interval_op);
+    apply_to_decrypted_pair(e1, e2, window_compute_local_interval_op);
 }
 
-static void compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
+void window_compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
     // Determine entry type (obliviously)
     int32_t is_start = (e2->field_type == START);
     int32_t is_end = (e2->field_type == END);
@@ -126,7 +124,7 @@ static void compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
     
     // For START/END entries from child, use local_mult
     // For SOURCE entries from parent, use final_mult
-    int32_t mult_to_use = is_source ? e2->final_mult : e2->local_mult;
+    // Note: mult_to_use removed as it's not used in the oblivious computation
     
     // Check if e1 is START with NEQ (open boundary)
     // If so, SOURCE at the same join_attr should NOT be counted
@@ -157,10 +155,10 @@ static void compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
  * e1 is window[0], e2 is window[1] in the sliding window
  */
 void window_compute_foreign_sum(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, compute_foreign_sum_op);
+    apply_to_decrypted_pair(e1, e2, window_compute_foreign_sum_op);
 }
 
-static void compute_foreign_interval_op(entry_t* e1, entry_t* e2) {
+void window_compute_foreign_interval_op(entry_t* e1, entry_t* e2) {
     // Check if we have a START/END pair (obliviously)
     int32_t is_start = (e1->field_type == START);
     int32_t is_end = (e2->field_type == END);
@@ -185,10 +183,10 @@ static void compute_foreign_interval_op(entry_t* e1, entry_t* e2) {
  * e1 is window[0], e2 is window[1] in the sliding window
  */
 void window_compute_foreign_interval(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, compute_foreign_interval_op);
+    apply_to_decrypted_pair(e1, e2, window_compute_foreign_interval_op);
 }
 
-static void propagate_foreign_interval_op(entry_t* e1, entry_t* e2) {
+void window_propagate_foreign_interval_op(entry_t* e1, entry_t* e2) {
     // Check entry types
     int32_t is_source2 = (e2->field_type == SOURCE);
     int32_t is_end1 = (e1->field_type == END);
@@ -208,7 +206,7 @@ static void propagate_foreign_interval_op(entry_t* e1, entry_t* e2) {
  * After computing intervals for START/END pairs, propagate to SOURCE entries
  */
 void window_propagate_foreign_interval(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, propagate_foreign_interval_op);
+    apply_to_decrypted_pair(e1, e2, window_propagate_foreign_interval_op);
 }
 
 // ============================================================================
@@ -218,31 +216,31 @@ void window_propagate_foreign_interval(entry_t* e1, entry_t* e2) {
 /**
  * Compute destination index as cumulative sum of final_mult
  */
-static void compute_dst_idx_op(entry_t* e1, entry_t* e2) {
+void window_compute_dst_idx_op(entry_t* e1, entry_t* e2) {
     // e2's dst_idx = e1's dst_idx + e1's final_mult
     e2->dst_idx = e1->dst_idx + e1->final_mult;
 }
 
 void window_compute_dst_idx(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, compute_dst_idx_op);
+    apply_to_decrypted_pair(e1, e2, window_compute_dst_idx_op);
 }
 
 /**
  * Set sequential index values
  */
-static void increment_index_op(entry_t* e1, entry_t* e2) {
+void window_increment_index_op(entry_t* e1, entry_t* e2) {
     // e2's index = e1's index + 1
     e2->index = e1->index + 1;
 }
 
 void window_increment_index(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, increment_index_op);
+    apply_to_decrypted_pair(e1, e2, window_increment_index_op);
 }
 
 /**
  * Expansion: copy non-empty entries to fill padding slots
  */
-static void expand_copy_op(entry_t* e1, entry_t* e2) {
+void window_expand_copy_op(entry_t* e1, entry_t* e2) {
     // Check if e2 is DIST_PADDING (obliviously)
     int is_padding = (e2->field_type == DIST_PADDING);
     
@@ -259,7 +257,7 @@ static void expand_copy_op(entry_t* e1, entry_t* e2) {
     uint8_t* src_orig = (uint8_t*)e2;
     
     for (size_t i = 0; i < sizeof(entry_t); i++) {
-        dst[i] = is_padding * src_temp[i] + (1 - is_padding) * src_orig[i];
+        dst[i] = (uint8_t)(is_padding * src_temp[i] + (1 - is_padding) * src_orig[i]);
     }
     
     // Restore e2's index (always)
@@ -269,7 +267,7 @@ static void expand_copy_op(entry_t* e1, entry_t* e2) {
 }
 
 void window_expand_copy(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, expand_copy_op);
+    apply_to_decrypted_pair(e1, e2, window_expand_copy_op);
 }
 
 // ============================================================================
@@ -281,7 +279,7 @@ void window_expand_copy(entry_t* e1, entry_t* e2) {
  * If same original index, increment from previous
  * If different, reset to 0
  */
-static void update_copy_index_op(entry_t* e1, entry_t* e2) {
+void window_update_copy_index_op(entry_t* e1, entry_t* e2) {
     // Check if same original tuple (obliviously)
     int is_same = (e1->original_index == e2->original_index);
     
@@ -290,14 +288,14 @@ static void update_copy_index_op(entry_t* e1, entry_t* e2) {
 }
 
 void window_update_copy_index(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, update_copy_index_op);
+    apply_to_decrypted_pair(e1, e2, window_update_copy_index_op);
 }
 
 /**
  * Concatenate attributes from right entry into left entry
  * This adds all attributes from right to left, preserving left's existing attributes
  */
-static void concat_attributes_op(entry_t* left, entry_t* right) {
+void concat_attributes_op(entry_t* left, entry_t* right) {
     // Find the number of existing attributes in left
     int left_attr_count = 0;
     for (int i = 0; i < MAX_ATTRIBUTES; i++) {

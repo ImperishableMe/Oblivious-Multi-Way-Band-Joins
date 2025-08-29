@@ -258,6 +258,21 @@ $(Encrypt_Tool): $(Encrypt_Tool_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags) -lstdc++fs
 	@echo "LINK =>  $@"
 
+# Unit test for batch collector
+Test_Batch_Collector_Objects := unit_test/test_batch_collector.o app/data_structures/entry.o \
+                                app/data_structures/table.o app/batch/ecall_batch_collector.o \
+                                app/crypto/crypto_utils.o app/debug_util.o app/data_structures/join_constraint.o \
+                                app/data_structures/join_condition.o app/io/converters.o \
+                                app/io/table_io.o $(Gen_Untrusted_Object)
+
+unit_test/test_batch_collector.o: unit_test/test_batch_collector.cpp $(Gen_Untrusted_Source)
+	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
+unit_test/test_batch_collector: $(Test_Batch_Collector_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
 # Test programs
 Test_Minimal_Objects := test_minimal.cpp app/data_structures/entry.o app/data_structures/table.o \
                         app/crypto/crypto_utils.o app/debug_util.o $(Gen_Untrusted_Object)

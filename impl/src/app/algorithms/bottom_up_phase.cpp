@@ -12,7 +12,6 @@ void debug_dump_with_mask(const Table& table, const char* label, const char* ste
                           uint32_t eid, uint32_t column_mask);
 
 void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
-    std::cout << "Starting Bottom-Up Phase..." << std::endl;
     
     // Step 1: Initialize all tables with metadata
     InitializeAllTables(root, eid);
@@ -24,13 +23,11 @@ void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     for (auto& node : nodes) {
         if (node->is_leaf()) {
             // Leaf nodes keep their initial local_mult = 1
-            std::cout << "  Leaf node ready: " << node->get_table_name() << std::endl;
+            // Leaf node ready
         } else {
             // Process internal nodes - multiply their local_mult by child contributions
-            std::cout << "  Processing internal node: " << node->get_table_name() << std::endl;
             
             for (auto& child : node->get_children()) {
-                std::cout << "    Joining with child: " << child->get_table_name() << std::endl;
                 
                 ComputeLocalMultiplicities(
                     node->get_table(),  // parent (target)
@@ -60,8 +57,6 @@ void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
         std::string step_name = "bottomup_step12_final_" + node->get_table_name();
         debug_dump_with_mask(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), eid, mask);
     }
-    
-    std::cout << "Bottom-Up Phase completed." << std::endl;
 }
 
 void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node, sgx_enclave_id_t eid) {

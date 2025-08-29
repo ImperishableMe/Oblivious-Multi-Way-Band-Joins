@@ -13,7 +13,6 @@ void debug_dump_with_mask(const Table& table, const char* label, const char* ste
 // debug_dump_table is already declared in debug_util.h
 
 void DistributeExpand::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
-    std::cout << "Starting Distribute-Expand Phase..." << std::endl;
     
     // Get all nodes to expand
     auto nodes = GetAllNodes(root);
@@ -31,7 +30,7 @@ void DistributeExpand::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     
     // Expand each table according to its final multiplicities
     for (auto& node : nodes) {
-        std::cout << "  Expanding table: " << node->get_table_name() << std::endl;
+        // Expanding table
         
         // Debug: Check table before expansion
         DEBUG_INFO("Before ExpandSingleTable for %s", node->get_table_name().c_str());
@@ -47,11 +46,8 @@ void DistributeExpand::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
         Table expanded = ExpandSingleTable(node->get_table(), eid);
         node->set_table(expanded);
         
-        std::cout << "    Original size: " << node->get_table().size() 
-                  << " -> Expanded size: " << expanded.size() << std::endl;
+        // Expanded from original size to new size
     }
-    
-    std::cout << "Distribute-Expand Phase completed." << std::endl;
 }
 
 Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t eid) {

@@ -10,38 +10,24 @@
 // Forward declaration for table debugging
 
 Table ObliviousJoin::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
-    std::cout << "\n=== Starting Oblivious Multi-Way Band Join ===" << std::endl;
-    
     // Validate the join tree
     if (!ValidateJoinTree(root)) {
         throw std::runtime_error("Invalid join tree structure");
     }
     
-    // Log the join tree structure
-    std::cout << "\nJoin Tree Structure:" << std::endl;
-    LogJoinTree(root);
-    
-    // Log initial statistics
-    std::cout << "\n" << GetJoinStatistics(root) << std::endl;
-    
     // Phase 1: Bottom-Up - Compute local multiplicities
-    std::cout << "\n--- Phase 1: Bottom-Up ---" << std::endl;
     BottomUpPhase::Execute(root, eid);
     
     // Phase 2: Top-Down - Compute final multiplicities
-    std::cout << "\n--- Phase 2: Top-Down ---" << std::endl;
     TopDownPhase::Execute(root, eid);
     
     // Phase 3: Distribute-Expand - Replicate tuples
-    std::cout << "\n--- Phase 3: Distribute-Expand ---" << std::endl;
     DistributeExpand::Execute(root, eid);
     
     // Phase 4: Align-Concat - Construct result
-    std::cout << "\n--- Phase 4: Align-Concat ---" << std::endl;
     Table result = AlignConcat::Execute(root, eid);
     
-    std::cout << "\n=== Join Complete ===" << std::endl;
-    std::cout << "Final result size: " << result.size() << " rows" << std::endl;
+    std::cout << "Result: " << result.size() << " rows" << std::endl;
     
     return result;
 }

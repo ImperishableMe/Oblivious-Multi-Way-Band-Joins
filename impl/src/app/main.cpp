@@ -110,7 +110,6 @@ int main(int argc, char* argv[]) {
         }
         
         // Load all CSV files from input directory
-        std::cout << "\nLoading encrypted tables..." << std::endl;
         std::map<std::string, Table> tables;
         
         DIR* dir = opendir(input_dir.c_str());
@@ -125,11 +124,9 @@ int main(int argc, char* argv[]) {
                 std::string filepath = input_dir + "/" + filename;
                 std::string table_name = filename.substr(0, filename.size() - 4);
                 
-                std::cout << "  Loading " << filename << "..." << std::endl;
                 Table table = TableIO::load_csv(filepath);
                 table.set_table_name(table_name);
                 tables[table_name] = table;
-                std::cout << "    " << table.size() << " rows loaded" << std::endl;
             }
         }
         closedir(dir);
@@ -139,17 +136,14 @@ int main(int argc, char* argv[]) {
         }
         
         // Parse SQL query and build join tree
-        std::cout << "\nParsing SQL query..." << std::endl;
         JoinTreeNodePtr join_tree = parse_sql_query(query_file, tables);
         
         // Execute oblivious join with debug output
-        std::cout << "\nExecuting oblivious join..." << std::endl;
         Table result = ObliviousJoin::ExecuteWithDebug(join_tree, global_eid, "oblivious_join");
         
         // Save result (encrypted with nonce)
-        std::cout << "\nSaving result to " << output_file << "..." << std::endl;
         TableIO::save_encrypted_csv(result, output_file, global_eid);
-        std::cout << "Result saved (" << result.size() << " rows)" << std::endl;
+        std::cout << "Result: " << result.size() << " rows" << std::endl;
         
         // Cleanup
         destroy_enclave();

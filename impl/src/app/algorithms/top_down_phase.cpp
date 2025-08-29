@@ -11,7 +11,6 @@ void debug_dump_with_mask(const Table& table, const char* label, const char* ste
                           uint32_t eid, uint32_t column_mask);
 
 void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
-    std::cout << "Starting Top-Down Phase..." << std::endl;
     
     // Step 1: Initialize ONLY root table with final_mult = local_mult
     InitializeRootTable(root, eid);
@@ -25,8 +24,6 @@ void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
         auto parent = node->get_parent();
         
         if (parent) {
-            std::cout << "  Processing node: " << node->get_table_name() 
-                      << " (parent: " << parent->get_table_name() << ")" << std::endl;
             
             // Compute foreign multiplicities from parent to child
             ComputeForeignMultiplicities(
@@ -36,8 +33,6 @@ void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
                 eid);
         }
     }
-    
-    std::cout << "Top-Down Phase completed." << std::endl;
     
     // Final debug dump of all tables (similar to bottom-up step 12)
     DEBUG_INFO("Top-Down Phase final - dumping all tables with foreign_sum");
@@ -65,7 +60,7 @@ void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
 
 void TopDownPhase::InitializeRootTable(JoinTreeNodePtr node, sgx_enclave_id_t eid) {
     // Initialize root table only: final_mult = local_mult
-    std::cout << "  Initializing root table: " << node->get_table_name() << std::endl;
+    // Initialize root table
     node->set_table(node->get_table().map(eid,
         [](sgx_enclave_id_t eid, entry_t* e) {
             return ecall_transform_init_final_mult(eid, e);

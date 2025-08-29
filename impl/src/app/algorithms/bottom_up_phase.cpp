@@ -231,10 +231,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 7: Sort END entries first for final update
     DEBUG_INFO("Sorting END entries first");
-    combined.oblivious_sort(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_comparator_end_first(eid, e1, e2);
-        });
+    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_END_FIRST);
     
     // Debug: Dump after sorting END first
     debug_dump_with_mask(combined, "sorted_end_first", "bottomup_step8_end_first", eid, init_mask);

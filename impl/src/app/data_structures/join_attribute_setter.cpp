@@ -83,6 +83,15 @@ void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node, sgx_enc
         // Debug: Print join_attr after
         DEBUG_DEBUG("Entry %zu after: join_attr=%d from column %s (index %d)",
                    i, entry.join_attr, join_column.c_str(), column_index);
+        
+        // Additional debug: Show all attributes to verify
+        if (i == 0) {
+            DEBUG_INFO("First entry attributes for verification:");
+            for (size_t j = 0; j < entry.attributes.size(); j++) {
+                DEBUG_INFO("  attr[%zu]=%d (column: %s)", j, entry.attributes[j], 
+                          j < entry.column_names.size() ? entry.column_names[j].c_str() : "unknown");
+            }
+        }
     }
 }
 

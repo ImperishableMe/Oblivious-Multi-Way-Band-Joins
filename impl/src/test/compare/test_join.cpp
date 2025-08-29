@@ -58,10 +58,25 @@ std::multiset<std::string> table_to_multiset(const Table& table) {
     std::multiset<std::string> result;
     
     for (const auto& entry : table) {
+        // Create pairs of (column_name, value) and sort by column name
+        std::vector<std::pair<std::string, int32_t>> column_value_pairs;
+        
+        for (size_t i = 0; i < entry.attributes.size() && i < entry.column_names.size(); i++) {
+            column_value_pairs.emplace_back(entry.column_names[i], entry.attributes[i]);
+        }
+        
+        // Sort by column name alphabetically
+        std::sort(column_value_pairs.begin(), column_value_pairs.end(),
+                  [](const std::pair<std::string, int32_t>& a, 
+                     const std::pair<std::string, int32_t>& b) { 
+                      return a.first < b.first; 
+                  });
+        
+        // Create the row string from sorted columns
         std::string row;
-        for (size_t i = 0; i < entry.attributes.size(); i++) {
+        for (size_t i = 0; i < column_value_pairs.size(); i++) {
             if (i > 0) row += ",";
-            row += std::to_string(entry.attributes[i]);
+            row += std::to_string(column_value_pairs[i].second);
         }
         result.insert(row);
     }
@@ -209,21 +224,15 @@ int main(int argc, char* argv[]) {
             
             if (!comparison.sgx_only.empty()) {
                 std::cout << "\nRows only in SGX result (" << comparison.sgx_only.size() << "):" << std::endl;
-                for (size_t i = 0; i < std::min(size_t(10), comparison.sgx_only.size()); i++) {
+                for (size_t i = 0; i < comparison.sgx_only.size(); i++) {
                     std::cout << "  " << comparison.sgx_only[i] << std::endl;
-                }
-                if (comparison.sgx_only.size() > 10) {
-                    std::cout << "  ... and " << (comparison.sgx_only.size() - 10) << " more" << std::endl;
                 }
             }
             
             if (!comparison.sqlite_only.empty()) {
                 std::cout << "\nRows only in SQLite result (" << comparison.sqlite_only.size() << "):" << std::endl;
-                for (size_t i = 0; i < std::min(size_t(10), comparison.sqlite_only.size()); i++) {
+                for (size_t i = 0; i < comparison.sqlite_only.size(); i++) {
                     std::cout << "  " << comparison.sqlite_only[i] << std::endl;
-                }
-                if (comparison.sqlite_only.size() > 10) {
-                    std::cout << "  ... and " << (comparison.sqlite_only.size() - 10) << " more" << std::endl;
                 }
             }
         }
@@ -232,7 +241,6 @@ int main(int argc, char* argv[]) {
         std::cout << "\n=== Performance ===" << std::endl;
         std::cout << "SGX time: " << sgx_time << " seconds" << std::endl;
         std::cout << "SQLite time: " << sqlite_time << " seconds" << std::endl;
-        std::cout << "Overhead: " << (sgx_time / sqlite_time) << "x" << std::endl;
         
         // Write summary to file
         // Extract base names from paths
@@ -254,17 +262,6 @@ int main(int argc, char* argv[]) {
         std::string summary_filename = summary_dir + "/" + query_basename + "_" + data_basename + "_summary.txt";
         std::ofstream summary_file(summary_filename);
         if (summary_file.is_open()) {
-            // Read the SQL query
-            std::ifstream sql_in(sql_file);
-            std::string sql_content;
-            if (sql_in.is_open()) {
-                std::string line;
-                while (std::getline(sql_in, line)) {
-                    sql_content += line + "\n";
-                }
-                sql_in.close();
-            }
-            
             // Count input table sizes
             std::map<std::string, size_t> table_sizes;
             DIR* dir = opendir(data_dir.c_str());
@@ -286,10 +283,8 @@ int main(int argc, char* argv[]) {
             summary_file << "=== Test Summary ===" << std::endl;
             summary_file << "Query File: " << query_basename << ".sql" << std::endl;
             summary_file << "Dataset: " << data_basename << std::endl;
-            summary_file << "\n=== SQL Query ===" << std::endl;
-            summary_file << sql_content << std::endl;
             
-            summary_file << "=== Input Table Sizes ===" << std::endl;
+            summary_file << "\n=== Input Table Sizes ===" << std::endl;
             for (const auto& pair : table_sizes) {
                 summary_file << pair.first << ": " << pair.second << " rows" << std::endl;
             }
@@ -304,12 +299,25 @@ int main(int argc, char* argv[]) {
                 summary_file << "  Matching rows: " << comparison.matching_rows << std::endl;
                 summary_file << "  SGX-only rows: " << comparison.sgx_only.size() << std::endl;
                 summary_file << "  SQLite-only rows: " << comparison.sqlite_only.size() << std::endl;
+                
+                // Output actual mismatched rows
+                if (!comparison.sgx_only.empty()) {
+                    summary_file << "\n  SGX-only row values (all " << comparison.sgx_only.size() << " rows):" << std::endl;
+                    for (size_t i = 0; i < comparison.sgx_only.size(); i++) {
+                        summary_file << "    " << comparison.sgx_only[i] << std::endl;
+                    }
+                }
+                if (!comparison.sqlite_only.empty()) {
+                    summary_file << "\n  SQLite-only row values (all " << comparison.sqlite_only.size() << " rows):" << std::endl;
+                    for (size_t i = 0; i < comparison.sqlite_only.size(); i++) {
+                        summary_file << "    " << comparison.sqlite_only[i] << std::endl;
+                    }
+                }
             }
             
             summary_file << "\n=== Performance ===" << std::endl;
             summary_file << "SGX Time: " << sgx_time << " seconds" << std::endl;
             summary_file << "SQLite Time: " << sqlite_time << " seconds" << std::endl;
-            summary_file << "Overhead: " << (sgx_time / sqlite_time) << "x" << std::endl;
             
             summary_file.close();
             std::cout << "\nSummary written to: " << summary_filename << std::endl;

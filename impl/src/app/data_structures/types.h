@@ -37,7 +37,7 @@
  * +----------+------------------+------------------+------------------+
  * 
  * Persistent Meta: field_index, local_mult, final_mult, foreign_sum
- * Temporary Meta: local_cumsum OR foreign_cumsum (not both simultaneously)
+ * Temporary Meta: local_cumsum OR foreign_sum (not both simultaneously)
  * 
  * Note: Combined tables have a special dual-entry structure where original
  * attributes are transformed into {field_type, join_attr, field_data} format"

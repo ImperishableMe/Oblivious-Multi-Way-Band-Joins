@@ -123,7 +123,7 @@ void test_window_compute_foreign_sum(sgx_enclave_id_t eid) {
     
     // Test START entry - should add to weight
     e1.local_weight = 100;
-    e1.foreign_cumsum = 50;
+    e1.foreign_sum = 50;
     e2.field_type = START;
     e2.local_mult = 25;
     
@@ -137,9 +137,9 @@ void test_window_compute_foreign_sum(sgx_enclave_id_t eid) {
         passed = false;
         std::cerr << "START: Expected weight 125, got " << e2.local_weight << std::endl;
     }
-    if (passed && e2.foreign_cumsum != 50) {
+    if (passed && e2.foreign_sum != 50) {
         passed = false;
-        std::cerr << "START: Expected foreign_cumsum 50, got " << e2.foreign_cumsum << std::endl;
+        std::cerr << "START: Expected foreign_sum 50, got " << e2.foreign_sum << std::endl;
     }
     
     // Test END entry - should subtract from weight
@@ -157,9 +157,9 @@ void test_window_compute_foreign_sum(sgx_enclave_id_t eid) {
         std::cerr << "END: Expected weight 75, got " << e2.local_weight << std::endl;
     }
     
-    // Test SOURCE entry - weight unchanged, foreign_cumsum updated
+    // Test SOURCE entry - weight unchanged, foreign_sum updated
     e1.local_weight = 100;
-    e1.foreign_cumsum = 50;
+    e1.foreign_sum = 50;
     e2.field_type = SOURCE;
     e2.final_mult = 200;
     
@@ -172,10 +172,10 @@ void test_window_compute_foreign_sum(sgx_enclave_id_t eid) {
         passed = false;
         std::cerr << "SOURCE: Weight should remain 100, got " << e2.local_weight << std::endl;
     }
-    // foreign_cumsum should be 50 + 200/100 = 52
-    if (passed && e2.foreign_cumsum != 52) {
+    // foreign_sum should be 50 + 200/100 = 52
+    if (passed && e2.foreign_sum != 52) {
         passed = false;
-        std::cerr << "SOURCE: Expected foreign_cumsum 52, got " << e2.foreign_cumsum << std::endl;
+        std::cerr << "SOURCE: Expected foreign_sum 52, got " << e2.foreign_sum << std::endl;
     }
     
     report_test_result("Window Compute Foreign Sum", passed);
@@ -190,9 +190,9 @@ void test_window_compute_foreign_interval(sgx_enclave_id_t eid) {
     
     // Test START/END pair
     e1.field_type = START;
-    e1.foreign_cumsum = 100;
+    e1.foreign_sum = 100;
     e2.field_type = END;
-    e2.foreign_cumsum = 300;
+    e2.foreign_sum = 300;
     e2.foreign_interval = 0;
     e2.foreign_sum = 0;
     

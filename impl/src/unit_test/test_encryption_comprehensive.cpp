@@ -37,7 +37,7 @@ bool entries_equal(const Entry& e1, const Entry& e2, bool check_encrypted = fals
     if (e1.foreign_sum != e2.foreign_sum) return false;
     if (e1.local_cumsum != e2.local_cumsum) return false;
     if (e1.local_interval != e2.local_interval) return false;
-    if (e1.foreign_cumsum != e2.foreign_cumsum) return false;
+    // foreign_cumsum removed - no longer checking
     if (e1.foreign_interval != e2.foreign_interval) return false;
     if (e1.local_weight != e2.local_weight) return false;
     if (e1.dst_idx != e2.dst_idx) return false;
@@ -78,7 +78,7 @@ void test_basic_small_values(sgx_enclave_id_t eid) {
     entry.foreign_sum = 20;
     entry.local_cumsum = 25;
     entry.local_interval = 30;
-    entry.foreign_cumsum = 35;
+    // foreign_cumsum removed
     entry.foreign_interval = 40;
     entry.local_weight = 45;
     entry.dst_idx = 50;
@@ -149,7 +149,7 @@ void test_boundary_values_within_constraints(sgx_enclave_id_t eid) {
     entry.foreign_sum = max_design - 4;
     entry.local_cumsum = max_design - 5;
     entry.local_interval = max_design - 6;
-    entry.foreign_cumsum = max_design - 7;
+    // foreign_cumsum removed
     entry.foreign_interval = max_design - 8;
     entry.local_weight = max_design - 9;
     entry.dst_idx = max_design - 10;
@@ -204,7 +204,7 @@ void test_values_outside_constraints(sgx_enclave_id_t eid) {
     entry.foreign_sum = 0;
     entry.local_cumsum = 0;
     entry.local_interval = 0;
-    entry.foreign_cumsum = 0;
+    // foreign_cumsum removed
     entry.foreign_interval = 0;
     entry.local_weight = 0;
     entry.dst_idx = 0;
@@ -312,7 +312,7 @@ void test_negative_values(sgx_enclave_id_t eid) {
     entry.foreign_sum = -20;
     entry.local_cumsum = -25;
     entry.local_interval = -30;
-    entry.foreign_cumsum = -35;
+    // foreign_cumsum removed
     entry.foreign_interval = -40;
     entry.local_weight = -45;
     entry.dst_idx = -50;

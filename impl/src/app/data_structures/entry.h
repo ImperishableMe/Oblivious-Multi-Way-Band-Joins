@@ -37,7 +37,6 @@ public:
     // Temporary metadata
     int32_t local_cumsum;
     int32_t local_interval;
-    int32_t foreign_cumsum;
     int32_t foreign_interval;
     int32_t local_weight;
     

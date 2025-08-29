@@ -84,6 +84,12 @@ void concat_attributes(entry_t* left, entry_t* right);
  */
 void transform_set_join_attr(entry_t* entry, int32_t column_index);
 
+/**
+ * Initialize metadata fields to NULL_VALUE based on field mask
+ * Use METADATA_* constants from enclave_types.h for the mask
+ */
+void transform_init_metadata_null(entry_t* entry, uint32_t field_mask);
+
 #ifdef __cplusplus
 }
 #endif

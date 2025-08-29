@@ -24,7 +24,7 @@ entry_t create_test_entry() {
     entry.foreign_sum = 30;
     entry.local_cumsum = 40;
     entry.local_interval = 50;
-    entry.foreign_cumsum = 60;
+    // foreign_cumsum removed
     entry.foreign_interval = 70;
     entry.local_weight = 80;
     entry.copy_index = 90;

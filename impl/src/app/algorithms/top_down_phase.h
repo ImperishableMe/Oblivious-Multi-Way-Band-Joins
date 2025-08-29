@@ -36,7 +36,7 @@ private:
     
     /**
      * Initialize foreign fields for a table
-     * Sets foreign_sum = 0, foreign_cumsum = 0, local_weight = 0
+     * Sets foreign_sum = 0, local_weight = 0
      * @param node Node to initialize
      * @param eid Enclave ID
      */

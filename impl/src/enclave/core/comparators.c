@@ -64,22 +64,22 @@ static inline int32_t adjust_for_padding(entry_t* e1, entry_t* e2, int32_t norma
  * Precedence ordering ensures correct join semantics
  */
 static inline int32_t get_precedence(entry_type_t field_type, equality_type_t equality_type) {
-    // Precedence table (from Algorithm 513):
-    // (START, EQ) -> 1
-    // (END, NEQ) -> 1  
-    // (SOURCE, _) -> 2
-    // (START, NEQ) -> 3
-    // (END, EQ) -> 3
+    // Correct precedence table for proper boundary handling:
+    // (END, NEQ) -> 1    // Open end: exclude boundary, comes first
+    // (START, EQ) -> 1   // Closed start: include boundary, comes first
+    // (SOURCE, _) -> 2   // Source entries in middle
+    // (END, EQ) -> 3     // Closed end: include boundary, comes last
+    // (START, NEQ) -> 3  // Open start: exclude boundary, comes last
     
-    int32_t is_start_eq = ((field_type == START) & (equality_type == EQ));
-    int32_t is_end_neq = ((field_type == END) & (equality_type == NEQ));
-    int32_t is_source = (field_type == SOURCE);
     int32_t is_start_neq = ((field_type == START) & (equality_type == NEQ));
     int32_t is_end_eq = ((field_type == END) & (equality_type == EQ));
+    int32_t is_source = (field_type == SOURCE);
+    int32_t is_start_eq = ((field_type == START) & (equality_type == EQ));
+    int32_t is_end_neq = ((field_type == END) & (equality_type == NEQ));
     
-    return 1 * (is_start_eq | is_end_neq) + 
+    return 1 * (is_end_neq | is_start_eq) + 
            2 * is_source + 
-           3 * (is_start_neq | is_end_eq);
+           3 * (is_end_eq | is_start_neq);
 }
 
 /**
@@ -214,22 +214,30 @@ void comparator_end_first(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Core operation for comparator by join attribute then original index (Algorithm 697)
- * Primary: join_attr, Secondary: original_index
+ * Core operation for comparator by join attribute then all attributes (Algorithm 697)
+ * Primary: join_attr, Secondary: all attributes in sequence
  */
 static void comparator_join_then_other_op(entry_t* e1, entry_t* e2) {
     // Compare join attributes (both are int32_t)
     int32_t diff = e1->join_attr - e2->join_attr;
     int32_t cmp = oblivious_sign(diff);
     
-    // Check if equal
-    int32_t is_equal = (cmp == 0);
+    // If join attributes are not equal, use that comparison
+    int32_t join_not_equal = (cmp != 0);
     
-    // Compare by original index
-    int32_t idx_cmp = oblivious_sign(e1->original_index - e2->original_index);
+    // If join attributes are equal, compare all attributes
+    int32_t attr_cmp = 0;
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        int32_t attr_diff = e1->attributes[i] - e2->attributes[i];
+        int32_t curr_cmp = oblivious_sign(attr_diff);
+        
+        // Only update attr_cmp if we haven't found a difference yet
+        int32_t is_first_diff = (attr_cmp == 0) & (curr_cmp != 0);
+        attr_cmp = attr_cmp + is_first_diff * curr_cmp;
+    }
     
-    // Combine: use join_attr comparison if not equal, else use index
-    int32_t normal_result = (1 - is_equal) * cmp + is_equal * idx_cmp;
+    // Combine: use join_attr comparison if not equal, else use attributes comparison
+    int32_t normal_result = join_not_equal * cmp + (1 - join_not_equal) * attr_cmp;
     
     // Adjust for SORT_PADDING entries
     int32_t result = adjust_for_padding(e1, e2, normal_result);
@@ -239,7 +247,7 @@ static void comparator_join_then_other_op(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Comparator by join attribute then original index with decrypt/encrypt wrapper
+ * Comparator by join attribute then all attributes with decrypt/encrypt wrapper
  */
 void comparator_join_then_other(entry_t* e1, entry_t* e2) {
     apply_to_decrypted_pair(e1, e2, comparator_join_then_other_op);
@@ -270,10 +278,28 @@ void comparator_original_index(entry_t* e1, entry_t* e2) {
 /**
  * Core operation for comparator by alignment key (Algorithm 715)
  * Used in final alignment phase
+ * Priority: 1) alignment_key, 2) join_attr, 3) copy_index
  */
 static void comparator_alignment_key_op(entry_t* e1, entry_t* e2) {
-    // Compare alignment keys
-    int32_t normal_result = oblivious_sign(e1->alignment_key - e2->alignment_key);
+    // Primary: Compare alignment keys
+    int32_t align_cmp = oblivious_sign(e1->alignment_key - e2->alignment_key);
+    
+    // Check if alignment keys are equal
+    int32_t align_equal = (align_cmp == 0);
+    
+    // Tie-breaker 1: Compare join attributes
+    int32_t join_cmp = oblivious_sign(e1->join_attr - e2->join_attr);
+    
+    // Check if join attributes are also equal
+    int32_t join_equal = (join_cmp == 0);
+    
+    // Tie-breaker 2: Compare copy indices
+    int32_t copy_cmp = oblivious_sign(e1->copy_index - e2->copy_index);
+    
+    // Combine: use alignment_key if not equal, else use join_attr, else use copy_index
+    int32_t normal_result = (1 - align_equal) * align_cmp + 
+                           align_equal * (1 - join_equal) * join_cmp +
+                           align_equal * join_equal * copy_cmp;
     
     // Adjust for SORT_PADDING entries
     int32_t result = adjust_for_padding(e1, e2, normal_result);

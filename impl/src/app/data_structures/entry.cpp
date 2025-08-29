@@ -16,7 +16,6 @@ Entry::Entry()
       foreign_sum(0), 
       local_cumsum(0), 
       local_interval(0),
-      foreign_cumsum(0), 
       foreign_interval(0), 
       local_weight(0),
       copy_index(0), 
@@ -30,9 +29,7 @@ Entry::Entry(const entry_t& c_entry) {
 }
 
 entry_t Entry::to_entry_t() const {
-    DEBUG_TRACE("Entry::to_entry_t() - Converting Entry to entry_t");
-    DEBUG_TRACE("  field_type=%d, is_encrypted=%d, join_attr=%d", 
-                field_type, is_encrypted, join_attr);
+    // Removed TRACE logs to reduce debug output volume
     
     entry_t result;
     memset(&result, 0, sizeof(entry_t));
@@ -49,7 +46,6 @@ entry_t Entry::to_entry_t() const {
     result.foreign_sum = foreign_sum;
     result.local_cumsum = local_cumsum;
     result.local_interval = local_interval;
-    result.foreign_cumsum = foreign_cumsum;
     result.foreign_interval = foreign_interval;
     result.local_weight = local_weight;
     result.copy_index = copy_index;
@@ -74,9 +70,7 @@ entry_t Entry::to_entry_t() const {
 }
 
 void Entry::from_entry_t(const entry_t& c_entry) {
-    DEBUG_TRACE("Entry::from_entry_t() - Converting entry_t to Entry");
-    DEBUG_TRACE("  field_type=%d, is_encrypted=%d, join_attr=%d", 
-                c_entry.field_type, c_entry.is_encrypted, c_entry.join_attr);
+    // Removed TRACE logs to reduce debug output volume
     
     field_type = c_entry.field_type;
     equality_type = c_entry.equality_type;
@@ -89,7 +83,6 @@ void Entry::from_entry_t(const entry_t& c_entry) {
     foreign_sum = c_entry.foreign_sum;
     local_cumsum = c_entry.local_cumsum;
     local_interval = c_entry.local_interval;
-    foreign_cumsum = c_entry.foreign_cumsum;
     foreign_interval = c_entry.foreign_interval;
     local_weight = c_entry.local_weight;
     copy_index = c_entry.copy_index;

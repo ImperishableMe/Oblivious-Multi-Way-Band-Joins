@@ -41,7 +41,6 @@ static void add_metadata_op(entry_t* entry) {
     // Initialize temporary metadata
     entry->local_cumsum = 0;
     entry->local_interval = 0;
-    entry->foreign_cumsum = 0;
     entry->foreign_interval = 0;
     entry->local_weight = 0;
     
@@ -186,7 +185,6 @@ static void set_sort_padding_op(entry_t* entry) {
     entry->foreign_sum = 0;
     entry->local_cumsum = 0;
     entry->local_interval = 0;
-    entry->foreign_cumsum = 0;
     entry->foreign_interval = 0;
     entry->local_weight = 0;
 }
@@ -202,7 +200,6 @@ static void init_final_mult_op(entry_t* entry) {
     entry->final_mult = entry->local_mult;
     // Also initialize foreign fields
     entry->foreign_sum = 0;
-    entry->foreign_cumsum = 0;
     entry->foreign_interval = 0;
     entry->local_weight = 0;
 }
@@ -217,7 +214,6 @@ void transform_init_final_mult(entry_t* entry) {
 static void init_foreign_temps_op(entry_t* entry) {
     // Initialize foreign tracking fields
     entry->foreign_sum = 0;
-    entry->foreign_cumsum = 0;
     entry->foreign_interval = 0;
     entry->local_weight = entry->local_mult;  // Initialize to local_mult per pseudocode
     // Preserve final_mult from parent if it's a START/END entry
@@ -355,4 +351,72 @@ void transform_set_join_attr(entry_t* entry, int32_t column_index) {
     if (was_encrypted) {
         aes_encrypt_entry(entry);
     }
+}
+
+/**
+ * Initialize metadata fields to NULL_VALUE based on field mask
+ * This provides fine-grained control over which fields to initialize
+ */
+static uint32_t g_field_mask;
+
+static void init_metadata_null_op(entry_t* entry) {
+    // Check each individual mask bit and initialize corresponding fields
+    // This allows any subset of fields to be set to NULL_VALUE
+    
+    // Persistent metadata fields
+    if (g_field_mask & METADATA_ORIGINAL_INDEX) {
+        entry->original_index = NULL_VALUE;
+    }
+    if (g_field_mask & METADATA_LOCAL_MULT) {
+        entry->local_mult = NULL_VALUE;
+    }
+    if (g_field_mask & METADATA_FINAL_MULT) {
+        entry->final_mult = NULL_VALUE;
+    }
+    if (g_field_mask & METADATA_FOREIGN_SUM) {
+        entry->foreign_sum = NULL_VALUE;
+    }
+    
+    // Temporary metadata fields
+    if (g_field_mask & METADATA_LOCAL_CUMSUM) {
+        entry->local_cumsum = NULL_VALUE;
+    }
+    if (g_field_mask & METADATA_LOCAL_INTERVAL) {
+        entry->local_interval = NULL_VALUE;
+    }
+    if (g_field_mask & METADATA_FOREIGN_INTERVAL) {
+        entry->foreign_interval = NULL_VALUE;
+    }
+    if (g_field_mask & METADATA_LOCAL_WEIGHT) {
+        entry->local_weight = NULL_VALUE;
+    }
+    
+    // Distribution metadata fields
+    if (g_field_mask & METADATA_DST_IDX) {
+        entry->dst_idx = NULL_VALUE;
+    }
+    if (g_field_mask & METADATA_INDEX) {
+        entry->index = NULL_VALUE;
+    }
+    
+    // Alignment metadata fields
+    if (g_field_mask & METADATA_COPY_INDEX) {
+        entry->copy_index = NULL_VALUE;
+    }
+    if (g_field_mask & METADATA_ALIGNMENT_KEY) {
+        entry->alignment_key = NULL_VALUE;
+    }
+    
+    // Type field - set to NULL_VALUE like other metadata
+    if (g_field_mask & METADATA_FIELD_TYPE) {
+        // Set to NULL_VALUE for clarity in debugging
+        // The algorithm will explicitly set these when needed
+        entry->field_type = NULL_VALUE;
+        entry->equality_type = NULL_VALUE;
+    }
+}
+
+void transform_init_metadata_null(entry_t* entry, uint32_t field_mask) {
+    g_field_mask = field_mask;
+    apply_to_decrypted_entry(entry, init_metadata_null_op);
 }

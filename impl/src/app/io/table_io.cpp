@@ -7,6 +7,7 @@
 #include <climits>  // For INT32_MAX, INT32_MIN
 #include "converters.h"
 #include "../Enclave_u.h"
+#include "../../common/types_common.h"  // For NULL_VALUE and type constants
 
 // For directory operations
 #include <dirent.h>
@@ -74,21 +75,23 @@ Table TableIO::load_csv(const std::string& filepath) {
                 }
             }
             
-            // Initialize metadata
-            // IMPORTANT: Don't set field_type or equality_type here!
-            // These are set during algorithm phases (transform_to_source, etc.)
-            // If data is encrypted, these fields are part of encrypted region
-            entry.field_type = 0;  // Will be set during algorithm
-            entry.equality_type = 0;  // Will be set during algorithm
+            // Initialize only essential fields
+            // All metadata will be properly initialized to NULL_VALUE by InitializeAllTables
+            // using ecall_init_metadata_null for proper encryption handling
             entry.is_encrypted = (nonce_column_index >= 0);  // Encrypted if nonce column exists
             entry.nonce = nonce_value;
-            entry.original_index = 0;  // Will be set in InitializeAllTables
-            entry.local_mult = 0;  // Will be computed during algorithm
+            
+            // Initialize metadata to 0 temporarily - will be set to NULL_VALUE by enclave
+            // We can't set to NULL_VALUE here because encrypted entries need the enclave
+            // to decrypt, set to NULL_VALUE, then re-encrypt
+            entry.field_type = 0;
+            entry.equality_type = 0;
+            entry.original_index = 0;
+            entry.local_mult = 0;
             entry.final_mult = 0;
             entry.foreign_sum = 0;
             entry.local_cumsum = 0;
             entry.local_interval = 0;
-            entry.foreign_cumsum = 0;
             entry.foreign_interval = 0;
             entry.local_weight = 0;
             entry.copy_index = 0;
@@ -264,12 +267,9 @@ TableIO::load_csv_directory(const std::string& dir_path) {
 }
 
 std::unordered_map<std::string, Table> 
-TableIO::load_tables_from_directory(const std::string& dir_path,
-                                   bool encrypted) {
-    // The encrypted parameter is kept for API compatibility but is now ignored
-    // load_csv auto-detects encryption by checking for nonce column
-    (void)encrypted; // Suppress unused parameter warning
-    
+TableIO::load_tables_from_directory(const std::string& dir_path) {
+    // This function is now just an alias for load_csv_directory
+    // Auto-detects encryption by checking for nonce column in each file
     return load_csv_directory(dir_path);
 }
 

@@ -5,9 +5,12 @@
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
 
-// Forward declaration for selective debug dumping  
+// Forward declarations for selective debug dumping  
 void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
                                  uint32_t eid, const std::vector<std::string>& columns);
+void debug_dump_with_mask(const Table& table, const char* label, const char* step_name,
+                          uint32_t eid, uint32_t column_mask);
+// debug_dump_table is already declared in debug_util.h
 
 void DistributeExpand::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     std::cout << "Starting Distribute-Expand Phase..." << std::endl;
@@ -59,9 +62,15 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     DEBUG_INFO("Expanding table with %zu entries", table.size());
     
+    // Get table name for debug output
+    std::string table_name = table.get_table_name();
+    DEBUG_INFO("Table name: %s", table_name.c_str());
+    
     // Targeted debug: Check final_mult values before expansion
-    std::vector<std::string> key_columns = {"original_index", "local_mult", "final_mult", "field_type"};
-    debug_dump_selected_columns(table, "pre_expand", "distexp_pre_expand", eid, key_columns);
+    uint32_t key_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
+                       DEBUG_COL_FINAL_MULT | DEBUG_COL_FIELD_TYPE;
+    debug_dump_with_mask(table, ("pre_expand_" + table_name).c_str(), 
+                        ("distexp_pre_expand_" + table_name).c_str(), eid, key_mask);
     
     // Step 1: Initialize dst_idx field to 0
     DEBUG_INFO("Step 1 - Initializing dst_idx");
@@ -78,6 +87,11 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
             return ecall_window_compute_dst_idx(eid, e1, e2);
         });
     DEBUG_INFO("Step 2 complete");
+    
+    // Debug: Show dst_idx values after cumulative sum
+    uint32_t dst_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FINAL_MULT | DEBUG_COL_DST_IDX;
+    debug_dump_with_mask(working, ("step2_dst_idx_" + table_name).c_str(),
+                        ("distexp_step2_cumsum_" + table_name).c_str(), eid, dst_mask);
     
     // Step 3: Get output size from last entry
     DEBUG_INFO("Step 3 - Getting output size");
@@ -98,6 +112,12 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
             return ecall_transform_mark_zero_mult_padding(eid, e);
         });
     DEBUG_INFO("Step 4 complete, table size=%zu", working.size());
+    
+    // Debug: Show which entries are marked as padding
+    uint32_t padding_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FINAL_MULT | 
+                           DEBUG_COL_FIELD_TYPE | DEBUG_COL_DST_IDX;
+    debug_dump_with_mask(working, ("step4_marked_padding_" + table_name).c_str(),
+                        ("distexp_step4_padding_" + table_name).c_str(), eid, padding_mask);
     
     // Step 5: Sort to move DIST_PADDING entries to the end
     DEBUG_INFO("Step 5 - Sorting (size=%zu)", working.size());
@@ -145,6 +165,13 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
         });
     DEBUG_INFO("Step 7 complete, table size=%zu", working.size());
     
+    // Step 7b: Debug dump before distribution - shows initial state with non-padding at top
+    uint32_t before_dist_mask = DEBUG_COL_INDEX | DEBUG_COL_ORIGINAL_INDEX | 
+                               DEBUG_COL_FINAL_MULT | DEBUG_COL_DST_IDX | 
+                               DEBUG_COL_FIELD_TYPE;
+    debug_dump_with_mask(working, ("step7_before_distribute_" + table_name).c_str(),
+                        ("distexp_step7_before_dist_" + table_name).c_str(), eid, before_dist_mask);
+    
     // Step 8: Distribution phase using variable-distance passes
     DEBUG_INFO("Step 8 - Distribution phase");
     DistributePhase(working, output_size, eid);
@@ -152,8 +179,26 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     // Step 9: Expansion phase to fill gaps
     DEBUG_INFO("Step 9 - Expansion phase");
+    
+    // Debug: Dump table before expansion copy
+    debug_dump_table(working, ("before_expansion_copy_" + table_name).c_str(), 
+                    ("distexp_step9a_before_" + table_name).c_str(), eid);
+    
     ExpansionPhase(working, eid);
+    
+    // Debug: Dump table after expansion copy
+    debug_dump_table(working, ("after_expansion_copy_" + table_name).c_str(), 
+                    ("distexp_step9b_after_" + table_name).c_str(), eid);
+    
     DEBUG_INFO("Step 9 complete, final table size=%zu", working.size());
+    
+    // Step 10: Final debug dump showing complete expanded table
+    DEBUG_INFO("Step 10 - Final expanded result");
+    uint32_t final_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
+                         DEBUG_COL_FINAL_MULT | DEBUG_COL_COPY_INDEX | 
+                         DEBUG_COL_DST_IDX | DEBUG_COL_FIELD_TYPE;
+    debug_dump_with_mask(working, ("final_expanded_" + table_name).c_str(),
+                        ("distexp_step10_final_" + table_name).c_str(), eid, final_mask);
     
     return working;
 }
@@ -183,12 +228,12 @@ void DistributeExpand::DistributePhase(Table& table, size_t output_size, sgx_enc
     
     DEBUG_INFO("Starting distribution phase for %zu entries", output_size);
     
-    // Calculate starting distance: 2^(ceil(log2(output_size)) - 1)
+    // Calculate starting distance: largest power of 2 <= output_size
     size_t distance = 1;
     while ((distance << 1) <= output_size) {
         distance <<= 1;
     }
-    distance >>= 1;  // This gives us 2^(ceil(log2(n))-1)
+    // distance now contains the largest power of 2 <= output_size
     
     DEBUG_INFO("Starting distance: %zu", distance);
     

@@ -3,10 +3,13 @@
 #include <iostream>
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
+#include "../../enclave/enclave_types.h"  // For METADATA_* constants
 
-// Forward declaration for selective debug dumping
+// Forward declarations for selective debug dumping
 void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
                                  uint32_t eid, const std::vector<std::string>& columns);
+void debug_dump_with_mask(const Table& table, const char* label, const char* step_name,
+                          uint32_t eid, uint32_t column_mask);
 
 void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     std::cout << "Starting Bottom-Up Phase..." << std::endl;
@@ -49,21 +52,29 @@ void BottomUpPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     collect(root);
     
     for (const auto& node : all_nodes) {
-        std::vector<std::string> key_columns = {"original_index", "local_mult"};
+        // Track more columns: original_index, local_mult, final_mult, field_type, equality_type
+        uint32_t mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
+                       DEBUG_COL_FINAL_MULT | DEBUG_COL_FOREIGN_SUM |
+                       DEBUG_COL_FIELD_TYPE | DEBUG_COL_EQUALITY_TYPE | 
+                       DEBUG_COL_JOIN_ATTR;
         std::string step_name = "bottomup_step12_final_" + node->get_table_name();
-        debug_dump_selected_columns(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), eid, key_columns);
+        debug_dump_with_mask(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), eid, mask);
     }
     
     std::cout << "Bottom-Up Phase completed." << std::endl;
 }
 
 void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node, sgx_enclave_id_t eid) {
-    // Add metadata columns and initialize multiplicities to 1 for all tables
+    // Initialize ALL metadata fields to NULL_VALUE for clarity in debugging
+    // Then set specific values as needed
     node->set_table(node->get_table().map(eid,
         [](sgx_enclave_id_t eid, entry_t* e) {
-            sgx_status_t status = ecall_transform_add_metadata(eid, e);
+            // First, set all metadata to NULL_VALUE (INT32_MAX)
+            // This makes it clear in debug which fields are actually used
+            sgx_status_t status = ecall_init_metadata_null(eid, e, METADATA_ALL);
             if (status == SGX_SUCCESS) {
-                // Set local_mult to 1 for all tables (both leaf and non-leaf)
+                // Now set local_mult to 1 for all tables (both leaf and non-leaf)
+                // This overrides the NULL_VALUE for local_mult specifically
                 status = ecall_transform_set_local_mult_one(eid, e);
             }
             return status;
@@ -181,9 +192,10 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     JoinAttributeSetter::SetJoinAttributesForTable(child, constraint.get_source_column(), eid);
     
     // Debug: Dump parent and child tables before combining  
-    std::vector<std::string> debug_columns = {"original_index", "local_mult", "join_attr", "ALL_ATTRIBUTES"};
-    debug_dump_selected_columns(parent, "parent", "bottomup_step1_inputs", eid, debug_columns);
-    debug_dump_selected_columns(child, "child", "bottomup_step1_inputs", eid, debug_columns);
+    uint32_t debug_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
+                         DEBUG_COL_JOIN_ATTR | DEBUG_COL_ALL_ATTRIBUTES;
+    debug_dump_with_mask(parent, "parent", "bottomup_step1_inputs", eid, debug_mask);
+    debug_dump_with_mask(child, "child", "bottomup_step1_inputs", eid, debug_mask);
     
     // Step 1: Create combined table with dual-entry technique
     DEBUG_INFO("Creating combined table from parent (%zu) and child (%zu)", 
@@ -192,8 +204,10 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     DEBUG_INFO("Combined table has %zu entries", combined.size());
     
     // Debug: Dump combined table after creation
-    std::vector<std::string> combined_columns = {"original_index", "local_mult", "field_type", "join_attr", "ALL_ATTRIBUTES"};
-    debug_dump_selected_columns(combined, "combined", "bottomup_step2_combine", eid, combined_columns);
+    uint32_t combined_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
+                            DEBUG_COL_FIELD_TYPE | DEBUG_COL_EQUALITY_TYPE | 
+                            DEBUG_COL_JOIN_ATTR | DEBUG_COL_ALL_ATTRIBUTES;
+    debug_dump_with_mask(combined, "combined", "bottomup_step2_combine", eid, combined_mask);
     
     // Step 2: Initialize temporary fields (local_cumsum = local_mult, local_interval = 0)
     DEBUG_INFO("Initializing temporary fields");
@@ -204,8 +218,10 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     DEBUG_INFO("Temporary fields initialized");
     
     // Debug: Dump after initializing temps
-    std::vector<std::string> init_columns = {"original_index", "field_type", "join_attr", "local_mult", "local_cumsum", "local_interval"};
-    debug_dump_selected_columns(combined, "initialized", "bottomup_step3_init_temps", eid, init_columns);
+    uint32_t init_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE | 
+                        DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | 
+                        DEBUG_COL_LOCAL_CUMSUM | DEBUG_COL_LOCAL_INTERVAL;
+    debug_dump_with_mask(combined, "initialized", "bottomup_step3_init_temps", eid, init_mask);
     
     // Step 3: Sort by join attribute and precedence
     DEBUG_INFO("Sorting combined table by join attribute");
@@ -216,7 +232,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     DEBUG_INFO("Sort completed");
     
     // Debug: Dump after sorting by join attribute
-    debug_dump_selected_columns(combined, "sorted_by_join", "bottomup_step4_sorted", eid, init_columns);
+    debug_dump_with_mask(combined, "sorted_by_join", "bottomup_step4_sorted", eid, init_mask);
     
     // Step 4: Compute local cumulative sums
     DEBUG_INFO("Computing local cumulative sums");
@@ -226,7 +242,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         });
     
     // Debug: Dump after computing cumulative sums
-    debug_dump_selected_columns(combined, "with_cumsum", "bottomup_step5_cumsum", eid, init_columns);
+    debug_dump_with_mask(combined, "with_cumsum", "bottomup_step5_cumsum", eid, init_mask);
     
     // Step 5: Sort for pairwise processing (group START/END pairs)
     DEBUG_INFO("Sorting for pairwise processing");
@@ -236,7 +252,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         });
     
     // Debug: Dump after sorting for pairwise
-    debug_dump_selected_columns(combined, "sorted_pairwise", "bottomup_step6_pairwise", eid, init_columns);
+    debug_dump_with_mask(combined, "sorted_pairwise", "bottomup_step6_pairwise", eid, init_mask);
     
     // Step 6: Compute intervals between START/END pairs
     DEBUG_INFO("Computing intervals between START/END pairs");
@@ -246,7 +262,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         });
     
     // Debug: Dump after computing intervals
-    debug_dump_selected_columns(combined, "with_intervals", "bottomup_step7_intervals", eid, init_columns);
+    debug_dump_with_mask(combined, "with_intervals", "bottomup_step7_intervals", eid, init_mask);
     
     // Step 7: Sort END entries first for final update
     DEBUG_INFO("Sorting END entries first");
@@ -256,7 +272,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         });
     
     // Debug: Dump after sorting END first
-    debug_dump_selected_columns(combined, "sorted_end_first", "bottomup_step8_end_first", eid, init_columns);
+    debug_dump_with_mask(combined, "sorted_end_first", "bottomup_step8_end_first", eid, init_mask);
     
     // Step 8: Truncate to parent size - now we have END entries with computed intervals
     // The first parent.size() entries are now the END entries with computed intervals
@@ -269,15 +285,16 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     }
     
     // Debug: Dump truncated END entries with intervals
-    std::vector<std::string> key_columns = {"original_index", "local_mult", "local_interval", "field_type"};
-    debug_dump_selected_columns(truncated, "truncated_ends", "bottomup_step9_truncated", eid, key_columns);
+    uint32_t key_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
+                       DEBUG_COL_LOCAL_INTERVAL | DEBUG_COL_FIELD_TYPE;
+    debug_dump_with_mask(truncated, "truncated_ends", "bottomup_step9_truncated", eid, key_mask);
     
     // Step 9: Update parent multiplicities using parallel pass
     // This multiplies parent's local_mult by the computed interval from END entries
     DEBUG_INFO("Updating parent multiplicities");
     
     // Debug: Parent before update
-    debug_dump_selected_columns(parent, "parent_before", "bottomup_step10_parent_before", eid, key_columns);
+    debug_dump_with_mask(parent, "parent_before", "bottomup_step10_parent_before", eid, key_mask);
     
     truncated.parallel_pass(parent, eid,
         [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
@@ -286,7 +303,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
         });
     
     // Debug: Parent after update
-    debug_dump_selected_columns(parent, "parent_after", "bottomup_step11_parent_after", eid, key_columns);
+    debug_dump_with_mask(parent, "parent_after", "bottomup_step11_parent_after", eid, key_mask);
     DEBUG_INFO("Parent multiplicities updated");
 }
 

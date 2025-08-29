@@ -102,41 +102,41 @@ JoinConstraint InequalityParser::operator_to_constraint(
     }
     else if (op == ">=") {
         // left.col >= right.col + deviation
-        // → left.col IN [right.col + deviation, +∞]
+        // → left.col IN [right.col + deviation, +∞)
         return JoinConstraint(
             left_table, left_column,
             right_table, right_column,
             deviation, EQ,
-            JOIN_ATTR_POS_INF, EQ
+            JOIN_ATTR_POS_INF, NEQ  // Infinity is always NEQ
         );
     }
     else if (op == ">") {
         // left.col > right.col + deviation
-        // → left.col IN (right.col + deviation, +∞]
+        // → left.col IN (right.col + deviation, +∞)
         return JoinConstraint(
             left_table, left_column,
             right_table, right_column,
             deviation, NEQ,  // Open lower bound
-            JOIN_ATTR_POS_INF, EQ
+            JOIN_ATTR_POS_INF, NEQ  // Infinity is always NEQ
         );
     }
     else if (op == "<=") {
         // left.col <= right.col + deviation
-        // → left.col IN [-∞, right.col + deviation]
+        // → left.col IN (-∞, right.col + deviation]
         return JoinConstraint(
             left_table, left_column,
             right_table, right_column,
-            JOIN_ATTR_NEG_INF, EQ,
+            JOIN_ATTR_NEG_INF, NEQ,  // Infinity is always NEQ
             deviation, EQ
         );
     }
     else if (op == "<") {
         // left.col < right.col + deviation
-        // → left.col IN [-∞, right.col + deviation)
+        // → left.col IN (-∞, right.col + deviation)
         return JoinConstraint(
             left_table, left_column,
             right_table, right_column,
-            JOIN_ATTR_NEG_INF, EQ,
+            JOIN_ATTR_NEG_INF, NEQ,  // Infinity is always NEQ
             deviation, NEQ  // Open upper bound
         );
     }

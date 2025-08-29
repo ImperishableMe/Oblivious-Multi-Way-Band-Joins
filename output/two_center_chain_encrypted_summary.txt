@@ -1,0 +1,27 @@
+=== Test Summary ===
+Query File: two_center_chain.sql
+Dataset: encrypted
+
+=== Input Table Sizes ===
+center1: 2 rows
+center2: 2 rows
+child1: 2 rows
+child2: 2 rows
+child3: 2 rows
+child4: 2 rows
+left_table: 2 rows
+right_table: 4 rows
+table_a: 2 rows
+table_b: 4 rows
+table_c: 8 rows
+
+=== Output ===
+SGX Output Size: 16 rows
+SQLite Output Size: 16 rows
+
+=== Results ===
+Match: YES
+
+=== Performance ===
+SGX Time: 0.547056 seconds
+SQLite Time: 0.334876 seconds

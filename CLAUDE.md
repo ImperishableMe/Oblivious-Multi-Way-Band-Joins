@@ -1,2 +1,4 @@
 - We are manipulating encrypted data obliviously outside of enclave using standard c++ stl, and operating on non-encrypted data obliviously inside enclave using native c.
 - you should never modify code with script. You should always edit code manually.
+- debug table dumps are saved to files in /home/r33wei/omwj/memory_const/debug/{date}_{time}_{test}
+- Use absolute path if you cant find a file

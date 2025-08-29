@@ -4,7 +4,7 @@
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
 
-// Forward declaration for table debugging
+// Table debugging functions are declared in debug_util.h
 
 Table AlignConcat::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     DEBUG_INFO("Starting Align-Concat Phase...");
@@ -59,8 +59,16 @@ Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root, sgx_enclave_id_t ei
 Table AlignConcat::AlignAndConcatenate(const Table& accumulator, 
                                        const Table& child,
                                        sgx_enclave_id_t eid) {
+    static int concat_iteration = 0;
+    concat_iteration++;
+    
+    DEBUG_INFO("========================================");
+    DEBUG_INFO("=== CONCATENATION OPERATION #%d ===", concat_iteration);
     DEBUG_INFO("Aligning tables: accumulator size=%zu, child size=%zu",
                accumulator.size(), child.size());
+    DEBUG_INFO("========================================");
+    
+    std::string concat_label = "concat" + std::to_string(concat_iteration);
     
     // Step 1: Sort accumulator by join attribute, then other attributes
     DEBUG_INFO("Step 1: Sorting accumulator by join attr, then others");
@@ -91,6 +99,37 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     // The result starts as a copy of the sorted accumulator
     Table result = sorted_accumulator;
     
+    // CRITICAL DEBUG: Dump both tables RIGHT BEFORE concatenation
+    // These are the two tables that will be concatenated horizontally
+    DEBUG_INFO("=== TABLES IMMEDIATELY BEFORE HORIZONTAL CONCATENATION ===");
+    
+    // Dump sorted accumulator (left side of concatenation)
+    debug_dump_table(result, ("before_concat_accumulator_" + concat_label).c_str(), 
+                    ("align_step5a_before_concat_" + concat_label).c_str(), eid,
+                    {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
+    
+    // Dump aligned child (right side of concatenation)  
+    debug_dump_table(aligned_child, ("before_concat_child_" + concat_label).c_str(),
+                    ("align_step5b_before_concat_" + concat_label).c_str(), eid,
+                    {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
+    
+    DEBUG_INFO("Table sizes - Accumulator: %zu rows, Child: %zu rows", result.size(), aligned_child.size());
+    DEBUG_INFO("These two tables will now be concatenated horizontally (parallel_pass)");
+    
+    // Debug: Print first few entries before concatenation
+    if (result.size() > 0 && aligned_child.size() > 0) {
+        DEBUG_INFO("Before concat - first accumulator entry:");
+        Entry acc_first = result[0];
+        DEBUG_INFO("  original_index=%d, join_attr=%d, final_mult=%d",
+                   acc_first.original_index, acc_first.join_attr, acc_first.final_mult);
+        
+        DEBUG_INFO("Before concat - first child entry:");
+        Entry child_first = aligned_child[0];
+        DEBUG_INFO("  original_index=%d, join_attr=%d, alignment_key=%d, copy_index=%d",
+                   child_first.original_index, child_first.join_attr, 
+                   child_first.alignment_key, child_first.copy_index);
+    }
+    
     // Use parallel_pass to concatenate attributes from aligned_child
     result.parallel_pass(aligned_child, eid,
         [](sgx_enclave_id_t eid, entry_t* left, entry_t* right) {
@@ -98,8 +137,15 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
             return ecall_concat_attributes(eid, left, right);
         });
     
+    // Debug: Dump final result - show concatenated attributes WITH ALL COLUMNS
+    debug_dump_table(result, ("final_result_" + concat_label).c_str(), 
+                    ("align_step5_" + concat_label).c_str(), eid,
+                    {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
-    DEBUG_INFO("Alignment and concatenation complete. Result size: %zu", result.size());
+    DEBUG_INFO("========================================");
+    DEBUG_INFO("=== END CONCATENATION #%d ===", concat_iteration);
+    DEBUG_INFO("Result size: %zu", result.size());
+    DEBUG_INFO("========================================\n");
     
     return result;
 }

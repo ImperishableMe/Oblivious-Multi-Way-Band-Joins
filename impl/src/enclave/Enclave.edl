@@ -88,6 +88,12 @@ enclave {
         // Sort by alignment_key field
         public void ecall_comparator_alignment_key([in,out] entry_t* e1, [in,out] entry_t* e2);
         
+        /* Metadata initialization functions */
+        
+        // Initialize metadata fields to NULL_VALUE based on field mask
+        // Use METADATA_* constants from enclave_types.h to specify which fields
+        public void ecall_init_metadata_null([in,out] entry_t* entry, uint32_t field_mask);
+        
         /* Distribute-expand phase functions */
         
         // Initialize destination index to 0

@@ -135,6 +135,12 @@ void ecall_comparator_alignment_key(entry_t* e1, entry_t* e2) {
     comparator_alignment_key(e1, e2);
 }
 
+// Metadata initialization function
+
+void ecall_init_metadata_null(entry_t* entry, uint32_t field_mask) {
+    transform_init_metadata_null(entry, field_mask);
+}
+
 // Distribute-expand phase functions
 
 void ecall_transform_init_dst_idx(entry_t* entry) {

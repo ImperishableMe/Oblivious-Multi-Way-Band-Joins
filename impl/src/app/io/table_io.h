@@ -79,16 +79,12 @@ public:
     
     /**
      * Load all tables from a directory (plain CSV or encrypted CSV)
+     * Auto-detects encryption by checking for nonce column in each file.
      * @param dir_path Directory path
-     * @param encrypted [DEPRECATED] This parameter is ignored. 
-     *                 The function auto-detects encryption by checking for nonce column.
-     *                 Kept for API compatibility, will be removed in future version.
      * @return Map of table name to Table object
-     * @deprecated The encrypted parameter is no longer used. Use load_csv_directory() directly.
      */
     static std::unordered_map<std::string, Table> 
-        load_tables_from_directory(const std::string& dir_path,
-                                  bool encrypted = false);
+        load_tables_from_directory(const std::string& dir_path);
     
     // Utility Functions
     /**

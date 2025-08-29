@@ -192,7 +192,8 @@ static Entry decrypt_entry_for_debug(const Entry& entry, uint32_t eid) {
 }
 
 // Table dumping functions
-void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid) {
+void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid,
+                      const std::vector<MetadataColumn>& columns, bool include_attributes) {
     if (!debug_session_active || !DEBUG_DUMP_TABLES) return;
     
     std::string filename_str;
@@ -210,11 +211,39 @@ void debug_dump_table(const Table& table, const char* label, const char* step_na
         
         if (!file.is_open()) return;
         
-        // Write header
-        file << "Index,OrigIdx,LocalMult,FinalMult,LocalCumsum,LocalInterval,ForeignSum,ForeignCumsum,ForeignInterval,LocalWeight,DstIdx,TableIdx,JoinAttr,FieldType,EqType,Encrypted";
+        // Write header based on requested columns
+        bool first = true;
+        for (const auto& col : columns) {
+            if (!first) file << ",";
+            first = false;
+            switch (col) {
+                case META_INDEX: file << "Index"; break;
+                case META_ORIG_IDX: file << "OrigIdx"; break;
+                case META_LOCAL_MULT: file << "LocalMult"; break;
+                case META_FINAL_MULT: file << "FinalMult"; break;
+                case META_LOCAL_CUMSUM: file << "LocalCumsum"; break;
+                case META_LOCAL_INTERVAL: file << "LocalInterval"; break;
+                case META_FOREIGN_SUM: file << "ForeignSum"; break;
+                case META_FOREIGN_INTERVAL: file << "ForeignInterval"; break;
+                case META_LOCAL_WEIGHT: file << "LocalWeight"; break;
+                case META_COPY_INDEX: file << "CopyIndex"; break;
+                case META_ALIGN_KEY: file << "AlignKey"; break;
+                case META_DST_IDX: file << "DstIdx"; break;
+                case META_TABLE_IDX: file << "TableIdx"; break;
+                case META_JOIN_ATTR: file << "JoinAttr"; break;
+                case META_FIELD_TYPE: file << "FieldType"; break;
+                case META_EQ_TYPE: file << "EqType"; break;
+                case META_ENCRYPTED: file << "Encrypted"; break;
+            }
+        }
         
-        // Add data columns if any
-        if (table.size() > 0) {
+        // If no columns specified, use default set
+        if (columns.empty()) {
+            file << "Index,OrigIdx,LocalMult,FinalMult,LocalCumsum,LocalInterval,ForeignSum,ForeignCumsum,ForeignInterval,LocalWeight,DstIdx,TableIdx,JoinAttr,FieldType,EqType,Encrypted";
+        }
+        
+        // Add data columns if requested
+        if (include_attributes && table.size() > 0) {
             const Entry& first = table[0];
             for (const auto& col_name : first.column_names) {
                 file << "," << col_name;
@@ -226,26 +255,78 @@ void debug_dump_table(const Table& table, const char* label, const char* step_na
         for (size_t i = 0; i < table.size(); i++) {
             Entry entry = decrypt_entry_for_debug(table[i], eid);
             
-            file << i << ","
-                 << entry.original_index << ","
-                 << entry.local_mult << ","
-                 << entry.final_mult << ","
-                 << entry.local_cumsum << ","
-                 << entry.local_interval << ","
-                 << entry.foreign_sum << ","
-                 << entry.foreign_cumsum << ","
-                 << entry.foreign_interval << ","
-                 << entry.local_weight << ","
-                 << entry.dst_idx << ","
-                 << entry.index << ","
-                 << entry.join_attr << ","
-                 << static_cast<int>(entry.field_type) << ","
-                 << static_cast<int>(entry.equality_type) << ","
-                 << (entry.is_encrypted ? "Y" : "N");
+            // Write requested columns
+            bool first = true;
+            for (const auto& col : columns) {
+                if (!first) file << ",";
+                first = false;
+                switch (col) {
+                    case META_INDEX: file << i; break;
+                    case META_ORIG_IDX: file << entry.original_index; break;
+                    case META_LOCAL_MULT: file << entry.local_mult; break;
+                    case META_FINAL_MULT: file << entry.final_mult; break;
+                    case META_LOCAL_CUMSUM: file << entry.local_cumsum; break;
+                    case META_LOCAL_INTERVAL: file << entry.local_interval; break;
+                    case META_FOREIGN_SUM: file << entry.foreign_sum; break;
+                    case META_FOREIGN_INTERVAL: file << entry.foreign_interval; break;
+                    case META_LOCAL_WEIGHT: file << entry.local_weight; break;
+                    case META_COPY_INDEX: file << entry.copy_index; break;
+                    case META_ALIGN_KEY: file << entry.alignment_key; break;
+                    case META_DST_IDX: file << entry.dst_idx; break;
+                    case META_TABLE_IDX: file << entry.index; break;
+                    case META_JOIN_ATTR: file << entry.join_attr; break;
+                    case META_FIELD_TYPE: {
+                        // Convert field type to readable string
+                        switch(entry.field_type) {
+                            case 0: file << "UNKNOWN"; break;
+                            case 1: file << "SOURCE"; break;
+                            case 2: file << "START"; break;
+                            case 3: file << "END"; break;
+                            case 4: file << "SORT_PADDING"; break;
+                            case 5: file << "DIST_PADDING"; break;
+                            default: file << "TYPE_" << static_cast<int>(entry.field_type); break;
+                        }
+                        break;
+                    }
+                    case META_EQ_TYPE: {
+                        // Convert equality type to readable string
+                        switch(entry.equality_type) {
+                            case 0: file << "NONE"; break;
+                            case 1: file << "EQ"; break;
+                            case 2: file << "NEQ"; break;
+                            default: file << "EQ_" << static_cast<int>(entry.equality_type); break;
+                        }
+                        break;
+                    }
+                    case META_ENCRYPTED: file << (entry.is_encrypted ? "Y" : "N"); break;
+                }
+            }
             
-            // Add data values
-            for (int32_t val : entry.attributes) {
-                file << "," << val;
+            // If no columns specified, write all
+            if (columns.empty()) {
+                file << i << ","
+                     << entry.original_index << ","
+                     << entry.local_mult << ","
+                     << entry.final_mult << ","
+                     << entry.local_cumsum << ","
+                     << entry.local_interval << ","
+                     << entry.foreign_sum << ","
+                     << "0" << ","  // foreign_cumsum removed
+                     << entry.foreign_interval << ","
+                     << entry.local_weight << ","
+                     << entry.dst_idx << ","
+                     << entry.index << ","
+                     << entry.join_attr << ","
+                     << static_cast<int>(entry.field_type) << ","
+                     << static_cast<int>(entry.equality_type) << ","
+                     << (entry.is_encrypted ? "Y" : "N");
+            }
+            
+            // Add data values if requested
+            if (include_attributes) {
+                for (int32_t val : entry.attributes) {
+                    file << "," << val;
+                }
             }
             
             file << std::endl;
@@ -398,4 +479,34 @@ void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid) {
     }
     
     DEBUG_DEBUG("%s", ss.str().c_str());
+}
+
+// Implementation for debug_dump_with_mask
+void debug_dump_with_mask(const Table& table, const char* label, const char* step_name,
+                          uint32_t eid, uint32_t column_mask) {
+    if (!debug_session_active || !DEBUG_DUMP_TABLES) return;
+    
+    // Convert mask to MetadataColumn vector
+    std::vector<MetadataColumn> columns;
+    if (column_mask & DEBUG_COL_INDEX) columns.push_back(META_INDEX);
+    if (column_mask & DEBUG_COL_ORIGINAL_INDEX) columns.push_back(META_ORIG_IDX);
+    if (column_mask & DEBUG_COL_LOCAL_MULT) columns.push_back(META_LOCAL_MULT);
+    if (column_mask & DEBUG_COL_FINAL_MULT) columns.push_back(META_FINAL_MULT);
+    if (column_mask & DEBUG_COL_LOCAL_CUMSUM) columns.push_back(META_LOCAL_CUMSUM);
+    if (column_mask & DEBUG_COL_LOCAL_INTERVAL) columns.push_back(META_LOCAL_INTERVAL);
+    if (column_mask & DEBUG_COL_FOREIGN_SUM) columns.push_back(META_FOREIGN_SUM);
+    if (column_mask & DEBUG_COL_FOREIGN_INTERVAL) columns.push_back(META_FOREIGN_INTERVAL);
+    if (column_mask & DEBUG_COL_LOCAL_WEIGHT) columns.push_back(META_LOCAL_WEIGHT);
+    if (column_mask & DEBUG_COL_COPY_INDEX) columns.push_back(META_COPY_INDEX);
+    if (column_mask & DEBUG_COL_ALIGNMENT_KEY) columns.push_back(META_ALIGN_KEY);
+    if (column_mask & DEBUG_COL_DST_IDX) columns.push_back(META_DST_IDX);
+    if (column_mask & DEBUG_COL_FIELD_TYPE) columns.push_back(META_FIELD_TYPE);
+    if (column_mask & DEBUG_COL_EQUALITY_TYPE) columns.push_back(META_EQ_TYPE);
+    if (column_mask & DEBUG_COL_JOIN_ATTR) columns.push_back(META_JOIN_ATTR);
+    
+    // Check if we should include attributes
+    bool include_attributes = (column_mask & DEBUG_COL_ALL_ATTRIBUTES) != 0;
+    
+    // Call the main debug_dump_table function
+    debug_dump_table(table, label, step_name, eid, columns, include_attributes);
 }

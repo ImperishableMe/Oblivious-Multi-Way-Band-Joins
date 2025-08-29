@@ -60,15 +60,21 @@ static void compute_local_sum_op(entry_t* e1, entry_t* e2) {
     // Check if e2 (window[1]) is SOURCE type (obliviously)
     int32_t is_source = (e2->field_type == SOURCE);
     
-    // Add local_mult only if SOURCE, otherwise add 0
+    // Check if e1 is START with NEQ (open boundary)
+    // If so, SOURCE at the same join_attr should NOT be counted
+    int32_t is_start_neq = (e1->field_type == START) & (e1->equality_type == NEQ);
+    int32_t same_join_attr = (e1->join_attr == e2->join_attr);
+    int32_t skip_source = is_start_neq & same_join_attr & is_source;
+    
+    // Add local_mult only if SOURCE and not skipped
     uint32_t old_cumsum = e2->local_cumsum;
-    e2->local_cumsum = e1->local_cumsum + (is_source * e2->local_mult);
+    e2->local_cumsum = e1->local_cumsum + (is_source * (1 - skip_source) * e2->local_mult);
     
     // Debug log to verify the operation
-    DEBUG_DEBUG("compute_local_sum: e1(type=%d,cumsum=%u) e2(type=%d,mult=%u) is_source=%d result=%u->%u",
-        e1->field_type, e1->local_cumsum, 
-        e2->field_type, e2->local_mult, 
-        is_source, old_cumsum, e2->local_cumsum);
+    DEBUG_DEBUG("compute_local_sum: e1(type=%d,eq=%d,join=%d,cumsum=%u) e2(type=%d,mult=%u,join=%d) skip=%d result=%u->%u",
+        e1->field_type, e1->equality_type, e1->join_attr, e1->local_cumsum, 
+        e2->field_type, e2->local_mult, e2->join_attr,
+        skip_source, old_cumsum, e2->local_cumsum);
 }
 
 /**
@@ -122,6 +128,12 @@ static void compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
     // For SOURCE entries from parent, use final_mult
     int32_t mult_to_use = is_source ? e2->final_mult : e2->local_mult;
     
+    // Check if e1 is START with NEQ (open boundary)
+    // If so, SOURCE at the same join_attr should NOT be counted
+    int32_t is_start_neq = (e1->field_type == START) & (e1->equality_type == NEQ);
+    int32_t same_join_attr = (e1->join_attr == e2->join_attr);
+    int32_t skip_source = is_start_neq & same_join_attr & is_source;
+    
     // Calculate weight delta: START adds, END subtracts, SOURCE no change
     int32_t weight_delta = (is_start * e2->local_mult) - 
                           (is_end * e2->local_mult);
@@ -129,14 +141,14 @@ static void compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
     // Update local weight
     e2->local_weight = e1->local_weight + weight_delta;
     
-    // Calculate foreign delta for SOURCE entries
+    // Calculate foreign delta for SOURCE entries (skip if at NEQ boundary)
     // SOURCE entries (parent) contribute final_mult / local_weight
     // Avoid division by zero
     int32_t safe_weight = e2->local_weight ? e2->local_weight : 1;
-    int32_t foreign_delta = is_source * (e2->final_mult / safe_weight);
+    int32_t foreign_delta = is_source * (1 - skip_source) * (e2->final_mult / safe_weight);
     
-    // Update foreign cumulative sum
-    e2->foreign_cumsum = e1->foreign_cumsum + foreign_delta;
+    // Update foreign sum (accumulator)
+    e2->foreign_sum = e1->foreign_sum + foreign_delta;
 }
 
 /**
@@ -154,14 +166,17 @@ static void compute_foreign_interval_op(entry_t* e1, entry_t* e2) {
     int32_t is_end = (e2->field_type == END);
     int32_t is_pair = is_start * is_end;
     
-    // Compute foreign interval difference
-    int32_t interval = e2->foreign_cumsum - e1->foreign_cumsum;
+    // Compute foreign interval difference using foreign_sum
+    int32_t interval = e2->foreign_sum - e1->foreign_sum;
     
-    // Set interval and foreign_sum only if we have a pair
+    // Set interval only if we have a pair
     e2->foreign_interval = (is_pair * interval) + 
                           ((1 - is_pair) * e2->foreign_interval);
-    e2->foreign_sum = (is_pair * e1->foreign_cumsum) + 
-                     ((1 - is_pair) * e2->foreign_sum);
+    
+    // CRITICAL: Copy START's foreign_sum to END when we have a pair
+    // This ensures END has the correct foreign_sum for later propagation to SOURCE entries
+    e2->foreign_sum = (is_pair * e1->foreign_sum) + 
+                      ((1 - is_pair) * e2->foreign_sum);
 }
 
 /**
@@ -234,37 +249,23 @@ static void expand_copy_op(entry_t* e1, entry_t* e2) {
     // Save e2's index (always done to maintain oblivious pattern)
     int32_t saved_index = e2->index;
     
-    // Conditionally copy fields from e1 to e2
-    // If is_padding=1, copy from e1; if is_padding=0, keep e2
-    e2->field_type = is_padding * e1->field_type + (1 - is_padding) * e2->field_type;
-    e2->equality_type = is_padding * e1->equality_type + (1 - is_padding) * e2->equality_type;
-    e2->join_attr = is_padding * e1->join_attr + (1 - is_padding) * e2->join_attr;
-    e2->original_index = is_padding * e1->original_index + (1 - is_padding) * e2->original_index;
-    e2->local_mult = is_padding * e1->local_mult + (1 - is_padding) * e2->local_mult;
-    e2->final_mult = is_padding * e1->final_mult + (1 - is_padding) * e2->final_mult;
-    e2->foreign_sum = is_padding * e1->foreign_sum + (1 - is_padding) * e2->foreign_sum;
-    e2->dst_idx = is_padding * e1->dst_idx + (1 - is_padding) * e2->dst_idx;
+    // Create temporary copy of e1
+    entry_t temp = *e1;
     
-    // Copy attributes obliviously
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        e2->attributes[i] = is_padding * e1->attributes[i] + (1 - is_padding) * e2->attributes[i];
+    // Obliviously copy entire struct byte-by-byte
+    // If is_padding=1, copy from temp (e1); if is_padding=0, keep e2
+    uint8_t* dst = (uint8_t*)e2;
+    uint8_t* src_temp = (uint8_t*)&temp;
+    uint8_t* src_orig = (uint8_t*)e2;
+    
+    for (size_t i = 0; i < sizeof(entry_t); i++) {
+        dst[i] = is_padding * src_temp[i] + (1 - is_padding) * src_orig[i];
     }
     
-    // Copy column names obliviously
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        for (int j = 0; j < MAX_COLUMN_NAME_LEN; j++) {
-            e2->column_names[i][j] = is_padding * e1->column_names[i][j] + 
-                                     (1 - is_padding) * e2->column_names[i][j];
-        }
-    }
-    
-    // Restore e2's index
+    // Restore e2's index (always)
     e2->index = saved_index;
     
-    // Update copy_index to track which copy this is
-    int not_padding_e1 = (e1->field_type != DIST_PADDING);
-    e2->copy_index = is_padding * not_padding_e1 * (e2->index - e1->dst_idx) + 
-                     (1 - (is_padding * not_padding_e1)) * e2->copy_index;
+    // Note: copy_index computation removed - this is handled in alignment phase
 }
 
 void window_expand_copy(entry_t* e1, entry_t* e2) {

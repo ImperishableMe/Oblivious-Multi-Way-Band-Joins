@@ -43,6 +43,34 @@
     #define DEBUG_TABLE_FORMAT DEBUG_FORMAT_CSV
 #endif
 
+// Column selection masks for debug output
+// Individual field masks - for precise control
+#define DEBUG_COL_ORIGINAL_INDEX   0x00000001
+#define DEBUG_COL_LOCAL_MULT       0x00000002
+#define DEBUG_COL_FINAL_MULT       0x00000004
+#define DEBUG_COL_FOREIGN_SUM      0x00000008
+#define DEBUG_COL_LOCAL_CUMSUM     0x00000010
+#define DEBUG_COL_LOCAL_INTERVAL   0x00000020
+#define DEBUG_COL_FOREIGN_INTERVAL 0x00000040
+#define DEBUG_COL_LOCAL_WEIGHT     0x00000100
+#define DEBUG_COL_COPY_INDEX       0x00000200
+#define DEBUG_COL_ALIGNMENT_KEY    0x00000400
+#define DEBUG_COL_DST_IDX          0x00000800
+#define DEBUG_COL_INDEX            0x00001000
+#define DEBUG_COL_FIELD_TYPE       0x00002000
+#define DEBUG_COL_EQUALITY_TYPE    0x00004000
+#define DEBUG_COL_JOIN_ATTR        0x00008000
+#define DEBUG_COL_ALL_ATTRIBUTES   0x00010000  // Special flag for data columns
+
+// Predefined combinations for common use cases
+#define DEBUG_COL_MULTIPLICITIES   (DEBUG_COL_LOCAL_MULT | DEBUG_COL_FINAL_MULT)
+#define DEBUG_COL_BOTTOM_UP        (DEBUG_COL_LOCAL_MULT | DEBUG_COL_LOCAL_CUMSUM | DEBUG_COL_LOCAL_INTERVAL)
+#define DEBUG_COL_TOP_DOWN         (DEBUG_COL_FINAL_MULT | DEBUG_COL_FOREIGN_SUM | DEBUG_COL_FOREIGN_INTERVAL | DEBUG_COL_LOCAL_WEIGHT)
+#define DEBUG_COL_DISTRIBUTE       (DEBUG_COL_DST_IDX | DEBUG_COL_INDEX)
+#define DEBUG_COL_ALIGNMENT        (DEBUG_COL_COPY_INDEX | DEBUG_COL_ALIGNMENT_KEY)
+#define DEBUG_COL_ESSENTIAL        (DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE | DEBUG_COL_JOIN_ATTR)
+#define DEBUG_COL_ALL_METADATA     0x0001FFFF  // All metadata fields (excluding ALL_ATTRIBUTES)
+
 // Function declarations based on environment
 #ifdef ENCLAVE_BUILD
     // Enclave environment - will use ocall
@@ -152,15 +180,39 @@ static inline const char* debug_level_str(uint32_t level) {
 class Table;
 class Entry;
 
+// Enum for metadata columns
+enum MetadataColumn {
+    META_INDEX,
+    META_ORIG_IDX,
+    META_LOCAL_MULT,
+    META_FINAL_MULT,
+    META_LOCAL_CUMSUM,
+    META_LOCAL_INTERVAL,
+    META_FOREIGN_SUM,
+    META_FOREIGN_INTERVAL,
+    META_LOCAL_WEIGHT,
+    META_COPY_INDEX,
+    META_ALIGN_KEY,
+    META_DST_IDX,
+    META_TABLE_IDX,
+    META_JOIN_ATTR,
+    META_FIELD_TYPE,
+    META_EQ_TYPE,
+    META_ENCRYPTED
+};
+
 // Debug session management
 void debug_init_session(const char* session_name);
 void debug_close_session();
 
 // Table dumping functions
-void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid);
+void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid,
+                      const std::vector<MetadataColumn>& columns = {}, bool include_attributes = true);
 void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid);
 void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
                                  uint32_t eid, const std::vector<std::string>& columns);
+void debug_dump_with_mask(const Table& table, const char* label, const char* step_name,
+                          uint32_t eid, uint32_t column_mask);
 
 // File output functions
 void debug_to_file(const char* filename, const char* content);

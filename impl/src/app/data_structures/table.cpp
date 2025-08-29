@@ -145,7 +145,7 @@ Table Table::map(sgx_enclave_id_t eid,
     
     // Apply transform to each entry independently
     for (size_t i = 0; i < output.size(); i++) {
-        DEBUG_TRACE("Map: Processing entry %zu/%zu", i, output.size());
+        // Removed TRACE log to reduce debug output volume
         
         // Log the Entry before conversion
         const Entry& orig_entry = output.entries[i];
@@ -321,17 +321,29 @@ void Table::oblivious_sort(sgx_enclave_id_t eid,
 void Table::distribute_pass(sgx_enclave_id_t eid, size_t distance,
                            std::function<void(sgx_enclave_id_t, entry_t*, entry_t*, size_t)> func) {
     // Apply function to pairs of entries at given distance
-    // Need to work with entry_t format for SGX
-    for (size_t i = 0; i + distance < entries.size(); i++) {
-        entry_t e1 = entries[i].to_entry_t();
-        entry_t e2 = entries[i + distance].to_entry_t();
+    // Reversed loop: process from right to left to avoid interference
+    // This ensures entries moving right don't interfere with unprocessed entries
+    for (size_t i = entries.size() - distance; i > 0; i--) {
+        entry_t e1 = entries[i - 1].to_entry_t();
+        entry_t e2 = entries[i - 1 + distance].to_entry_t();
         
         // Apply the function
         func(eid, &e1, &e2, distance);
         
         // Update entries from modified entry_t structures
-        entries[i] = Entry(e1);
-        entries[i + distance] = Entry(e2);
+        entries[i - 1] = Entry(e1);
+        entries[i - 1 + distance] = Entry(e2);
+    }
+    
+    // Handle i = 0 case separately to avoid underflow
+    if (distance < entries.size()) {
+        entry_t e1 = entries[0].to_entry_t();
+        entry_t e2 = entries[distance].to_entry_t();
+        
+        func(eid, &e1, &e2, distance);
+        
+        entries[0] = Entry(e1);
+        entries[distance] = Entry(e2);
     }
 }
 

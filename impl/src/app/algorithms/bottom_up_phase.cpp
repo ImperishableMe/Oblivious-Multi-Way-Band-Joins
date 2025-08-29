@@ -121,24 +121,17 @@ Table BottomUpPhase::CombineTable(
     
     // Transform source entries to SOURCE type
     DEBUG_INFO("Transforming source entries to SOURCE type");
-    Table source_entries = source.map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_to_source(eid, e);
-        });
+    Table source_entries = source.batched_map(eid, OP_ECALL_TRANSFORM_TO_SOURCE);
     
     // Transform target entries to START boundaries
     DEBUG_INFO("Transforming target entries to START boundaries");
-    Table start_entries = target.map(eid,
-        [dev1, eq1](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_to_start(eid, e, dev1, eq1);
-        });
+    int32_t start_params[2] = { dev1, (int32_t)eq1 };
+    Table start_entries = target.batched_map(eid, OP_ECALL_TRANSFORM_TO_START, start_params);
     
     // Transform target entries to END boundaries
     DEBUG_INFO("Transforming target entries to END boundaries");
-    Table end_entries = target.map(eid,
-        [dev2, eq2](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_to_end(eid, e, dev2, eq2);
-        });
+    int32_t end_params[2] = { dev2, (int32_t)eq2 };
+    Table end_entries = target.batched_map(eid, OP_ECALL_TRANSFORM_TO_END, end_params);
     
     // Combine all three tables
     DEBUG_INFO("Combining tables: source=%zu, start=%zu, end=%zu",

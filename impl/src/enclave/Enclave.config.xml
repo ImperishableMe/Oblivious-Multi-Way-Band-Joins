@@ -4,8 +4,8 @@
   <ISVSVN>0</ISVSVN>
   <!-- Stack size: 256KB -->
   <StackMaxSize>0x40000</StackMaxSize>
-  <!-- Heap size: 64MB for processing large datasets -->
-  <HeapMaxSize>0x4000000</HeapMaxSize>
+  <!-- Heap size: 128MB for processing large datasets -->
+  <HeapMaxSize>0x8000000</HeapMaxSize>
   <!-- Thread number: 4 threads -->
   <TCSNum>4</TCSNum>
   <TCSPolicy>1</TCSPolicy>

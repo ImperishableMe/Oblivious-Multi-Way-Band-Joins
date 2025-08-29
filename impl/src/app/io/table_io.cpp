@@ -8,6 +8,7 @@
 #include "converters.h"
 #include "../Enclave_u.h"
 #include "../../common/types_common.h"  // For NULL_VALUE and type constants
+#include "../../common/debug_util.h"
 
 // For directory operations
 #include <dirent.h>
@@ -147,29 +148,16 @@ void TableIO::save_csv(const Table& table, const std::string& filepath) {
 void TableIO::save_encrypted_csv(const Table& table, 
                                  const std::string& filepath,
                                  sgx_enclave_id_t eid) {
-    // Check that all entries are encrypted (or will be encrypted)
-    bool has_encrypted = false;
-    bool has_unencrypted = false;
-    for (size_t i = 0; i < table.size(); i++) {
-        if (table.get_entry(i).is_encrypted) {
-            has_encrypted = true;
-        } else {
-            has_unencrypted = true;
-        }
-    }
-    
-    if (has_encrypted && has_unencrypted) {
-        std::cout << "Warning: save_encrypted_csv called with mixed encrypted/unencrypted data. "
-                  << "Encrypting unencrypted entries." << std::endl;
-    }
+    // Assert consistent encryption status - all entries should be encrypted
+    uint8_t encryption_status = AssertConsistentEncryption(table);
     
     // Work with a copy of the table to allow encryption if needed
     Table table_copy = table;
     
-    // Only encrypt entries that aren't already encrypted
-    for (size_t i = 0; i < table_copy.size(); i++) {
-        Entry& entry = table_copy.get_entry(i);
-        if (!entry.is_encrypted) {
+    // If table is not encrypted, encrypt all entries
+    if (encryption_status == 0) {
+        for (size_t i = 0; i < table_copy.size(); i++) {
+            Entry& entry = table_copy.get_entry(i);
             crypto_status_t ret = CryptoUtils::encrypt_entry(entry, eid);
             if (ret != CRYPTO_SUCCESS) {
                 throw std::runtime_error("Encryption failed at entry " + std::to_string(i));

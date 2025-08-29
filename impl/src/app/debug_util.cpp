@@ -10,7 +10,10 @@
 #include <iomanip>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <cassert>
+#include <functional>
 #include "data_structures/types.h"
+#include "data_structures/join_tree_node.h"
 #include "crypto/crypto_utils.h"
 #include "Enclave_u.h"
 
@@ -80,8 +83,12 @@ extern "C" void debug_print(uint32_t level, const char* file, int line, const ch
         debug_log_file.flush();
     }
     
-    // Output to console if in console or both mode
-    if (DEBUG_OUTPUT_MODE == DEBUG_OUTPUT_CONSOLE || DEBUG_OUTPUT_MODE == DEBUG_OUTPUT_BOTH) {
+    // Always output warnings and errors to console, regardless of DEBUG_OUTPUT_MODE
+    // Other levels follow DEBUG_OUTPUT_MODE setting
+    bool output_to_console = (level <= DEBUG_LEVEL_WARN) || 
+                             (DEBUG_OUTPUT_MODE == DEBUG_OUTPUT_CONSOLE || DEBUG_OUTPUT_MODE == DEBUG_OUTPUT_BOTH);
+    
+    if (output_to_console) {
         FILE* stream = (level <= DEBUG_LEVEL_ERROR) ? stderr : stdout;
         
         // Print header with color
@@ -516,4 +523,34 @@ void debug_dump_with_mask(const Table& table, const char* label, const char* ste
     
     // Call the main debug_dump_table function
     debug_dump_table(table, label, step_name, eid, columns, include_attributes);
+}
+
+// ===================================================================
+// Encryption Consistency Assertions
+// ===================================================================
+
+uint8_t AssertConsistentEncryption(const Table& table) {
+    if (table.size() == 0) {
+        return 0;  // Empty table defaults to unencrypted
+    }
+    
+    uint8_t first_status = table[0].is_encrypted;
+    for (size_t i = 1; i < table.size(); i++) {
+        if (table[i].is_encrypted != first_status) {
+            DEBUG_ERROR("ASSERTION FAILED: Table '%s' has mixed encryption state at index %zu (first=%d, current=%d)",
+                       table.get_table_name().c_str(), i, first_status, table[i].is_encrypted);
+            assert(false && "Table has mixed encryption state!");
+        }
+    }
+    return first_status;
+}
+
+void AssertTreeConsistentEncryption(JoinTreeNodePtr root) {
+    std::function<void(JoinTreeNodePtr)> check_node = [&](JoinTreeNodePtr n) {
+        AssertConsistentEncryption(n->get_table());
+        for (auto& child : n->get_children()) {
+            check_node(child);
+        }
+    };
+    check_node(root);
 }

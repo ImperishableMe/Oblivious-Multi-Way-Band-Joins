@@ -25,7 +25,7 @@
 #define DEBUG_OUTPUT_FILE    1
 #define DEBUG_OUTPUT_BOTH    2
 
-// Default to console output
+// Default to file output to avoid cluttering console
 #ifndef DEBUG_OUTPUT_MODE
     #define DEBUG_OUTPUT_MODE DEBUG_OUTPUT_FILE
 #endif
@@ -85,6 +85,15 @@
     #ifdef __cplusplus
     }
     #endif
+#endif
+
+// Special macro for essential output (results, matches, times) - shows at ERROR level
+// This ensures critical information is shown even with minimal debug output
+#if DEBUG_LEVEL >= DEBUG_LEVEL_ERROR
+    #define DEBUG_RESULT(fmt, ...) \
+        printf(fmt "\n", ##__VA_ARGS__)
+#else
+    #define DEBUG_RESULT(fmt, ...) ((void)0)
 #endif
 
 // Macro definitions with zero overhead when disabled
@@ -156,6 +165,7 @@
 #ifdef __cplusplus
 #include <vector>
 #include <string>
+#include <memory>
 class Table;
 void debug_dump_table(const Table& table, const char* table_name, const char* phase = nullptr);
 #endif
@@ -179,6 +189,8 @@ static inline const char* debug_level_str(uint32_t level) {
 // Forward declarations
 class Table;
 class Entry;
+class JoinTreeNode;
+typedef std::shared_ptr<JoinTreeNode> JoinTreeNodePtr;
 
 // Enum for metadata columns
 enum MetadataColumn {
@@ -217,6 +229,10 @@ void debug_dump_with_mask(const Table& table, const char* label, const char* ste
 // File output functions
 void debug_to_file(const char* filename, const char* content);
 void debug_append_to_file(const char* filename, const char* content);
+
+// Encryption consistency assertions
+uint8_t AssertConsistentEncryption(const Table& table);
+void AssertTreeConsistentEncryption(JoinTreeNodePtr root);
 
 // Convenience macro for table dumping
 #if DEBUG_LEVEL >= DEBUG_LEVEL_DEBUG && DEBUG_DUMP_TABLES

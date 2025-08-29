@@ -139,9 +139,14 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     // Step 6: Add padding entries to reach output_size
     size_t current_size = working.size();
     DEBUG_INFO("Step 6 - Adding padding entries: current_size=%zu, output_size=%zu", current_size, output_size);
+    
+    // Get the table's encryption status (asserts consistency)
+    uint8_t table_encryption_status = AssertConsistentEncryption(working);
+    
     for (size_t i = current_size; i < output_size; i++) {
         entry_t padding;
         memset(&padding, 0, sizeof(entry_t));
+        padding.is_encrypted = table_encryption_status;  // Match table's encryption
         // Initialize padding entry
         ecall_transform_create_dist_padding(eid, &padding);
         working.add_entry(Entry(padding));

@@ -5,6 +5,7 @@
 #include "align_concat.h"
 #include <iostream>
 #include <sstream>
+#include <functional>
 #include "../../common/debug_util.h"
 
 // Forward declaration for table debugging
@@ -15,19 +16,32 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
         throw std::runtime_error("Invalid join tree structure");
     }
     
+    // Check initial encryption state
+    AssertTreeConsistentEncryption(root);
+    
     // Phase 1: Bottom-Up - Compute local multiplicities
+    AssertTreeConsistentEncryption(root);
     BottomUpPhase::Execute(root, eid);
+    AssertTreeConsistentEncryption(root);
     
     // Phase 2: Top-Down - Compute final multiplicities
+    AssertTreeConsistentEncryption(root);
     TopDownPhase::Execute(root, eid);
+    AssertTreeConsistentEncryption(root);
     
     // Phase 3: Distribute-Expand - Replicate tuples
+    AssertTreeConsistentEncryption(root);
     DistributeExpand::Execute(root, eid);
+    AssertTreeConsistentEncryption(root);
     
     // Phase 4: Align-Concat - Construct result
+    AssertTreeConsistentEncryption(root);
     Table result = AlignConcat::Execute(root, eid);
     
-    std::cout << "Result: " << result.size() << " rows" << std::endl;
+    // Check final result encryption state
+    AssertConsistentEncryption(result);
+    
+    printf("Result: %zu rows\n", result.size());
     
     return result;
 }

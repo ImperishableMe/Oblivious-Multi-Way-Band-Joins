@@ -168,10 +168,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 3: Sort by join attribute
     DEBUG_INFO("Sorting by join attribute");
-    combined.oblivious_sort(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_comparator_join_attr(eid, e1, e2);
-        });
+    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
     
     // Debug: Dump after sorting by join attribute
     debug_dump_with_mask(combined, "sorted_by_join", "topdown_step3_sorted", eid, foreign_init_mask);

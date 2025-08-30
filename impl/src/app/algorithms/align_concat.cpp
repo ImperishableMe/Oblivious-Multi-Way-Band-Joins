@@ -73,10 +73,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     // Step 1: Sort accumulator by join attribute, then other attributes
     DEBUG_INFO("Step 1: Sorting accumulator by join attr, then others");
     Table sorted_accumulator = accumulator;
-    sorted_accumulator.oblivious_sort(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_comparator_join_then_other(eid, e1, e2);
-        });
+    sorted_accumulator.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_THEN_OTHER);
     
     // Step 2: Compute copy indices for child table
     DEBUG_INFO("Step 2: Computing copy indices");

@@ -97,11 +97,8 @@ endif
 
 # Allow override of DEBUG_LEVEL
 ifndef DEBUG_LEVEL
-    ifeq ($(SGX_DEBUG), 1)
-        DEBUG_LEVEL := 5
-    else
-        DEBUG_LEVEL := 0
-    endif
+    # Default to 0 (no debug) to avoid overhead
+    DEBUG_LEVEL := 0
 endif
 App_Compile_CXXFlags := $(App_Compile_CFlags) -std=c++11 -DDEBUG_LEVEL=$(DEBUG_LEVEL)
 App_Link_Flags := -L$(SGX_LIBRARY_PATH) -l$(Urts_Library_Name) -lpthread

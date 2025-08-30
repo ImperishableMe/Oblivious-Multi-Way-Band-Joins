@@ -188,7 +188,9 @@ bool InequalityParser::parse(const std::string& condition, JoinConstraint& resul
     std::string right_part = trim(trimmed.substr(op_pos + op.length()));
     
     // Parse left side (should be table.column)
-    auto [left_table, left_column] = parse_qualified_name(left_part);
+    auto left_parsed = parse_qualified_name(left_part);
+    const std::string& left_table = left_parsed.first;
+    const std::string& left_column = left_parsed.second;
     if (left_table.empty() || left_column.empty()) {
         return false;
     }
@@ -219,7 +221,9 @@ bool InequalityParser::parse(const std::string& condition, JoinConstraint& resul
         right_qualified = right_part;
     }
     
-    auto [right_table, right_column] = parse_qualified_name(right_qualified);
+    auto right_parsed = parse_qualified_name(right_qualified);
+    const std::string& right_table = right_parsed.first;
+    const std::string& right_column = right_parsed.second;
     if (right_table.empty() || right_column.empty()) {
         return false;
     }

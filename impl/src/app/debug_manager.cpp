@@ -115,7 +115,7 @@ void DebugManager::loadConfig(const std::string& config_file) {
                 else if (value == "JSON") config.tables.format = DEBUG_FORMAT_JSON;
                 else if (value == "BINARY") config.tables.format = DEBUG_FORMAT_BINARY;
             } else if (key == "max_rows") {
-                config.tables.max_rows = std::stoul(value);
+                config.tables.max_rows = static_cast<uint32_t>(std::stoul(value));
             } else if (key.find("stages.") == 0) {
                 std::string stage = key.substr(7);
                 bool enabled = (value == "true" || value == "1");

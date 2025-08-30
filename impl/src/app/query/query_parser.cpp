@@ -155,7 +155,9 @@ void QueryParser::merge_join_conditions(std::vector<JoinConstraint>& conditions)
     std::vector<JoinConstraint> merged_conditions;
     std::set<size_t> processed_indices;
     
-    for (const auto& [key, indices] : condition_groups) {
+    for (const auto& pair : condition_groups) {
+        const auto& key = pair.first;
+        const auto& indices = pair.second;
         if (indices.size() == 1) {
             // Single condition, no merge needed
             merged_conditions.push_back(conditions[indices[0]]);

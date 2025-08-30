@@ -17,7 +17,7 @@
 - [x] Compile: `make clean && make -j4`
 - [x] Test two_center_chain: PASS [x]
 - [x] Test TB1: PASS [x]
-- [ ] Commit: "Add schema management to Table class"
+- [x] Commit: "Add schema management to Table class"
 
 ## Phase 2: Migrate I/O to Use Table Schema
 

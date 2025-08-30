@@ -38,7 +38,7 @@ Table TableIO::load_csv(const std::string& filepath) {
             // Check if any column is "nonce"
             for (size_t i = 0; i < headers.size(); ++i) {
                 if (headers[i] == "nonce") {
-                    nonce_column_index = i;
+                    nonce_column_index = static_cast<int>(i);
                     break;
                 }
             }

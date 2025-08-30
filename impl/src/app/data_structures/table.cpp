@@ -53,7 +53,7 @@ void Table::set_all_field_type(entry_type_t type) {
 
 void Table::initialize_original_indices() {
     for (size_t i = 0; i < entries.size(); i++) {
-        entries[i].original_index = i;
+        entries[i].original_index = static_cast<int32_t>(i);
     }
 }
 
@@ -224,10 +224,14 @@ Table Table::map(sgx_enclave_id_t eid,
         // Removed TRACE log to reduce debug output volume
         
         // Log the Entry before conversion
+        #if DEBUG_LEVEL >= 3
         const Entry& orig_entry = output.entries[i];
         DEBUG_DEBUG("  Before: field_type=%d, is_encrypted=%d, join_attr=%d, original_index=%u",
                     orig_entry.field_type, orig_entry.is_encrypted, 
                     orig_entry.join_attr, orig_entry.original_index);
+        #else
+        (void)0; // Avoid empty statement warning
+        #endif
         
         entry_t entry = output.entries[i].to_entry_t();
         
@@ -446,7 +450,7 @@ void Table::batched_distribute_pass(sgx_enclave_id_t eid, size_t distance, OpEca
     DEBUG_TRACE("Table::batched_distribute_pass: Complete");
 }
 
-Table Table::oblivious_expand(sgx_enclave_id_t eid) const {
+Table Table::oblivious_expand(sgx_enclave_id_t /*eid*/) const {
     // Calculate total size after expansion
     size_t total_size = 0;
     std::vector<uint32_t> multiplicities;

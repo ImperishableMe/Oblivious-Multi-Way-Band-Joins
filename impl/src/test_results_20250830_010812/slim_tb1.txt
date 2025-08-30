@@ -1,1 +1,0 @@
-Error: Command failed: /home/r33wei/omwj/memory_const/impl/src/sgx_app /home/r33wei/omwj/memory_const/input/queries/tpch_tb1.sql /tmp/slim_encrypted_1756530504 /tmp/join_compare_1756530505/sgx_result.csv 2>&1

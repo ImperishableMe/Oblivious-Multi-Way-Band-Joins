@@ -36,10 +36,10 @@ std::pair<Entry, Entry> JoinCondition::create_boundary_entries(const Entry& targ
     end_entry.field_type = END;
     
     // Apply bounds
-    start_entry.join_attr += lower_bound.deviation;
+    start_entry.join_attr += static_cast<int32_t>(lower_bound.deviation);
     start_entry.equality_type = lower_bound.equality;
     
-    end_entry.join_attr += upper_bound.deviation;
+    end_entry.join_attr += static_cast<int32_t>(upper_bound.deviation);
     end_entry.equality_type = upper_bound.equality;
     
     return std::make_pair(start_entry, end_entry);

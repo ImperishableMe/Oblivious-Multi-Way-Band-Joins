@@ -4,11 +4,7 @@
 #include "../../common/debug_util.h"
 #include "../counted_ecalls.h"  // Use counted ecalls
 
-// Forward declarations for selective debug dumping
-void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
-                                 uint32_t eid, const std::vector<std::string>& columns);
-void debug_dump_with_mask(const Table& table, const char* label, const char* step_name,
-                          uint32_t eid, uint32_t column_mask);
+// Debug functions are declared in debug_util.h
 
 void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     
@@ -54,7 +50,7 @@ void TopDownPhase::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
                        DEBUG_COL_FIELD_TYPE | DEBUG_COL_EQUALITY_TYPE | 
                        DEBUG_COL_JOIN_ATTR;
         std::string step_name = "topdown_step12_final_" + node->get_table_name();
-        debug_dump_with_mask(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), eid, mask);
+        debug_dump_with_mask(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), static_cast<uint32_t>(eid), mask);
     }
 }
 
@@ -153,7 +149,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     uint32_t combined_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE | 
                             DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | DEBUG_COL_FINAL_MULT |
                             DEBUG_COL_EQUALITY_TYPE;
-    debug_dump_with_mask(combined, "combined_foreign", "topdown_step1_combined", eid, combined_mask);
+    debug_dump_with_mask(combined, "combined_foreign", "topdown_step1_combined", static_cast<uint32_t>(eid), combined_mask);
     
     // Step 2: Initialize foreign temporary fields
     DEBUG_INFO("Initializing foreign temporary fields");
@@ -164,14 +160,14 @@ void TopDownPhase::ComputeForeignMultiplicities(
                                 DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | DEBUG_COL_FINAL_MULT |
                                 DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_FOREIGN_SUM | 
                                 DEBUG_COL_LOCAL_WEIGHT;
-    debug_dump_with_mask(combined, "foreign_temps_init", "topdown_step2_init_temps", eid, foreign_init_mask);
+    debug_dump_with_mask(combined, "foreign_temps_init", "topdown_step2_init_temps", static_cast<uint32_t>(eid), foreign_init_mask);
     
     // Step 3: Sort by join attribute
     DEBUG_INFO("Sorting by join attribute");
     combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
     
     // Debug: Dump after sorting by join attribute
-    debug_dump_with_mask(combined, "sorted_by_join", "topdown_step3_sorted", eid, foreign_init_mask);
+    debug_dump_with_mask(combined, "sorted_by_join", "topdown_step3_sorted", static_cast<uint32_t>(eid), foreign_init_mask);
     
     // Step 4: Compute foreign cumulative sums and weights
     DEBUG_INFO("Computing foreign cumulative sums");
@@ -182,14 +178,14 @@ void TopDownPhase::ComputeForeignMultiplicities(
                                DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | DEBUG_COL_FINAL_MULT |
                                DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_FOREIGN_SUM | 
                                DEBUG_COL_LOCAL_WEIGHT;
-    debug_dump_with_mask(combined, "foreign_sum", "topdown_step4_cumsum", eid, foreign_sum_mask);
+    debug_dump_with_mask(combined, "foreign_sum", "topdown_step4_cumsum", static_cast<uint32_t>(eid), foreign_sum_mask);
     
     // Step 5: Sort for pairwise processing
     DEBUG_INFO("Sorting for pairwise processing");
     combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_PAIRWISE);
     
     // Debug: Dump after pairwise sort
-    debug_dump_with_mask(combined, "sorted_pairwise", "topdown_step5_pairwise", eid, foreign_sum_mask);
+    debug_dump_with_mask(combined, "sorted_pairwise", "topdown_step5_pairwise", static_cast<uint32_t>(eid), foreign_sum_mask);
     
     // Step 6: Compute foreign intervals
     DEBUG_INFO("Computing foreign intervals");
@@ -201,14 +197,14 @@ void TopDownPhase::ComputeForeignMultiplicities(
                                      DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_FOREIGN_SUM |
                                      DEBUG_COL_FOREIGN_INTERVAL | 
                                      DEBUG_COL_LOCAL_WEIGHT;
-    debug_dump_with_mask(combined, "foreign_intervals", "topdown_step6_intervals", eid, foreign_interval_mask);
+    debug_dump_with_mask(combined, "foreign_intervals", "topdown_step6_intervals", static_cast<uint32_t>(eid), foreign_interval_mask);
     
     // Step 7: Sort END entries first to extract computed intervals
     DEBUG_INFO("Sorting END entries first");
     combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_END_FIRST);
     
     // Debug: Dump after END-first sort
-    debug_dump_with_mask(combined, "sorted_end_first", "topdown_step7_end_first", eid, foreign_interval_mask);
+    debug_dump_with_mask(combined, "sorted_end_first", "topdown_step7_end_first", static_cast<uint32_t>(eid), foreign_interval_mask);
     
     // Step 8: Truncate to child size
     DEBUG_INFO("Truncating to %zu entries (child size)", child.size());
@@ -225,7 +221,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
                              DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_FOREIGN_SUM |
                              DEBUG_COL_FOREIGN_INTERVAL |
                              DEBUG_COL_LOCAL_WEIGHT;
-    debug_dump_with_mask(truncated, "truncated_foreign", "topdown_step8_truncated", eid, truncated_mask);
+    debug_dump_with_mask(truncated, "truncated_foreign", "topdown_step8_truncated", static_cast<uint32_t>(eid), truncated_mask);
     
     // Step 9: Update child's final multiplicities
     DEBUG_INFO("Updating child's final multiplicities");
@@ -234,7 +230,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     uint32_t child_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE |
                          DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | 
                          DEBUG_COL_FINAL_MULT | DEBUG_COL_EQUALITY_TYPE;
-    debug_dump_with_mask(child, "child_before_update", "topdown_step9a_before", eid, child_mask);
+    debug_dump_with_mask(child, "child_before_update", "topdown_step9a_before", static_cast<uint32_t>(eid), child_mask);
     
     // Debug: Check field types before update
     DEBUG_INFO("Before parallel_pass - checking first entry field types");
@@ -255,7 +251,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     }
     
     // Debug: Dump child table after update
-    debug_dump_with_mask(child, "child_after_update", "topdown_step9b_after", eid, child_mask);
+    debug_dump_with_mask(child, "child_after_update", "topdown_step9b_after", static_cast<uint32_t>(eid), child_mask);
     
     DEBUG_INFO("Child final multiplicities updated");
 }

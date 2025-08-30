@@ -137,12 +137,12 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     
     // Dump sorted accumulator (left side of concatenation)
     debug_dump_table(result, ("before_concat_accumulator_" + concat_label).c_str(), 
-                    ("align_step5a_before_concat_" + concat_label).c_str(), eid,
+                    ("align_step5a_before_concat_" + concat_label).c_str(), static_cast<uint32_t>(eid),
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     // Dump aligned child (right side of concatenation)  
     debug_dump_table(aligned_child, ("before_concat_child_" + concat_label).c_str(),
-                    ("align_step5b_before_concat_" + concat_label).c_str(), eid,
+                    ("align_step5b_before_concat_" + concat_label).c_str(), static_cast<uint32_t>(eid),
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     DEBUG_INFO("Table sizes - Accumulator: %zu rows, Child: %zu rows", result.size(), aligned_child.size());
@@ -167,7 +167,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     
     // Debug: Dump final result - show concatenated attributes WITH ALL COLUMNS
     debug_dump_table(result, ("final_result_" + concat_label).c_str(), 
-                    ("align_step5_" + concat_label).c_str(), eid,
+                    ("align_step5_" + concat_label).c_str(), static_cast<uint32_t>(eid),
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     DEBUG_INFO("========================================");

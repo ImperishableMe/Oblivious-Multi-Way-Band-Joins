@@ -85,10 +85,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     
     // Step 4: Sort child by alignment key
     DEBUG_INFO("Step 4: Sorting child by alignment key");
-    aligned_child.oblivious_sort(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_comparator_alignment_key(eid, e1, e2);
-        });
+    aligned_child.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_ALIGNMENT_KEY);
     
     // Step 5: Horizontal concatenation using parallel pass
     DEBUG_INFO("Step 5: Horizontal concatenation via parallel pass");

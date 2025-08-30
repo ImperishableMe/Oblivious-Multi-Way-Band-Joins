@@ -43,6 +43,17 @@ Table TableIO::load_csv(const std::string& filepath) {
                 }
             }
             
+            // Build schema (excluding nonce column if present)
+            std::vector<std::string> schema_columns;
+            for (size_t i = 0; i < headers.size(); ++i) {
+                if (static_cast<int>(i) != nonce_column_index) {
+                    schema_columns.push_back(headers[i]);
+                }
+            }
+            
+            // Set table schema for slim mode preparation
+            table.set_schema(schema_columns);
+            
             // Set num_columns (excluding nonce column if present)
             size_t data_columns = (nonce_column_index >= 0) ? headers.size() - 1 : headers.size();
             table.set_num_columns(data_columns);
@@ -122,12 +133,19 @@ void TableIO::save_csv(const Table& table, const std::string& filepath) {
         throw std::runtime_error("Cannot create CSV file: " + filepath);
     }
     
-    // Write headers (from first entry if available)
+    // Write headers (prefer Table schema, fallback to first entry)
     if (table.size() > 0) {
-        const auto& first_entry = table.get_entry(0);
-        for (size_t i = 0; i < first_entry.column_names.size(); ++i) {
+        std::vector<std::string> headers = table.get_schema();
+        
+        // If no schema set, fall back to first entry's column names
+        if (headers.empty()) {
+            const auto& first_entry = table.get_entry(0);
+            headers = first_entry.column_names;
+        }
+        
+        for (size_t i = 0; i < headers.size(); ++i) {
             if (i > 0) file << ",";
-            file << first_entry.column_names[i];
+            file << headers[i];
         }
         file << "\n";
         
@@ -182,16 +200,25 @@ void TableIO::save_encrypted_csv(const Table& table,
         throw std::runtime_error("Cannot create encrypted CSV file: " + filepath);
     }
     
-    // Write headers (from first entry if available)
+    // Write headers (prefer Table schema, fallback to first entry)
     if (entries.size() > 0) {
-        // Column names are not encrypted
-        for (size_t i = 0; i < MAX_ATTRIBUTES; ++i) {
-            if (entries[0].column_names[i][0] != '\0') {
-                if (i > 0) file << ",";
-                file << entries[0].column_names[i];
-            } else {
-                break;
+        std::vector<std::string> headers = table_copy.get_schema();
+        
+        // If no schema set, fall back to first entry's column names
+        if (headers.empty()) {
+            for (size_t i = 0; i < MAX_ATTRIBUTES; ++i) {
+                if (entries[0].column_names[i][0] != '\0') {
+                    headers.push_back(std::string(entries[0].column_names[i]));
+                } else {
+                    break;
+                }
             }
+        }
+        
+        // Write column headers
+        for (size_t i = 0; i < headers.size(); ++i) {
+            if (i > 0) file << ",";
+            file << headers[i];
         }
         // Add nonce column header
         file << ",nonce\n";

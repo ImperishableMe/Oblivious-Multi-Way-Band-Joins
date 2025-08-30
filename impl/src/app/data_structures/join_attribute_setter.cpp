@@ -46,13 +46,28 @@ void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node, sgx_enc
     DEBUG_INFO("Setting join_attr for %zu entries in %s using column %s",
                table.size(), node->get_table_name().c_str(), join_column.c_str());
     
-    // Get column index from first entry
+    // Get column index from table schema (prefer) or first entry (fallback)
     if (table.size() == 0) {
         DEBUG_WARN("Table %s is empty, cannot set join attributes", node->get_table_name().c_str());
         return;
     }
     
-    int32_t column_index = GetColumnIndex(table[0], join_column);
+    int32_t column_index = -1;
+    
+    // Try to get column index from table schema first
+    try {
+        size_t idx = table.get_column_index(join_column);
+        column_index = static_cast<int32_t>(idx);
+        DEBUG_DEBUG("Found column %s at index %d using table schema", join_column.c_str(), column_index);
+    } catch (const std::runtime_error& e) {
+        // Fall back to Entry column names if schema not available
+        column_index = GetColumnIndex(table[0], join_column);
+        if (column_index >= 0) {
+            DEBUG_DEBUG("Found column %s at index %d using entry column names (fallback)", 
+                       join_column.c_str(), column_index);
+        }
+    }
+    
     if (column_index < 0) {
         DEBUG_ERROR("Column %s not found in table %s", 
                     join_column.c_str(), node->get_table_name().c_str());
@@ -101,8 +116,23 @@ void JoinAttributeSetter::SetJoinAttributesForTable(Table& table, const std::str
         return;
     }
     
-    // Get column index from first entry
-    int32_t column_index = GetColumnIndex(table[0], column_name);
+    // Get column index from table schema (prefer) or first entry (fallback)
+    int32_t column_index = -1;
+    
+    // Try to get column index from table schema first
+    try {
+        size_t idx = table.get_column_index(column_name);
+        column_index = static_cast<int32_t>(idx);
+        DEBUG_DEBUG("Found column %s at index %d using table schema", column_name.c_str(), column_index);
+    } catch (const std::runtime_error& e) {
+        // Fall back to Entry column names if schema not available
+        column_index = GetColumnIndex(table[0], column_name);
+        if (column_index >= 0) {
+            DEBUG_DEBUG("Found column %s at index %d using entry column names (fallback)", 
+                       column_name.c_str(), column_index);
+        }
+    }
+    
     if (column_index < 0) {
         DEBUG_ERROR("Column %s not found in table", column_name.c_str());
         return;

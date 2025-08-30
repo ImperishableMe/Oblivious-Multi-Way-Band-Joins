@@ -363,6 +363,18 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
             }
             break;
             
+        case OP_ECALL_TRANSFORM_INIT_COPY_INDEX:
+            for (size_t i = 0; i < ops_count; i++) {
+                transform_init_copy_index_op(&data_array[ops_array[i].idx1]);
+            }
+            break;
+            
+        case OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY:
+            for (size_t i = 0; i < ops_count; i++) {
+                transform_compute_alignment_key_op(&data_array[ops_array[i].idx1]);
+            }
+            break;
+            
         // ============================================================================
         // Transform Operations with parameters
         // ============================================================================

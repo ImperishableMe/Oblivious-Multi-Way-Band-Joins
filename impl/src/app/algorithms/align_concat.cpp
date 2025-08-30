@@ -148,10 +148,7 @@ Table AlignConcat::ComputeCopyIndices(const Table& table, sgx_enclave_id_t eid) 
     DEBUG_DEBUG("Computing copy indices for %zu entries", table.size());
     
     // Initialize copy_index to 0 for all entries
-    Table result = table.map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_init_copy_index(eid, e);
-        });
+    Table result = table.batched_map(eid, OP_ECALL_TRANSFORM_INIT_COPY_INDEX);
     
     // Linear pass to compute copy indices
     // Same original_index -> increment

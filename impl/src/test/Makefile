@@ -51,6 +51,11 @@ App_Include_Paths := -I$(SGX_SDK)/include -I../app -I../enclave -I../common
 
 App_Compile_CFlags := -fPIC -Wno-attributes $(App_Include_Paths)
 
+# Slim entry mode support
+ifdef SLIM_ENTRY
+	App_Compile_CFlags += -DSLIM_ENTRY=$(SLIM_ENTRY)
+endif
+
 # Debug configuration
 ifeq ($(SGX_DEBUG), 1)
 	App_Compile_CFlags += -DDEBUG -UNDEBUG -UEDEBUG
@@ -75,6 +80,7 @@ Shared_Cpp_Files := ../app/io/table_io.cpp \
                    ../app/data_structures/table.cpp \
                    ../app/data_structures/join_condition.cpp \
                    ../app/batch/ecall_batch_collector.cpp \
+                   ../app/ecall_wrapper.cpp \
                    ../app/debug_util.cpp
 
 # Generated untrusted source

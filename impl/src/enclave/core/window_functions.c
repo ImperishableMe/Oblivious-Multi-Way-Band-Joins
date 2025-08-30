@@ -67,7 +67,7 @@ void window_compute_local_sum_op(entry_t* e1, entry_t* e2) {
     int32_t skip_source = is_start_neq & same_join_attr & is_source;
     
     // Add local_mult only if SOURCE and not skipped
-    uint32_t old_cumsum = (uint32_t)e2->local_cumsum;
+    uint32_t old_cumsum __attribute__((unused)) = (uint32_t)e2->local_cumsum;
     e2->local_cumsum = e1->local_cumsum + (is_source * (1 - skip_source) * e2->local_mult);
     
     // Debug log to verify the operation
@@ -94,7 +94,7 @@ void window_compute_local_interval_op(entry_t* e1, entry_t* e2) {
     
     // Compute interval difference
     int32_t interval = e2->local_cumsum - e1->local_cumsum;
-    uint32_t old_interval = (uint32_t)e2->local_interval;
+    uint32_t old_interval __attribute__((unused)) = (uint32_t)e2->local_interval;
     
     // Debug: Check for negative interval
     // Note: Cannot use DEBUG_ENCLAVE in enclave code - would need OCALL for logging

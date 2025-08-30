@@ -1,7 +1,6 @@
 #include "aes_crypto.h"
 
-// Define ENCLAVE_BUILD before including secure_key.h
-#define ENCLAVE_BUILD
+// ENCLAVE_BUILD is already defined in Makefile
 #include "../secure_key.h"
 
 #include <stddef.h>
@@ -25,7 +24,7 @@ static void init_aes_key(void) {
         for (int i = 0; i < 16; i++) {
             aes_key[i] = (key >> ((i % 4) * 8)) & 0xFF;
             // Mix in counter for more entropy
-            aes_key[i] ^= (i * 0x37);
+            aes_key[i] ^= (uint8_t)(i * 0x37);
         }
         aes_key_initialized = 1;
     }
@@ -90,7 +89,7 @@ crypto_status_t aes_encrypt_entry(entry_t* entry) {
             sgx_status_t status = sgx_aes_ctr_encrypt(
                 (const sgx_aes_ctr_128bit_key_t*)aes_key,
                 entry_bytes + regions[i].start,
-                region_size,
+                (uint32_t)region_size,
                 ctr,
                 128,  // Number of bits in counter
                 encrypted_data + regions[i].start
@@ -163,7 +162,7 @@ crypto_status_t aes_decrypt_entry(entry_t* entry) {
             sgx_status_t status = sgx_aes_ctr_decrypt(
                 (const sgx_aes_ctr_128bit_key_t*)aes_key,
                 entry_bytes + regions[i].start,
-                region_size,
+                (uint32_t)region_size,
                 ctr,
                 128,
                 decrypted_data + regions[i].start

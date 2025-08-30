@@ -111,7 +111,7 @@ void transform_to_start_op(entry_t* entry, int32_t deviation, equality_type_t eq
     entry->equality_type = equality;
     
     // Debug: Check if values are within expected range
-    int32_t original_join_attr = entry->join_attr;
+    int32_t original_join_attr __attribute__((unused)) = entry->join_attr;
     int32_t new_join_attr = entry->join_attr + deviation;
     
     // Check if original value is within design constraint
@@ -156,7 +156,7 @@ void transform_to_end_op(entry_t* entry, int32_t deviation, equality_type_t equa
     entry->equality_type = equality;
     
     // Debug: Check if values are within expected range
-    int32_t original_join_attr = entry->join_attr;
+    int32_t original_join_attr __attribute__((unused)) = entry->join_attr;
     int32_t new_join_attr = entry->join_attr + deviation;
     
     // Check for overflow/underflow

@@ -15,7 +15,7 @@
  * This eliminates per-operation crypto overhead (up to 2000x reduction)
  */
 void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
-                           void* ops_array_void, size_t ops_count, size_t ops_size,
+                           void* ops_array_void, size_t ops_count, size_t ops_size __attribute__((unused)),
                            int32_t op_type_int) {
     
     // Cast to proper types
@@ -296,7 +296,7 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
             for (size_t i = 0; i < ops_count; i++) {
                 // Call the raw operation directly - data is already decrypted
                 int32_t idx = ops_array[i].idx1;
-                if (idx >= 0 && idx < data_count) {
+                if (idx >= 0 && idx < (int32_t)data_count) {
                     data_array[idx].local_mult = 1;
                     data_array[idx].final_mult = 0;
                 }

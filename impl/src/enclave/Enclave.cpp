@@ -4,8 +4,7 @@
 #include "crypto/aes_crypto.h"
 #include "core/core.h"
 
-// Define ENCLAVE_BUILD so secure_key.h knows we're in the enclave
-#define ENCLAVE_BUILD
+// ENCLAVE_BUILD is already defined in Makefile
 #include "secure_key.h"
 
 /**

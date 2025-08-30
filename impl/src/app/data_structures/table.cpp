@@ -523,3 +523,38 @@ void Table::batched_oblivious_sort(sgx_enclave_id_t eid, OpEcall op_type) {
     DEBUG_TRACE("Table::batched_oblivious_sort: Complete");
 }
 
+void Table::add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encryption_status) {
+    if (count == 0) {
+        return;
+    }
+    
+    DEBUG_TRACE("Table::add_batched_padding: Adding %zu padding entries", count);
+    
+    // Reserve space for new entries
+    entries.reserve(entries.size() + count);
+    
+    // Create batch collector for padding creation
+    EcallBatchCollector collector(eid, OP_ECALL_TRANSFORM_CREATE_DIST_PADDING);
+    
+    // Create padding entries in batches
+    for (size_t i = 0; i < count; i++) {
+        Entry padding;
+        // Initialize entry_t structure instead of Entry class
+        entry_t padding_entry;
+        memset(&padding_entry, 0, sizeof(entry_t));
+        padding_entry.is_encrypted = encryption_status;  // Match table's encryption
+        padding = Entry(padding_entry);
+        
+        // Add to table first
+        entries.push_back(padding);
+        
+        // Add to batch for transformation
+        collector.add_operation(entries.back());
+    }
+    
+    // Flush any remaining operations
+    collector.flush();
+    
+    DEBUG_TRACE("Table::add_batched_padding: Complete - added %zu entries", count);
+}
+

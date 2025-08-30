@@ -23,5 +23,12 @@ SQLite Output Size: 16 rows
 Match: YES
 
 === Performance ===
-SGX Time: 0.38367 seconds
-SQLite Time: 0.345294 seconds
+SGX Time: 0.388932 seconds
+SQLite Time: 0.333671 seconds
+
+=== SGX Phase Timings ===
+Bottom-Up: 0.006743 seconds
+Top-Down: 0.006493 seconds
+Distribute-Expand: 0.006687 seconds
+Align-Concat: 0.014901 seconds
+Total (phases): 0.034833 seconds

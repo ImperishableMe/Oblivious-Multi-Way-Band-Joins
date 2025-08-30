@@ -1,5 +1,6 @@
 #include "join_attribute_setter.h"
 #include "../Enclave_u.h"
+#include "../../common/batch_types.h"
 #include <stdexcept>
 #include <sstream>
 
@@ -60,37 +61,24 @@ void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node, sgx_enc
     
     DEBUG_INFO("Column %s is at index %d", join_column.c_str(), column_index);
     
-    // Use ecall to set join_attr for each entry
-    for (size_t i = 0; i < table.size(); i++) {
-        Entry& entry = table[i];
-        entry_t c_entry = entry.to_entry_t();
-        
-        // Debug: Print join_attr before
-        DEBUG_DEBUG("Entry %zu before: join_attr=%d, is_encrypted=%d", 
-                    i, c_entry.join_attr, c_entry.is_encrypted);
-        
-        // Call ecall to set join_attr (handles decryption/encryption)
-        sgx_status_t status = ecall_transform_set_join_attr(eid, &c_entry, column_index);
-        
-        if (status != SGX_SUCCESS) {
-            DEBUG_ERROR("Failed to set join_attr for entry %zu: SGX error 0x%x", i, status);
-            continue;
-        }
-        
-        // Update entry from c_entry
-        entry.from_entry_t(c_entry);
-        
-        // Debug: Print join_attr after
-        DEBUG_DEBUG("Entry %zu after: join_attr=%d from column %s (index %d)",
-                   i, entry.join_attr, join_column.c_str(), column_index);
+    // Use batched operation to set join_attr for all entries
+    int32_t params[4] = {column_index, 0, 0, 0};
+    Table updated = table.batched_map(eid, OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
+    
+    // Replace the table's entries with the updated ones
+    table = updated;
+    
+    // Debug: Print first entry's join_attr after update
+    if (table.size() > 0) {
+        Entry& first_entry = table[0];
+        DEBUG_DEBUG("First entry after: join_attr=%d from column %s (index %d)",
+                   first_entry.join_attr, join_column.c_str(), column_index);
         
         // Additional debug: Show all attributes to verify
-        if (i == 0) {
-            DEBUG_INFO("First entry attributes for verification:");
-            for (size_t j = 0; j < entry.attributes.size(); j++) {
-                DEBUG_INFO("  attr[%zu]=%d (column: %s)", j, entry.attributes[j], 
-                          j < entry.column_names.size() ? entry.column_names[j].c_str() : "unknown");
-            }
+        DEBUG_INFO("First entry attributes for verification:");
+        for (size_t j = 0; j < first_entry.attributes.size(); j++) {
+            DEBUG_INFO("  attr[%zu]=%d (column: %s)", j, first_entry.attributes[j], 
+                      j < first_entry.column_names.size() ? first_entry.column_names[j].c_str() : "unknown");
         }
     }
 }
@@ -123,20 +111,10 @@ void JoinAttributeSetter::SetJoinAttributesForTable(Table& table, const std::str
     DEBUG_INFO("Setting join_attr for %zu entries using column %s (index %d)",
                table.size(), column_name.c_str(), column_index);
     
-    // Use ecall to set join_attr for each entry
-    for (size_t i = 0; i < table.size(); i++) {
-        Entry& entry = table[i];
-        entry_t c_entry = entry.to_entry_t();
-        
-        // Call ecall to set join_attr (handles decryption/encryption)
-        sgx_status_t status = ecall_transform_set_join_attr(eid, &c_entry, column_index);
-        
-        if (status != SGX_SUCCESS) {
-            DEBUG_ERROR("Failed to set join_attr for entry %zu: SGX error 0x%x", i, status);
-            continue;
-        }
-        
-        // Update entry from c_entry
-        entry.from_entry_t(c_entry);
-    }
+    // Use batched operation to set join_attr for all entries
+    int32_t params[4] = {column_index, 0, 0, 0};
+    Table updated = table.batched_map(eid, OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
+    
+    // Replace the table's entries with the updated ones
+    table = updated;
 }

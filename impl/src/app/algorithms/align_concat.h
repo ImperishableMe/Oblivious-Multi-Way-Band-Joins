@@ -35,6 +35,26 @@ public:
      * @return Final join result table
      */
     static Table Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid);
+    
+    /**
+     * Get sorting metrics collected during align-concat phase
+     * 
+     * @param total_time Total time spent sorting (output)
+     * @param total_ecalls Total ecalls for sorting (output)
+     * @param acc_time Time spent sorting accumulators (output)
+     * @param child_time Time spent sorting children (output)
+     * @param acc_ecalls Ecalls for accumulator sorts (output)
+     * @param child_ecalls Ecalls for child sorts (output)
+     */
+    static void GetSortingMetrics(double& total_time, size_t& total_ecalls,
+                                  double& acc_time, double& child_time,
+                                  size_t& acc_ecalls, size_t& child_ecalls);
+    
+    /**
+     * Reset sorting metrics to zero
+     * Should be called before each join execution
+     */
+    static void ResetSortingMetrics();
 
 private:
     /**

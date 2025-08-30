@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <cstdio>
+#include <cstring>
 #include <dirent.h>
 #include <sys/stat.h>
 #include "../../app/data_structures/types.h"
@@ -122,6 +124,158 @@ ComparisonResult compare_tables(const Table& sgx_table, const Table& sqlite_tabl
     return result;
 }
 
+/* Structure to hold phase timing information */
+struct PhaseTimings {
+    double bottom_up;
+    double top_down;
+    double distribute_expand;
+    double align_concat;
+    double total;
+    bool valid;
+    
+    PhaseTimings() : bottom_up(0), top_down(0), distribute_expand(0), 
+                     align_concat(0), total(0), valid(false) {}
+};
+
+/* Structure to hold phase ecall counts */
+struct PhaseEcalls {
+    size_t bottom_up;
+    size_t top_down;
+    size_t distribute_expand;
+    size_t align_concat;
+    size_t total;
+    bool valid;
+    
+    PhaseEcalls() : bottom_up(0), top_down(0), distribute_expand(0),
+                    align_concat(0), total(0), valid(false) {}
+};
+
+/* Structure to hold phase sizes */
+struct PhaseSizes {
+    size_t bottom_up;
+    size_t top_down;
+    size_t distribute_expand;
+    size_t align_concat;
+    bool valid;
+    
+    PhaseSizes() : bottom_up(0), top_down(0), distribute_expand(0),
+                   align_concat(0), valid(false) {}
+};
+
+/* Structure to hold align-concat sorting metrics */
+struct AlignConcatSortMetrics {
+    double total_time;
+    size_t total_ecalls;
+    double accumulator_time;
+    size_t accumulator_ecalls;
+    double child_time;
+    size_t child_ecalls;
+    bool valid;
+    
+    AlignConcatSortMetrics() : total_time(0), total_ecalls(0),
+                               accumulator_time(0), accumulator_ecalls(0),
+                               child_time(0), child_ecalls(0), valid(false) {}
+};
+
+/* Run a command and capture output with timing */
+struct CommandResult {
+    double wall_time;
+    PhaseTimings phase_timings;
+    PhaseEcalls phase_ecalls;
+    PhaseSizes phase_sizes;
+    AlignConcatSortMetrics sort_metrics;
+    std::string output;
+};
+
+CommandResult run_command_with_output(const std::string& command) {
+    CommandResult result;
+    
+    // Use popen to capture output
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    FILE* pipe = popen(command.c_str(), "r");
+    if (!pipe) {
+        throw std::runtime_error("Failed to run command: " + command);
+    }
+    
+    char buffer[256];
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        result.output += buffer;
+        
+        // Parse phase timing if present
+        if (strncmp(buffer, "PHASE_TIMING:", 13) == 0) {
+            // Parse the timing line
+            double bu, td, de, ac, tot;
+            if (sscanf(buffer + 13, " Bottom-Up=%lf Top-Down=%lf Distribute-Expand=%lf Align-Concat=%lf Total=%lf",
+                       &bu, &td, &de, &ac, &tot) == 5) {
+                result.phase_timings.bottom_up = bu;
+                result.phase_timings.top_down = td;
+                result.phase_timings.distribute_expand = de;
+                result.phase_timings.align_concat = ac;
+                result.phase_timings.total = tot;
+                result.phase_timings.valid = true;
+            }
+        }
+        // Parse phase ecalls if present
+        else if (strncmp(buffer, "PHASE_ECALLS:", 13) == 0) {
+            size_t bu, td, de, ac, tot;
+            if (sscanf(buffer + 13, " Bottom-Up=%zu Top-Down=%zu Distribute-Expand=%zu Align-Concat=%zu Total=%zu",
+                       &bu, &td, &de, &ac, &tot) == 5) {
+                result.phase_ecalls.bottom_up = bu;
+                result.phase_ecalls.top_down = td;
+                result.phase_ecalls.distribute_expand = de;
+                result.phase_ecalls.align_concat = ac;
+                result.phase_ecalls.total = tot;
+                result.phase_ecalls.valid = true;
+            }
+        }
+        // Parse phase sizes if present
+        else if (strncmp(buffer, "PHASE_SIZES:", 12) == 0) {
+            size_t bu, td, de, ac;
+            if (sscanf(buffer + 12, " Bottom-Up=%zu Top-Down=%zu Distribute-Expand=%zu Align-Concat=%zu",
+                       &bu, &td, &de, &ac) == 4) {
+                result.phase_sizes.bottom_up = bu;
+                result.phase_sizes.top_down = td;
+                result.phase_sizes.distribute_expand = de;
+                result.phase_sizes.align_concat = ac;
+                result.phase_sizes.valid = true;
+            }
+        } else if (strncmp(buffer, "ALIGN_CONCAT_SORTS:", 19) == 0) {
+            // Parse sorting metrics
+            double total_time;
+            size_t total_ecalls;
+            double acc_time;
+            size_t acc_ecalls;
+            double child_time;
+            size_t child_ecalls;
+            
+            // Look for pattern: Total=XXXs (YYY ecalls), Accumulator=XXXs (YYY ecalls), Child=XXXs (YYY ecalls)
+            if (sscanf(buffer + 19, " Total=%lfs (%zu ecalls), Accumulator=%lfs (%zu ecalls), Child=%lfs (%zu ecalls)",
+                       &total_time, &total_ecalls, &acc_time, &acc_ecalls, &child_time, &child_ecalls) == 6) {
+                result.sort_metrics.total_time = total_time;
+                result.sort_metrics.total_ecalls = total_ecalls;
+                result.sort_metrics.accumulator_time = acc_time;
+                result.sort_metrics.accumulator_ecalls = acc_ecalls;
+                result.sort_metrics.child_time = child_time;
+                result.sort_metrics.child_ecalls = child_ecalls;
+                result.sort_metrics.valid = true;
+            }
+        }
+    }
+    
+    int ret = pclose(pipe);
+    auto end = std::chrono::high_resolution_clock::now();
+    
+    if (ret != 0) {
+        throw std::runtime_error("Command failed: " + command);
+    }
+    
+    std::chrono::duration<double> diff = end - start;
+    result.wall_time = diff.count();
+    
+    return result;
+}
+
 /* Run a command and measure time */
 double run_timed_command(const std::string& command) {
     // Executing command
@@ -180,8 +334,8 @@ int main(int argc, char* argv[]) {
         
         // Run SGX oblivious join
         // Running SGX
-        std::string sgx_cmd = "/home/r33wei/omwj/memory_const/impl/src/sgx_app " + sql_file + " " + data_dir + " " + sgx_output;
-        double sgx_time = run_timed_command(sgx_cmd);
+        std::string sgx_cmd = "/home/r33wei/omwj/memory_const/impl/src/sgx_app " + sql_file + " " + data_dir + " " + sgx_output + " 2>&1";
+        CommandResult sgx_result = run_command_with_output(sgx_cmd);
         // SGX done
         
         // Run SQLite baseline
@@ -193,13 +347,13 @@ int main(int argc, char* argv[]) {
         // Load and decrypt results
         // Comparing results
         Table sgx_encrypted = TableIO::load_csv(sgx_output);
-        Table sgx_result = decrypt_table(sgx_encrypted);
+        Table sgx_decrypted = decrypt_table(sgx_encrypted);
         
         Table sqlite_encrypted = TableIO::load_csv(sqlite_output);
         Table sqlite_result = decrypt_table(sqlite_encrypted);
         
         // Compare results
-        ComparisonResult comparison = compare_tables(sgx_result, sqlite_result);
+        ComparisonResult comparison = compare_tables(sgx_decrypted, sqlite_result);
         
         // Print minimal output
         printf("Output: SGX=%zu rows, SQLite=%zu rows\n", comparison.sgx_rows, comparison.sqlite_rows);
@@ -207,7 +361,47 @@ int main(int argc, char* argv[]) {
         printf("Match: %s\n", comparison.are_equivalent ? "YES" : "NO");
         
         // Performance comparison
-        printf("Time: SGX=%.6fs, SQLite=%.6fs\n", sgx_time, sqlite_time);
+        printf("Time: SGX=%.6fs, SQLite=%.6fs\n", sgx_result.wall_time, sqlite_time);
+        
+        // Print phase timings if available
+        if (sgx_result.phase_timings.valid) {
+            printf("Phase Timings:\n");
+            printf("  Bottom-Up: %.6fs\n", sgx_result.phase_timings.bottom_up);
+            printf("  Top-Down: %.6fs\n", sgx_result.phase_timings.top_down);
+            printf("  Distribute-Expand: %.6fs\n", sgx_result.phase_timings.distribute_expand);
+            printf("  Align-Concat: %.6fs\n", sgx_result.phase_timings.align_concat);
+            printf("  Total (phases): %.6fs\n", sgx_result.phase_timings.total);
+        }
+        
+        // Print phase ecalls if available
+        if (sgx_result.phase_ecalls.valid) {
+            printf("Phase Ecalls:\n");
+            printf("  Bottom-Up: %zu ecalls\n", sgx_result.phase_ecalls.bottom_up);
+            printf("  Top-Down: %zu ecalls\n", sgx_result.phase_ecalls.top_down);
+            printf("  Distribute-Expand: %zu ecalls\n", sgx_result.phase_ecalls.distribute_expand);
+            printf("  Align-Concat: %zu ecalls\n", sgx_result.phase_ecalls.align_concat);
+            printf("  Total: %zu ecalls\n", sgx_result.phase_ecalls.total);
+        }
+        
+        // Print phase sizes if available
+        if (sgx_result.phase_sizes.valid) {
+            printf("Phase Sizes (total rows in tree):\n");
+            printf("  Bottom-Up: %zu rows\n", sgx_result.phase_sizes.bottom_up);
+            printf("  Top-Down: %zu rows\n", sgx_result.phase_sizes.top_down);
+            printf("  Distribute-Expand: %zu rows\n", sgx_result.phase_sizes.distribute_expand);
+            printf("  Align-Concat (result): %zu rows\n", sgx_result.phase_sizes.align_concat);
+        }
+        
+        // Display sorting metrics if available
+        if (sgx_result.sort_metrics.valid) {
+            printf("Align-Concat Sorting Details:\n");
+            printf("  Total sorting: %.6fs (%zu ecalls)\n", 
+                   sgx_result.sort_metrics.total_time, sgx_result.sort_metrics.total_ecalls);
+            printf("    - Accumulator sorts: %.6fs (%zu ecalls)\n",
+                   sgx_result.sort_metrics.accumulator_time, sgx_result.sort_metrics.accumulator_ecalls);
+            printf("    - Child sorts: %.6fs (%zu ecalls)\n",
+                   sgx_result.sort_metrics.child_time, sgx_result.sort_metrics.child_ecalls);
+        }
         
         // Write summary to file
         // Extract base names from paths
@@ -283,8 +477,44 @@ int main(int argc, char* argv[]) {
             }
             
             summary_file << "\n=== Performance ===" << std::endl;
-            summary_file << "SGX Time: " << sgx_time << " seconds" << std::endl;
+            summary_file << "SGX Time: " << sgx_result.wall_time << " seconds" << std::endl;
             summary_file << "SQLite Time: " << sqlite_time << " seconds" << std::endl;
+            
+            if (sgx_result.phase_timings.valid) {
+                summary_file << "\n=== SGX Phase Timings ===" << std::endl;
+                summary_file << "Bottom-Up: " << sgx_result.phase_timings.bottom_up << " seconds" << std::endl;
+                summary_file << "Top-Down: " << sgx_result.phase_timings.top_down << " seconds" << std::endl;
+                summary_file << "Distribute-Expand: " << sgx_result.phase_timings.distribute_expand << " seconds" << std::endl;
+                summary_file << "Align-Concat: " << sgx_result.phase_timings.align_concat << " seconds" << std::endl;
+                summary_file << "Total (phases): " << sgx_result.phase_timings.total << " seconds" << std::endl;
+            }
+            
+            if (sgx_result.phase_ecalls.valid) {
+                summary_file << "\n=== SGX Phase Ecalls ===" << std::endl;
+                summary_file << "Bottom-Up: " << sgx_result.phase_ecalls.bottom_up << " ecalls" << std::endl;
+                summary_file << "Top-Down: " << sgx_result.phase_ecalls.top_down << " ecalls" << std::endl;
+                summary_file << "Distribute-Expand: " << sgx_result.phase_ecalls.distribute_expand << " ecalls" << std::endl;
+                summary_file << "Align-Concat: " << sgx_result.phase_ecalls.align_concat << " ecalls" << std::endl;
+                summary_file << "Total: " << sgx_result.phase_ecalls.total << " ecalls" << std::endl;
+            }
+            
+            if (sgx_result.phase_sizes.valid) {
+                summary_file << "\n=== SGX Phase Sizes ===" << std::endl;
+                summary_file << "Bottom-Up: " << sgx_result.phase_sizes.bottom_up << " rows in tree" << std::endl;
+                summary_file << "Top-Down: " << sgx_result.phase_sizes.top_down << " rows in tree" << std::endl;
+                summary_file << "Distribute-Expand: " << sgx_result.phase_sizes.distribute_expand << " rows in tree" << std::endl;
+                summary_file << "Align-Concat (result): " << sgx_result.phase_sizes.align_concat << " rows" << std::endl;
+            }
+            
+            if (sgx_result.sort_metrics.valid) {
+                summary_file << "\n=== Align-Concat Sorting Details ===" << std::endl;
+                summary_file << "Total sorting: " << sgx_result.sort_metrics.total_time << " seconds (" 
+                            << sgx_result.sort_metrics.total_ecalls << " ecalls)" << std::endl;
+                summary_file << "  - Accumulator sorts: " << sgx_result.sort_metrics.accumulator_time << " seconds (" 
+                            << sgx_result.sort_metrics.accumulator_ecalls << " ecalls)" << std::endl;
+                summary_file << "  - Child sorts: " << sgx_result.sort_metrics.child_time << " seconds (" 
+                            << sgx_result.sort_metrics.child_ecalls << " ecalls)" << std::endl;
+            }
             
             summary_file.close();
             // Summary written

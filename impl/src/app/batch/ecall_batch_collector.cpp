@@ -15,6 +15,8 @@ EcallBatchCollector::EcallBatchCollector(sgx_enclave_id_t enclave_id, OpEcall op
     // Reserve space to avoid frequent reallocations
     batch_data.reserve(max_batch_size);
     operations.reserve(max_batch_size);
+    entry_pointers.reserve(max_batch_size);  // Pre-reserve to avoid reallocations
+    entry_map.reserve(max_batch_size);       // Pre-reserve hash table buckets
     
     DEBUG_INFO("BatchCollector: Created for operation %d with max batch size %zu", 
                op_type, max_batch_size);

@@ -1,8 +1,24 @@
 #include "align_concat.h"
 #include "../data_structures/join_attribute_setter.h"
 #include <iostream>
+#include <chrono>
 #include "../../common/debug_util.h"
 #include "../Enclave_u.h"
+
+// External ecall counter functions
+extern "C" {
+    size_t get_ecall_count(void);
+    void reset_ecall_count(void);
+}
+
+// Global variables to track sorting metrics across all concatenations
+static double g_total_sort_time = 0.0;
+static size_t g_total_sort_ecalls = 0;
+static size_t g_sort_operations = 0;
+static double g_accumulator_sort_time = 0.0;
+static double g_child_sort_time = 0.0;
+static size_t g_accumulator_sort_ecalls = 0;
+static size_t g_child_sort_ecalls = 0;
 
 // Table debugging functions are declared in debug_util.h
 
@@ -73,7 +89,17 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     // Step 1: Sort accumulator by join attribute, then other attributes
     DEBUG_INFO("Step 1: Sorting accumulator by join attr, then others");
     Table sorted_accumulator = accumulator;
+    
+    // Track accumulator sort timing and ecalls
+    using Clock = std::chrono::high_resolution_clock;
+    auto sort_start = Clock::now();
+    size_t before_sort = get_ecall_count();
+    
     sorted_accumulator.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_THEN_OTHER);
+    
+    double acc_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
+    size_t acc_sort_ecalls = get_ecall_count() - before_sort;
+    DEBUG_INFO("Accumulator sort: %.6fs, %zu ecalls", acc_sort_time, acc_sort_ecalls);
     
     // Step 2: Compute copy indices for child table
     DEBUG_INFO("Step 2: Computing copy indices");
@@ -85,7 +111,25 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     
     // Step 4: Sort child by alignment key
     DEBUG_INFO("Step 4: Sorting child by alignment key");
+    
+    // Track child sort timing and ecalls
+    sort_start = Clock::now();
+    before_sort = get_ecall_count();
+    
     aligned_child.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_ALIGNMENT_KEY);
+    
+    double child_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
+    size_t child_sort_ecalls = get_ecall_count() - before_sort;
+    DEBUG_INFO("Child sort: %.6fs, %zu ecalls", child_sort_time, child_sort_ecalls);
+    
+    // Update global sorting metrics
+    g_accumulator_sort_time += acc_sort_time;
+    g_child_sort_time += child_sort_time;
+    g_accumulator_sort_ecalls += acc_sort_ecalls;
+    g_child_sort_ecalls += child_sort_ecalls;
+    g_total_sort_time += acc_sort_time + child_sort_time;
+    g_total_sort_ecalls += acc_sort_ecalls + child_sort_ecalls;
+    g_sort_operations += 2;
     
     // Step 5: Horizontal concatenation using parallel pass
     DEBUG_INFO("Step 5: Horizontal concatenation via parallel pass");
@@ -184,4 +228,25 @@ std::vector<JoinTreeNodePtr> AlignConcat::PreOrderTraversal(JoinTreeNodePtr root
     }
     
     return result;
+}
+
+void AlignConcat::GetSortingMetrics(double& total_time, size_t& total_ecalls,
+                                    double& acc_time, double& child_time,
+                                    size_t& acc_ecalls, size_t& child_ecalls) {
+    total_time = g_total_sort_time;
+    total_ecalls = g_total_sort_ecalls;
+    acc_time = g_accumulator_sort_time;
+    child_time = g_child_sort_time;
+    acc_ecalls = g_accumulator_sort_ecalls;
+    child_ecalls = g_child_sort_ecalls;
+}
+
+void AlignConcat::ResetSortingMetrics() {
+    g_total_sort_time = 0.0;
+    g_total_sort_ecalls = 0;
+    g_sort_operations = 0;
+    g_accumulator_sort_time = 0.0;
+    g_child_sort_time = 0.0;
+    g_accumulator_sort_ecalls = 0;
+    g_child_sort_ecalls = 0;
 }

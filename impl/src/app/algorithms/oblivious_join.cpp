@@ -6,7 +6,24 @@
 #include <iostream>
 #include <sstream>
 #include <functional>
+#include <chrono>
 #include "../../common/debug_util.h"
+
+// External ecall counter functions from Enclave_u.c
+extern "C" {
+    size_t get_ecall_count();
+    void reset_ecall_count();
+}
+
+// Helper function to calculate total size of all tables in tree
+static size_t GetTotalTreeSize(JoinTreeNodePtr node) {
+    if (!node) return 0;
+    size_t total = node->get_table().size();
+    for (const auto& child : node->get_children()) {
+        total += GetTotalTreeSize(child);
+    }
+    return total;
+}
 
 // Forward declaration for table debugging
 
@@ -19,29 +36,79 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     // Check initial encryption state
     AssertTreeConsistentEncryption(root);
     
+    // Timing and ecall counting variables
+    using Clock = std::chrono::high_resolution_clock;
+    auto start_time = Clock::now();
+    auto phase_start = Clock::now();
+    
+    // Reset ecall counter at start
+    reset_ecall_count();
+    size_t start_ecalls = get_ecall_count();
+    
     // Phase 1: Bottom-Up - Compute local multiplicities
     AssertTreeConsistentEncryption(root);
+    phase_start = Clock::now();
+    size_t before_phase = get_ecall_count();
     BottomUpPhase::Execute(root, eid);
+    auto bottom_up_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
+    size_t bottom_up_ecalls = get_ecall_count() - before_phase;
+    size_t bottom_up_size = GetTotalTreeSize(root);
     AssertTreeConsistentEncryption(root);
     
     // Phase 2: Top-Down - Compute final multiplicities
     AssertTreeConsistentEncryption(root);
+    phase_start = Clock::now();
+    before_phase = get_ecall_count();
     TopDownPhase::Execute(root, eid);
+    auto top_down_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
+    size_t top_down_ecalls = get_ecall_count() - before_phase;
+    size_t top_down_size = GetTotalTreeSize(root);
     AssertTreeConsistentEncryption(root);
     
     // Phase 3: Distribute-Expand - Replicate tuples
     AssertTreeConsistentEncryption(root);
+    phase_start = Clock::now();
+    before_phase = get_ecall_count();
     DistributeExpand::Execute(root, eid);
+    auto distribute_expand_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
+    size_t distribute_expand_ecalls = get_ecall_count() - before_phase;
+    size_t distribute_expand_size = GetTotalTreeSize(root);
     AssertTreeConsistentEncryption(root);
     
     // Phase 4: Align-Concat - Construct result
     AssertTreeConsistentEncryption(root);
+    AlignConcat::ResetSortingMetrics();  // Reset metrics before execution
+    phase_start = Clock::now();
+    before_phase = get_ecall_count();
     Table result = AlignConcat::Execute(root, eid);
+    auto align_concat_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
+    size_t align_concat_ecalls = get_ecall_count() - before_phase;
+    size_t align_concat_size = result.size();  // Final result size
     
     // Check final result encryption state
     AssertConsistentEncryption(result);
     
+    // Calculate total time and ecalls
+    auto total_time = std::chrono::duration<double>(Clock::now() - start_time).count();
+    size_t total_ecalls = get_ecall_count() - start_ecalls;
+    
+    // Get sorting metrics from align-concat
+    double sort_time, acc_sort_time, child_sort_time;
+    size_t sort_ecalls, acc_ecalls, child_ecalls;
+    AlignConcat::GetSortingMetrics(sort_time, sort_ecalls,
+                                   acc_sort_time, child_sort_time,
+                                   acc_ecalls, child_ecalls);
+    
+    // Output timing information
     printf("Result: %zu rows\n", result.size());
+    printf("PHASE_TIMING: Bottom-Up=%.6f Top-Down=%.6f Distribute-Expand=%.6f Align-Concat=%.6f Total=%.6f\n",
+           bottom_up_time, top_down_time, distribute_expand_time, align_concat_time, total_time);
+    printf("PHASE_ECALLS: Bottom-Up=%zu Top-Down=%zu Distribute-Expand=%zu Align-Concat=%zu Total=%zu\n",
+           bottom_up_ecalls, top_down_ecalls, distribute_expand_ecalls, align_concat_ecalls, total_ecalls);
+    printf("PHASE_SIZES: Bottom-Up=%zu Top-Down=%zu Distribute-Expand=%zu Align-Concat=%zu\n",
+           bottom_up_size, top_down_size, distribute_expand_size, align_concat_size);
+    printf("ALIGN_CONCAT_SORTS: Total=%.6fs (%zu ecalls), Accumulator=%.6fs (%zu ecalls), Child=%.6fs (%zu ecalls)\n",
+           sort_time, sort_ecalls, acc_sort_time, acc_ecalls, child_sort_time, child_ecalls);
     
     return result;
 }

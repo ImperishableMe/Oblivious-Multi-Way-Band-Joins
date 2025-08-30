@@ -164,6 +164,14 @@ public:
      */
     void batched_distribute_pass(sgx_enclave_id_t eid, size_t distance, OpEcall op_type, int32_t* params = nullptr);
     
+    /**
+     * AddBatchedPadding: Add multiple padding entries using batched ecalls
+     * @param count Number of padding entries to add
+     * @param eid SGX enclave ID
+     * @param encryption_status Encryption status to match table
+     */
+    void add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encryption_status);
+    
 private:
     // Helper methods for oblivious operations
     static void check_sgx_status(sgx_status_t status, const std::string& operation);

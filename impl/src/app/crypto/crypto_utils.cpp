@@ -1,6 +1,6 @@
 #include "crypto_utils.h"
 #include "../data_structures/entry.h"
-#include "../Enclave_u.h"
+#include "../counted_ecalls.h"  // Use counted ecalls instead of direct Enclave_u.h
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -17,10 +17,10 @@ crypto_status_t CryptoUtils::encrypt_entry(Entry& entry, sgx_enclave_id_t eid) {
     
     // Call SGX ecall (uses secure key inside enclave)
     crypto_status_t status;
-    sgx_status_t sgx_status = ecall_encrypt_entry(eid, &status, &c_entry);
+    sgx_status_t sgx_status = counted_ecall_encrypt_entry(eid, &status, &c_entry);
     
     if (sgx_status != SGX_SUCCESS) {
-        std::cerr << "SGX ecall_encrypt_entry failed with status: " << sgx_status << std::endl;
+        std::cerr << "SGX counted_ecall_encrypt_entry failed with status: " << sgx_status << std::endl;
         return CRYPTO_INVALID_PARAM;
     }
     
@@ -46,10 +46,10 @@ crypto_status_t CryptoUtils::decrypt_entry(Entry& entry, sgx_enclave_id_t eid) {
     
     // Call SGX ecall (uses secure key inside enclave)
     crypto_status_t status;
-    sgx_status_t sgx_status = ecall_decrypt_entry(eid, &status, &c_entry);
+    sgx_status_t sgx_status = counted_ecall_decrypt_entry(eid, &status, &c_entry);
     
     if (sgx_status != SGX_SUCCESS) {
-        std::cerr << "SGX ecall_decrypt_entry failed with status: " << sgx_status << std::endl;
+        std::cerr << "SGX counted_ecall_decrypt_entry failed with status: " << sgx_status << std::endl;
         return CRYPTO_INVALID_PARAM;
     }
     

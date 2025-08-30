@@ -3,13 +3,7 @@
 #include <iostream>
 #include <chrono>
 #include "../../common/debug_util.h"
-#include "../Enclave_u.h"
-
-// External ecall counter functions
-extern "C" {
-    size_t get_ecall_count(void);
-    void reset_ecall_count(void);
-}
+#include "../counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
 
 // Global variables to track sorting metrics across all concatenations
 static double g_total_sort_time = 0.0;

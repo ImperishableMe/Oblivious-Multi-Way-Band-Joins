@@ -1,5 +1,5 @@
 #include "ecall_batch_collector.h"
-#include "../Enclave_u.h"
+#include "../counted_ecalls.h"  // Use counted ecalls instead of direct Enclave_u.h
 #include "../../common/debug_util.h"
 #include <stdexcept>
 #include <sstream>
@@ -164,8 +164,8 @@ void EcallBatchCollector::flush() {
         stats.max_batch_size_reached = operations.size();
     }
     
-    // Call the batch dispatcher ecall
-    sgx_status_t status = ecall_batch_dispatcher(
+    // Call the batch dispatcher ecall (counted version)
+    sgx_status_t status = counted_ecall_batch_dispatcher(
         eid,
         batch_data.data(),
         batch_data.size(),

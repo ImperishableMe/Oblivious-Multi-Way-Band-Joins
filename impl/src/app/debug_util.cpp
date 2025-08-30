@@ -258,8 +258,8 @@ void debug_dump_table(const Table& table, const char* label, const char* step_na
         
         // Add data columns if requested
         if (include_attributes && table.size() > 0) {
-            const Entry& first = table[0];
-            for (const auto& col_name : first.column_names) {
+            const Entry& first_entry = table[0];
+            for (const auto& col_name : first_entry.column_names) {
                 file << "," << col_name;
             }
         }
@@ -270,10 +270,10 @@ void debug_dump_table(const Table& table, const char* label, const char* step_na
             Entry entry = decrypt_entry_for_debug(table[i], eid);
             
             // Write requested columns
-            bool first = true;
+            bool first_col = true;
             for (const auto& col : columns) {
-                if (!first) file << ",";
-                first = false;
+                if (!first_col) file << ",";
+                first_col = false;
                 switch (col) {
                     case META_INDEX: file << i; break;
                     case META_ORIG_IDX: file << entry.original_index; break;

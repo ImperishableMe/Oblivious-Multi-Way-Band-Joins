@@ -97,6 +97,81 @@ size_t Table::get_num_columns() const {
     return num_columns;
 }
 
+// Schema management methods for slim mode migration
+void Table::set_schema(const std::vector<std::string>& columns) {
+    schema_column_names = columns;
+    // Also update num_columns to match
+    if (num_columns == 0 || num_columns != columns.size()) {
+        num_columns = columns.size();
+    }
+}
+
+std::vector<std::string> Table::get_schema() const {
+    return schema_column_names;
+}
+
+size_t Table::get_column_index(const std::string& col_name) const {
+    for (size_t i = 0; i < schema_column_names.size(); i++) {
+        if (schema_column_names[i] == col_name) {
+            return i;
+        }
+    }
+    // If not found in schema, fall back to checking first entry (backward compatibility)
+    if (!entries.empty()) {
+        const Entry& first = entries[0];
+        for (size_t i = 0; i < first.column_names.size(); i++) {
+            if (first.column_names[i] == col_name) {
+                return i;
+            }
+        }
+    }
+    throw std::runtime_error("Column not found: " + col_name);
+}
+
+bool Table::has_column(const std::string& col_name) const {
+    // Check schema first
+    for (const auto& name : schema_column_names) {
+        if (name == col_name) {
+            return true;
+        }
+    }
+    // Fall back to checking first entry (backward compatibility)
+    if (!entries.empty()) {
+        const Entry& first = entries[0];
+        for (const auto& name : first.column_names) {
+            if (name == col_name) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+int32_t Table::get_attribute(size_t row, const std::string& col_name) const {
+    if (row >= entries.size()) {
+        throw std::out_of_range("Row index out of bounds");
+    }
+    size_t col_index = get_column_index(col_name);
+    const Entry& entry = entries[row];
+    if (col_index >= entry.attributes.size()) {
+        throw std::out_of_range("Column index out of bounds");
+    }
+    return entry.attributes[col_index];
+}
+
+void Table::set_attribute(size_t row, const std::string& col_name, int32_t value) {
+    if (row >= entries.size()) {
+        throw std::out_of_range("Row index out of bounds");
+    }
+    size_t col_index = get_column_index(col_name);
+    Entry& entry = entries[row];
+    if (col_index >= entry.attributes.size()) {
+        // Expand attributes if needed
+        entry.attributes.resize(col_index + 1, NULL_VALUE);
+    }
+    entry.attributes[col_index] = value;
+}
+
 std::vector<Entry>::iterator Table::begin() {
     return entries.begin();
 }

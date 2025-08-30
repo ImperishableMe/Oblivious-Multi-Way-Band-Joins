@@ -2,7 +2,7 @@
 #include "../data_structures/join_attribute_setter.h"
 #include <iostream>
 #include "../../common/debug_util.h"
-#include "../Enclave_u.h"
+#include "../counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
 #include "../../enclave/enclave_types.h"  // For METADATA_* constants
 
 // Forward declarations for selective debug dumping
@@ -75,7 +75,7 @@ void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node, sgx_enclave_id_t e
     if (table.size() > 0) {
         // Set first entry's index to 0
         entry_t first = table[0].to_entry_t();
-        ecall_transform_set_index(eid, &first, 0);
+        counted_ecall_transform_set_index(eid, &first, 0);
         table[0].from_entry_t(first);
         
         // Use batched window function to set consecutive indices

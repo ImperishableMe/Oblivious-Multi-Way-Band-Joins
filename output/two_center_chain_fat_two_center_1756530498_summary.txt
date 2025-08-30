@@ -1,6 +1,6 @@
 === Test Summary ===
 Query File: two_center_chain.sql
-Dataset: encrypted
+Dataset: fat_two_center_1756530498
 
 === Input Table Sizes ===
 center1: 2 rows
@@ -23,22 +23,22 @@ SQLite Output Size: 16 rows
 Match: YES
 
 === Performance ===
-SGX Time: 0.391482 seconds
-SQLite Time: 0.350561 seconds
+SGX Time: 0.383804 seconds
+SQLite Time: 0.354748 seconds
 
 === SGX Phase Timings ===
-Bottom-Up: 0.006762 seconds
-Top-Down: 0.006339 seconds
-Distribute-Expand: 0.006223 seconds
-Align-Concat: 0.014147 seconds
-Total (phases): 0.033477 seconds
+Bottom-Up: 0.006574 seconds
+Top-Down: 0.006221 seconds
+Distribute-Expand: 0.006273 seconds
+Align-Concat: 0.014207 seconds
+Total (phases): 0.033282 seconds
 
 === SGX Phase Ecalls ===
-Bottom-Up: 159 ecalls
-Top-Down: 136 ecalls
-Distribute-Expand: 78 ecalls
-Align-Concat: 130 ecalls
-Total: 503 ecalls
+Bottom-Up: 0 ecalls
+Top-Down: 0 ecalls
+Distribute-Expand: 0 ecalls
+Align-Concat: 0 ecalls
+Total: 0 ecalls
 
 === SGX Phase Sizes ===
 Bottom-Up: 12 rows in tree
@@ -47,6 +47,6 @@ Distribute-Expand: 96 rows in tree
 Align-Concat (result): 16 rows
 
 === Align-Concat Sorting Details ===
-Total sorting: 0.012564 seconds (100 ecalls)
-  - Accumulator sorts: 0.006362 seconds (50 ecalls)
-  - Child sorts: 0.006202 seconds (50 ecalls)
+Total sorting: 0.012632 seconds (0 ecalls)
+  - Accumulator sorts: 0.006363 seconds (0 ecalls)
+  - Child sorts: 0.006269 seconds (0 ecalls)

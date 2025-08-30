@@ -80,6 +80,7 @@ App_Cpp_Files := app/main.cpp \
                  app/algorithms/align_concat.cpp \
                  app/algorithms/oblivious_join.cpp \
                  app/batch/ecall_batch_collector.cpp \
+                 app/ecall_wrapper.cpp \
                  app/debug_util.cpp \
                  app/debug_manager.cpp
 App_Include_Paths := -I$(SGX_SDK)/include -Iapp -Ienclave -Icommon
@@ -245,7 +246,7 @@ $(App_Name): $(App_Objects)
 Encrypt_Tool_Objects := app/tools/encrypt_tables.o app/io/table_io.o app/data_structures/join_constraint.o \
                        app/io/converters.o app/crypto/crypto_utils.o app/data_structures/entry.o \
                        app/data_structures/table.o app/data_structures/join_condition.o app/debug_util.o \
-                       app/batch/ecall_batch_collector.o $(Gen_Untrusted_Object)
+                       app/batch/ecall_batch_collector.o app/ecall_wrapper.o $(Gen_Untrusted_Object)
 
 app/tools/encrypt_tables.o: app/tools/encrypt_tables.cpp $(Gen_Untrusted_Source)
 	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -std=c++17 -c $< -o $@

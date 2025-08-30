@@ -19,6 +19,7 @@ private:
     std::vector<Entry> entries;
     std::string table_name;
     size_t num_columns;
+    std::vector<std::string> schema_column_names;  // NEW: Table's schema for slim mode
     
 public:
     // Constructors
@@ -49,6 +50,16 @@ public:
     std::string get_table_name() const;
     void set_num_columns(size_t n);
     size_t get_num_columns() const;
+    
+    // Schema management (for slim mode migration)
+    void set_schema(const std::vector<std::string>& columns);
+    std::vector<std::string> get_schema() const;
+    size_t get_column_index(const std::string& col_name) const;
+    bool has_column(const std::string& col_name) const;
+    
+    // Named attribute access using schema
+    int32_t get_attribute(size_t row, const std::string& col_name) const;
+    void set_attribute(size_t row, const std::string& col_name, int32_t value);
     
     // Iterator support
     std::vector<Entry>::iterator begin();

@@ -2,7 +2,7 @@
 #include "../data_structures/join_attribute_setter.h"
 #include <iostream>
 #include "../../common/debug_util.h"
-#include "../Enclave_u.h"
+#include "../counted_ecalls.h"  // Use counted ecalls
 
 // Forward declarations for selective debug dumping
 void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 

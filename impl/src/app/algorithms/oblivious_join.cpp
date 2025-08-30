@@ -9,11 +9,8 @@
 #include <chrono>
 #include "../../common/debug_util.h"
 
-// External ecall counter functions from Enclave_u.c
-extern "C" {
-    size_t get_ecall_count();
-    void reset_ecall_count();
-}
+// Include counted ecalls (includes Enclave_u.h and ecall_wrapper.h)
+#include "../counted_ecalls.h"
 
 // Helper function to calculate total size of all tables in tree
 static size_t GetTotalTreeSize(JoinTreeNodePtr node) {

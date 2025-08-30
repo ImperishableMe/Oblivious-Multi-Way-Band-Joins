@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstring>
 #include "../../common/debug_util.h"
-#include "../Enclave_u.h"
+#include "../counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
 
 // Forward declarations for selective debug dumping  
 void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
@@ -192,7 +192,7 @@ size_t DistributeExpand::ComputeOutputSize(const Table& table, sgx_enclave_id_t 
     entry_t last_entry = table[table.size() - 1].to_entry_t();
     int32_t output_size = 0;
     
-    sgx_status_t status = ecall_obtain_output_size(eid, &output_size, &last_entry);
+    sgx_status_t status = counted_ecall_obtain_output_size(eid, &output_size, &last_entry);
     if (status != SGX_SUCCESS) {
         DEBUG_ERROR("Failed to obtain output size: %d", status);
         return 0;

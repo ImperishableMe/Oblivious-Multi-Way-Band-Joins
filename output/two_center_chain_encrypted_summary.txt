@@ -23,5 +23,5 @@ SQLite Output Size: 16 rows
 Match: YES
 
 === Performance ===
-SGX Time: 0.389942 seconds
-SQLite Time: 0.333972 seconds
+SGX Time: 0.383331 seconds
+SQLite Time: 0.3468 seconds

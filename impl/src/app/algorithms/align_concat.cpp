@@ -153,10 +153,7 @@ Table AlignConcat::ComputeCopyIndices(const Table& table, sgx_enclave_id_t eid) 
     // Linear pass to compute copy indices
     // Same original_index -> increment
     // Different original_index -> reset to 0
-    result.linear_pass(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_window_update_copy_index(eid, e1, e2);
-        });
+    result.batched_linear_pass(eid, OP_ECALL_WINDOW_UPDATE_COPY_INDEX);
     
     DEBUG_DEBUG("Copy indices computed");
     

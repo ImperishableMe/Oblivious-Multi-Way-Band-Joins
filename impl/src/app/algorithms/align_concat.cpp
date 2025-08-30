@@ -164,10 +164,7 @@ Table AlignConcat::ComputeAlignmentKeys(const Table& table, sgx_enclave_id_t eid
     DEBUG_DEBUG("Computing alignment keys for %zu entries", table.size());
     
     // Apply transformation to compute alignment_key = foreign_sum + (copy_index / local_mult)
-    Table result = table.map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_compute_alignment_key(eid, e);
-        });
+    Table result = table.batched_map(eid, OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY);
     
     DEBUG_DEBUG("Alignment keys computed");
     

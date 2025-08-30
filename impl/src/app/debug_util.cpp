@@ -258,8 +258,14 @@ void debug_dump_table(const Table& table, const char* label, const char* step_na
         
         // Add data columns if requested
         if (include_attributes && table.size() > 0) {
-            const Entry& first_entry = table[0];
-            for (const auto& col_name : first_entry.column_names) {
+            // Prefer Table schema, fallback to Entry column_names
+            std::vector<std::string> column_headers = table.get_schema();
+            if (column_headers.empty()) {
+                // Fallback to first entry's column names for backward compatibility
+                const Entry& first_entry = table[0];
+                column_headers = first_entry.column_names;
+            }
+            for (const auto& col_name : column_headers) {
                 file << "," << col_name;
             }
         }
@@ -445,13 +451,25 @@ void debug_dump_selected_columns(const Table& table, const char* label, const ch
                 } else {
                     // Check if it's a data column by name
                     bool found = false;
-                    for (size_t j = 0; j < entry.column_names.size(); j++) {
-                        if (entry.column_names[j] == col) {
-                            file << "," << entry.attributes[j];
+                    
+                    // Try to find column using Table schema first
+                    try {
+                        size_t col_idx = table.get_column_index(col);
+                        if (col_idx < entry.attributes.size()) {
+                            file << "," << entry.attributes[col_idx];
                             found = true;
-                            break;
+                        }
+                    } catch (const std::runtime_error& e) {
+                        // Fallback to Entry column_names for backward compatibility
+                        for (size_t j = 0; j < entry.column_names.size(); j++) {
+                            if (entry.column_names[j] == col) {
+                                file << "," << entry.attributes[j];
+                                found = true;
+                                break;
+                            }
                         }
                     }
+                    
                     if (!found) {
                         file << ",N/A";
                     }

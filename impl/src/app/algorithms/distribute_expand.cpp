@@ -97,10 +97,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     // Step 4: Mark entries with final_mult = 0 as DIST_PADDING
     DEBUG_INFO("Step 4 - Marking entries with final_mult=0 as padding");
-    working = working.map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_mark_zero_mult_padding(eid, e);
-        });
+    working = working.batched_map(eid, OP_ECALL_TRANSFORM_MARK_ZERO_MULT_PADDING);
     DEBUG_INFO("Step 4 complete, table size=%zu", working.size());
     
     // Debug: Show which entries are marked as padding
@@ -111,10 +108,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     // Step 5: Sort to move DIST_PADDING entries to the end
     DEBUG_INFO("Step 5 - Sorting (size=%zu)", working.size());
-    working.oblivious_sort(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_comparator_padding_last(eid, e1, e2);
-        });
+    working.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_PADDING_LAST);
     DEBUG_INFO("Step 5 complete, table size after sort=%zu", working.size());
     
     // Step 5b: Truncate table to remove excess DIST_PADDING entries
@@ -149,15 +143,9 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     // Step 7: Initialize index field (0 to output_size-1)
     DEBUG_INFO("Step 7 - Initializing index field");
-    working = working.map(eid,
-        [](sgx_enclave_id_t eid, entry_t* e) {
-            return ecall_transform_init_index(eid, e);
-        });
+    working = working.batched_map(eid, OP_ECALL_TRANSFORM_INIT_INDEX);
     
-    working.linear_pass(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_window_increment_index(eid, e1, e2);
-        });
+    working.batched_linear_pass(eid, OP_ECALL_WINDOW_INCREMENT_INDEX);
     DEBUG_INFO("Step 7 complete, table size=%zu", working.size());
     
     // Step 7b: Debug dump before distribution - shows initial state with non-padding at top
@@ -237,11 +225,8 @@ void DistributeExpand::DistributePhase(Table& table, size_t output_size, sgx_enc
     while (distance >= 1) {
         DEBUG_DEBUG("Distribution pass with distance %zu", distance);
         
-        // Use a special function that operates on pairs at given distance
-        table.distribute_pass(eid, distance,
-            [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2, size_t dist) {
-                ecall_comparator_distribute(eid, e1, e2);
-            });
+        // Use batched version for better performance
+        table.batched_distribute_pass(eid, distance, OP_ECALL_COMPARATOR_DISTRIBUTE);
         
         distance >>= 1;  // Halve the distance
     }
@@ -253,10 +238,7 @@ void DistributeExpand::ExpansionPhase(Table& table, sgx_enclave_id_t eid) {
     DEBUG_INFO("Starting expansion phase");
     
     // Linear pass to copy non-empty entries to fill DIST_PADDING slots
-    table.linear_pass(eid,
-        [](sgx_enclave_id_t eid, entry_t* e1, entry_t* e2) {
-            return ecall_window_expand_copy(eid, e1, e2);
-        });
+    table.batched_linear_pass(eid, OP_ECALL_WINDOW_EXPAND_COPY);
     
     DEBUG_INFO("Expansion phase completed");
 }

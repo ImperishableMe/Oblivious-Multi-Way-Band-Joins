@@ -348,6 +348,29 @@ void Table::distribute_pass(sgx_enclave_id_t eid, size_t distance,
     }
 }
 
+void Table::batched_distribute_pass(sgx_enclave_id_t eid, size_t distance, OpEcall op_type, int32_t* params) {
+    DEBUG_TRACE("Table::batched_distribute_pass: Starting with distance %zu, op_type=%d", distance, op_type);
+    
+    // Create batch collector
+    EcallBatchCollector collector(eid, op_type);
+    
+    // Add all pairs at given distance
+    // Process from right to left (same as non-batched version)
+    for (size_t i = entries.size() - distance; i > 0; i--) {
+        collector.add_operation(entries[i - 1], entries[i - 1 + distance], params);
+    }
+    
+    // Handle i = 0 case separately to avoid underflow
+    if (distance < entries.size()) {
+        collector.add_operation(entries[0], entries[distance], params);
+    }
+    
+    // Flush the batch - this writes back to entries
+    collector.flush();
+    
+    DEBUG_TRACE("Table::batched_distribute_pass: Complete");
+}
+
 Table Table::oblivious_expand(sgx_enclave_id_t eid) const {
     // Calculate total size after expansion
     size_t total_size = 0;

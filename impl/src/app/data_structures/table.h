@@ -155,6 +155,15 @@ public:
      */
     void batched_oblivious_sort(sgx_enclave_id_t eid, OpEcall op_type);
     
+    /**
+     * BatchedDistributePass: Batched version of distribute_pass
+     * @param eid SGX enclave ID
+     * @param distance Distance between pairs to process
+     * @param op_type Operation type for batch dispatcher
+     * @param params Optional parameters for operations (can be nullptr)
+     */
+    void batched_distribute_pass(sgx_enclave_id_t eid, size_t distance, OpEcall op_type, int32_t* params = nullptr);
+    
 private:
     // Helper methods for oblivious operations
     static void check_sgx_status(sgx_status_t status, const std::string& operation);

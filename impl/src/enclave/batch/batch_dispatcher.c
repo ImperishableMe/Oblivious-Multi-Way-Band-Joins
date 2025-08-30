@@ -275,6 +275,20 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
             break;
             
         // ============================================================================
+        // Concat Operations (two parameters)
+        // ============================================================================
+        
+        case OP_ECALL_CONCAT_ATTRIBUTES:
+            for (size_t i = 0; i < ops_count; i++) {
+                if (ops_array[i].idx2 != BATCH_NO_PARAM) {
+                    // Concatenate attributes from right to left
+                    concat_attributes_op(&data_array[ops_array[i].idx1],
+                                        &data_array[ops_array[i].idx2]);
+                }
+            }
+            break;
+            
+        // ============================================================================
         // Transform Operations (single parameter)
         // ============================================================================
         

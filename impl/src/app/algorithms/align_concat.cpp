@@ -125,11 +125,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     }
     
     // Use parallel_pass to concatenate attributes from aligned_child
-    result.parallel_pass(aligned_child, eid,
-        [](sgx_enclave_id_t eid, entry_t* left, entry_t* right) {
-            // This ecall will concatenate attributes from right into left
-            return ecall_concat_attributes(eid, left, right);
-        });
+    result.batched_parallel_pass(aligned_child, eid, OP_ECALL_CONCAT_ATTRIBUTES);
     
     // Debug: Dump final result - show concatenated attributes WITH ALL COLUMNS
     debug_dump_table(result, ("final_result_" + concat_label).c_str(), 

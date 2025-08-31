@@ -66,12 +66,8 @@ public:
     void clear();
     // NOTE: Use CryptoUtils::encrypt_entry() and CryptoUtils::decrypt_entry() for actual encryption/decryption
     
-    // Attribute access by column name
-    int32_t get_attribute(const std::string& column_name) const;
-    bool has_attribute(const std::string& column_name) const;
-    void set_attribute(const std::string& column_name, int32_t value);
-    void add_attribute(const std::string& column_name, int32_t value);
-    std::map<std::string, int32_t> get_attributes_map() const;
+    // Note: Attribute access by column name has been moved to Table class
+    // Use Table::get_attribute(row, column_name) instead
     
     // Comparison operators for sorting
     bool operator<(const Entry& other) const;

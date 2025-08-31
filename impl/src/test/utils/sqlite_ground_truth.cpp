@@ -122,9 +122,14 @@ void SQLiteGroundTruth::insert_table_data(const std::string& table_name, const T
             fields[schema_cols[i]] = first.attributes[i];
         }
     } else {
-        // Fallback to Entry's get_attributes_map
+        // Build attributes map using available data
+        // Since we don't have schema, just use indexed access
         Entry first = table[0];
-        fields = first.get_attributes_map();
+        for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+            if (!first.column_names[i].empty()) {
+                fields[first.column_names[i]] = first.attributes[i];
+            }
+        }
     }
     
     // Build column list

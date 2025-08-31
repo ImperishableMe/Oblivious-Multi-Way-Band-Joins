@@ -135,57 +135,9 @@ void Entry::clear() {
     *this = Entry();  // Reset to default values
 }
 
-int32_t Entry::get_attribute(const std::string& column_name) const {
-    // Find the column index - check all MAX_ATTRIBUTES
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (!column_names[i].empty() && column_names[i] == column_name) {
-            return attributes[i];
-        }
-    }
-    return 0;  // Return 0 if column not found
-}
-
-bool Entry::has_attribute(const std::string& column_name) const {
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (!column_names[i].empty() && column_names[i] == column_name) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void Entry::set_attribute(const std::string& column_name, int32_t value) {
-    // Find the column index
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (!column_names[i].empty() && column_names[i] == column_name) {
-            attributes[i] = value;
-            return;
-        }
-    }
-    // If column not found, add it
-    add_attribute(column_name, value);
-}
-
-void Entry::add_attribute(const std::string& column_name, int32_t value) {
-    // Find first empty slot
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (column_names[i].empty()) {
-            column_names[i] = column_name;
-            attributes[i] = value;
-            return;
-        }
-    }
-}
-
-std::map<std::string, int32_t> Entry::get_attributes_map() const {
-    std::map<std::string, int32_t> result;
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (!column_names[i].empty()) {
-            result[column_names[i]] = attributes[i];
-        }
-    }
-    return result;
-}
+// Note: Attribute access methods by column name have been removed
+// Use Table::get_attribute(row, column_name) for name-based access
+// This simplifies Entry and moves schema management to Table level only
 
 bool Entry::operator<(const Entry& other) const {
     return join_attr < other.join_attr;

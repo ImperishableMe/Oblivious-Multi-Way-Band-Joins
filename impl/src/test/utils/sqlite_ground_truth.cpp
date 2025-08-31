@@ -56,9 +56,21 @@ std::string SQLiteGroundTruth::create_table_schema(const std::string& table_name
         throw std::runtime_error("Cannot create schema from empty table");
     }
     
-    // Get column names from first entry
-    Entry first = table[0];
-    auto fields = first.get_attributes_map();
+    // Get column names - prefer Table schema, fallback to Entry
+    std::vector<std::string> column_names = table.get_schema();
+    std::map<std::string, int32_t> fields;
+    
+    if (!column_names.empty()) {
+        // Use Table schema - create map with dummy values
+        Entry first = table[0];
+        for (size_t i = 0; i < column_names.size() && i < first.attributes.size(); i++) {
+            fields[column_names[i]] = first.attributes[i];
+        }
+    } else {
+        // Fallback to Entry's get_attributes_map
+        Entry first = table[0];
+        fields = first.get_attributes_map();
+    }
     
     std::stringstream sql;
     sql << "CREATE TABLE " << table_name << " (";
@@ -100,9 +112,21 @@ void SQLiteGroundTruth::load_table(const std::string& name, const Table& table) 
 void SQLiteGroundTruth::insert_table_data(const std::string& table_name, const Table& table) {
     if (table.size() == 0) return;
     
-    // Get column names from first entry
-    Entry first = table[0];
-    auto fields = first.get_attributes_map();
+    // Get column names - prefer Table schema, fallback to Entry
+    std::vector<std::string> schema_cols = table.get_schema();
+    std::map<std::string, int32_t> fields;
+    
+    if (!schema_cols.empty()) {
+        // Use Table schema - create map with dummy values
+        Entry first = table[0];
+        for (size_t i = 0; i < schema_cols.size() && i < first.attributes.size(); i++) {
+            fields[schema_cols[i]] = first.attributes[i];
+        }
+    } else {
+        // Fallback to Entry's get_attributes_map
+        Entry first = table[0];
+        fields = first.get_attributes_map();
+    }
     
     // Build column list
     std::vector<std::string> col_names;
@@ -122,7 +146,6 @@ void SQLiteGroundTruth::insert_table_data(const std::string& table_name, const T
     // Insert each row
     for (size_t i = 0; i < table.size(); i++) {
         Entry entry = table[i];
-        auto entry_fields = entry.get_attributes_map();
         
         std::stringstream sql;
         sql << "INSERT INTO " << table_name << " (";
@@ -135,12 +158,10 @@ void SQLiteGroundTruth::insert_table_data(const std::string& table_name, const T
         
         sql << ") VALUES (";
         
-        // Values
-        bool first_val = true;
-        for (const auto& [col_name, value] : entry_fields) {
-            if (!first_val) sql << ", ";
-            first_val = false;
-            sql << static_cast<int>(value);
+        // Values - use indices directly
+        for (size_t j = 0; j < col_names.size() && j < entry.attributes.size(); j++) {
+            if (j > 0) sql << ", ";
+            sql << static_cast<int>(entry.attributes[j]);
         }
         
         sql << ")";

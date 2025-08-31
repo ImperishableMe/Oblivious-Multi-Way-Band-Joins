@@ -7,6 +7,7 @@
 #include <sqlite3.h>
 #include "../../app/data_structures/types.h"
 #include "../../app/io/table_io.h"
+#include "../../app/io/io_entry.h"  // Use IO_Entry for dynamic data
 #include "../../app/crypto/crypto_utils.h"
 #include "sgx_urts.h"
 #include "../../common/debug_util.h"
@@ -96,10 +97,12 @@ void create_sqlite_table(sqlite3* db, const std::string& table_name, const Table
     
     // Insert data
     for (const auto& entry : table) {
+        // Convert Entry to IO_Entry for easier attribute access
+        IO_Entry io_entry(entry);
         std::string insert_sql = "INSERT INTO " + table_name + " VALUES (";
-        for (size_t i = 0; i < entry.attributes.size(); i++) {
+        for (size_t i = 0; i < io_entry.attributes.size(); i++) {
             if (i > 0) insert_sql += ", ";
-            insert_sql += std::to_string(entry.attributes[i]);
+            insert_sql += std::to_string(io_entry.attributes[i]);
         }
         insert_sql += ")";
         
@@ -132,14 +135,15 @@ static int query_callback(void* data, int argc, char** argv, char** col_names) {
         result->first_row = false;
     }
     
-    // Create entry for this row
-    Entry entry;
-    entry.column_names = result->column_names;
+    // Create IO_Entry for this row (dynamic size)
+    IO_Entry io_entry;
+    io_entry.column_names = result->column_names;
     for (int i = 0; i < argc; i++) {
-        entry.attributes.push_back(argv[i] ? std::stoi(argv[i]) : 0);
+        io_entry.attributes.push_back(argv[i] ? std::stoi(argv[i]) : 0);
     }
     
-    result->table.add_entry(entry);
+    // Convert to fixed-size Entry and add to table
+    result->table.add_entry(io_entry.to_entry());
     return 0;
 }
 

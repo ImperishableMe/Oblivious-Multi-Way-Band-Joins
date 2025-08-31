@@ -444,8 +444,11 @@ void debug_dump_selected_columns(const Table& table, const char* label, const ch
                     file << "," << entry.foreign_sum;
                 } else if (col == "ALL_ATTRIBUTES") {
                     // Special keyword to dump all attribute values
-                    for (size_t j = 0; j < entry.attributes.size(); j++) {
-                        file << ",attr" << j << "=" << entry.attributes[j];
+                    // Dump all non-empty attributes
+                    for (int j = 0; j < MAX_ATTRIBUTES; j++) {
+                        if (!entry.column_names[j].empty()) {
+                            file << ",attr" << j << "=" << entry.attributes[j];
+                        }
                     }
                 } else {
                     // Check if it's a data column by name
@@ -454,7 +457,7 @@ void debug_dump_selected_columns(const Table& table, const char* label, const ch
                     // Try to find column using Table schema first
                     try {
                         size_t col_idx = table.get_column_index(col);
-                        if (col_idx < entry.attributes.size()) {
+                        if (col_idx < MAX_ATTRIBUTES) {
                             file << "," << entry.attributes[col_idx];
                             found = true;
                         }
@@ -494,12 +497,20 @@ void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid) {
     ss << ", type=" << static_cast<int>(decrypted.field_type);
     ss << ", eq=" << static_cast<int>(decrypted.equality_type);
     
-    if (!decrypted.attributes.empty()) {
-        ss << ", data=[";
-        for (size_t i = 0; i < decrypted.attributes.size(); i++) {
-            if (i > 0) ss << ",";
+    // Print non-empty attributes
+    bool has_attrs = false;
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        if (!decrypted.column_names[i].empty()) {
+            if (!has_attrs) {
+                ss << ", data=[";
+                has_attrs = true;
+            } else {
+                ss << ",";
+            }
             ss << decrypted.attributes[i];
         }
+    }
+    if (has_attrs) {
         ss << "]";
     }
     

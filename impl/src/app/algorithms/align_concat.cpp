@@ -162,9 +162,34 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
                    child_first.alignment_key, child_first.copy_index);
     }
     
-    // Get attribute counts for concatenation
-    int32_t left_attr_count = result.size() > 0 ? result[0].attributes.size() : 0;
-    int32_t right_attr_count = aligned_child.size() > 0 ? aligned_child[0].attributes.size() : 0;
+    // Get attribute counts - but need to count actual non-empty attributes
+    // since we're using fixed arrays but only some slots are filled
+    int32_t left_attr_count = 0;
+    int32_t right_attr_count = 0;
+    
+    // Count non-empty attributes in left table (result)
+    if (result.size() > 0) {
+        const Entry& first = result[0];
+        for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+            if (!first.column_names[i].empty()) {
+                left_attr_count++;
+            } else {
+                break;  // Stop at first empty column name
+            }
+        }
+    }
+    
+    // Count non-empty attributes in right table (aligned_child)
+    if (aligned_child.size() > 0) {
+        const Entry& first = aligned_child[0];
+        for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+            if (!first.column_names[i].empty()) {
+                right_attr_count++;
+            } else {
+                break;  // Stop at first empty column name
+            }
+        }
+    }
     
     // Pass attribute counts as extra parameters
     int32_t concat_params[MAX_EXTRA_PARAMS] = {left_attr_count, right_attr_count, 0, 0};

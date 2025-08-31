@@ -22,6 +22,9 @@ Entry::Entry()
       alignment_key(0),
       dst_idx(0),
       index(0) {
+    // Initialize arrays
+    memset(attributes, 0, sizeof(attributes));
+    // column_names are automatically initialized as empty strings
 }
 
 Entry::Entry(const entry_t& c_entry) {
@@ -53,15 +56,9 @@ entry_t Entry::to_entry_t() const {
     result.dst_idx = dst_idx;
     result.index = index;
     
-    // Copy attributes (up to MAX_ATTRIBUTES)
-    size_t attr_count = std::min(attributes.size(), (size_t)MAX_ATTRIBUTES);
-    for (size_t i = 0; i < attr_count; i++) {
+    // Copy all MAX_ATTRIBUTES - simpler and consistent
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
         result.attributes[i] = attributes[i];
-    }
-    
-    // Copy column names (up to MAX_ATTRIBUTES)
-    size_t col_count = std::min(column_names.size(), (size_t)MAX_ATTRIBUTES);
-    for (size_t i = 0; i < col_count; i++) {
         strncpy(result.column_names[i], column_names[i].c_str(), MAX_COLUMN_NAME_LEN - 1);
         result.column_names[i][MAX_COLUMN_NAME_LEN - 1] = '\0';
     }
@@ -90,22 +87,11 @@ void Entry::from_entry_t(const entry_t& c_entry) {
     dst_idx = c_entry.dst_idx;
     index = c_entry.index;
     
-    // Clear and copy column names first to determine actual column count
-    column_names.clear();
-    int actual_columns = 0;
+    // Copy all MAX_ATTRIBUTES - no need to figure out actual size
+    // Empty entries will just have empty strings and zeros
     for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (strlen(c_entry.column_names[i]) == 0) {
-            // Stop at first empty column name
-            break;
-        }
-        column_names.push_back(std::string(c_entry.column_names[i]));
-        actual_columns++;
-    }
-    
-    // Clear and copy only the actual number of attributes
-    attributes.clear();
-    for (int i = 0; i < actual_columns && i < MAX_ATTRIBUTES; i++) {
-        attributes.push_back(c_entry.attributes[i]);
+        column_names[i] = std::string(c_entry.column_names[i]);
+        attributes[i] = c_entry.attributes[i];
     }
 }
 
@@ -129,20 +115,19 @@ void Entry::from_entry_t(const entry_t& c_entry, const std::vector<std::string>&
     dst_idx = c_entry.dst_idx;
     index = c_entry.index;
     
-    // Use provided schema to determine number of attributes
-    size_t num_attributes = schema.size();
-    if (num_attributes > MAX_ATTRIBUTES) {
-        num_attributes = MAX_ATTRIBUTES;
+    // Copy all MAX_ATTRIBUTES from c_entry
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        attributes[i] = c_entry.attributes[i];
     }
     
-    // Copy column names from schema
-    column_names.clear();
-    column_names = schema;
-    
-    // Copy attributes based on schema size
-    attributes.clear();
-    for (size_t i = 0; i < num_attributes; i++) {
-        attributes.push_back(c_entry.attributes[i]);
+    // Set column names from schema
+    size_t schema_size = std::min(schema.size(), (size_t)MAX_ATTRIBUTES);
+    for (size_t i = 0; i < schema_size; i++) {
+        column_names[i] = schema[i];
+    }
+    // Clear remaining column names
+    for (size_t i = schema_size; i < MAX_ATTRIBUTES; i++) {
+        column_names[i].clear();
     }
 }
 
@@ -151,21 +136,18 @@ void Entry::clear() {
 }
 
 int32_t Entry::get_attribute(const std::string& column_name) const {
-    // Find the column index
-    for (size_t i = 0; i < column_names.size(); i++) {
-        if (column_names[i] == column_name) {
-            if (i < attributes.size()) {
-                return attributes[i];
-            }
-            break;
+    // Find the column index - check all MAX_ATTRIBUTES
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        if (!column_names[i].empty() && column_names[i] == column_name) {
+            return attributes[i];
         }
     }
     return 0;  // Return 0 if column not found
 }
 
 bool Entry::has_attribute(const std::string& column_name) const {
-    for (const auto& name : column_names) {
-        if (name == column_name) {
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        if (!column_names[i].empty() && column_names[i] == column_name) {
             return true;
         }
     }
@@ -174,17 +156,9 @@ bool Entry::has_attribute(const std::string& column_name) const {
 
 void Entry::set_attribute(const std::string& column_name, int32_t value) {
     // Find the column index
-    for (size_t i = 0; i < column_names.size(); i++) {
-        if (column_names[i] == column_name) {
-            if (i < attributes.size()) {
-                attributes[i] = value;
-            } else {
-                // Extend attributes vector if needed
-                while (attributes.size() < i) {
-                    attributes.push_back(0);
-                }
-                attributes.push_back(value);
-            }
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        if (!column_names[i].empty() && column_names[i] == column_name) {
+            attributes[i] = value;
             return;
         }
     }
@@ -193,14 +167,22 @@ void Entry::set_attribute(const std::string& column_name, int32_t value) {
 }
 
 void Entry::add_attribute(const std::string& column_name, int32_t value) {
-    column_names.push_back(column_name);
-    attributes.push_back(value);
+    // Find first empty slot
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        if (column_names[i].empty()) {
+            column_names[i] = column_name;
+            attributes[i] = value;
+            return;
+        }
+    }
 }
 
 std::map<std::string, int32_t> Entry::get_attributes_map() const {
     std::map<std::string, int32_t> result;
-    for (size_t i = 0; i < column_names.size() && i < attributes.size(); i++) {
-        result[column_names[i]] = attributes[i];
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        if (!column_names[i].empty()) {
+            result[column_names[i]] = attributes[i];
+        }
     }
     return result;
 }
@@ -222,12 +204,12 @@ std::string Entry::to_string() const {
        << ", local_mult=" << local_mult
        << ", final_mult=" << final_mult
        << ", attrs=[";
-    for (size_t i = 0; i < attributes.size(); i++) {
-        if (i > 0) ss << ", ";
-        if (i < column_names.size()) {
+    bool first = true;
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        if (!column_names[i].empty()) {
+            if (!first) ss << ", ";
             ss << column_names[i] << "=" << attributes[i];
-        } else {
-            ss << attributes[i];
+            first = false;
         }
     }
     ss << "]}";

@@ -48,9 +48,10 @@ public:
     int32_t dst_idx;
     int32_t index;
     
-    // Data attributes (all integers - using vector for flexibility)
-    std::vector<int32_t> attributes;
-    std::vector<std::string> column_names;
+    // Data attributes - fixed array of MAX_ATTRIBUTES
+    // Always process all MAX_ATTRIBUTES - empty slots have empty strings and zeros
+    int32_t attributes[MAX_ATTRIBUTES];
+    std::string column_names[MAX_ATTRIBUTES];
     
     // Constructors
     Entry();

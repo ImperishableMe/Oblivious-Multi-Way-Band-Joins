@@ -144,7 +144,7 @@ int32_t Table::get_attribute(size_t row, const std::string& col_name) const {
     }
     size_t col_index = get_column_index(col_name);
     const Entry& entry = entries[row];
-    if (col_index >= entry.attributes.size()) {
+    if (col_index >= MAX_ATTRIBUTES) {
         throw std::out_of_range("Column index out of bounds");
     }
     return entry.attributes[col_index];
@@ -156,10 +156,10 @@ void Table::set_attribute(size_t row, const std::string& col_name, int32_t value
     }
     size_t col_index = get_column_index(col_name);
     Entry& entry = entries[row];
-    if (col_index >= entry.attributes.size()) {
-        // Expand attributes if needed
-        entry.attributes.resize(col_index + 1, NULL_VALUE);
+    if (col_index >= MAX_ATTRIBUTES) {
+        throw std::out_of_range("Column index exceeds MAX_ATTRIBUTES");
     }
+    // Just set the value - column_names should already be set
     entry.attributes[col_index] = value;
 }
 

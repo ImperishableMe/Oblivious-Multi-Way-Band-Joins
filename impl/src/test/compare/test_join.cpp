@@ -70,7 +70,7 @@ std::multiset<std::string> table_to_multiset(const Table& table) {
         // Create pairs of (column_name, value) and sort by column name
         std::vector<std::pair<std::string, int32_t>> column_value_pairs;
         
-        for (size_t i = 0; i < entry.attributes.size() && i < schema.size(); i++) {
+        for (size_t i = 0; i < schema.size() && i < MAX_ATTRIBUTES; i++) {
             column_value_pairs.emplace_back(schema[i], entry.attributes[i]);
         }
         

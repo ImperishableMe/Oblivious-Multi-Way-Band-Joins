@@ -6,6 +6,7 @@
 #include <cstring>
 #include <climits>  // For INT32_MAX, INT32_MIN
 #include "converters.h"
+#include "io_entry.h"  // For IO_Entry
 #include "../Enclave_u.h"
 #include "../../common/types_common.h"  // For NULL_VALUE and type constants
 #include "../../common/debug_util.h"
@@ -59,14 +60,13 @@ Table TableIO::load_csv(const std::string& filepath) {
             table.set_num_columns(data_columns);
             first_line = false;
         } else {
-            // Data line - create Entry
-            Entry entry;
+            // Data line - create IO_Entry for dynamic size handling
+            IO_Entry io_entry;
             
             // Build column names (excluding nonce if present)
-            // TODO: Remove this once entry_t no longer needs column_names for counting
             for (size_t i = 0; i < headers.size(); ++i) {
                 if (static_cast<int>(i) != nonce_column_index) {
-                    entry.column_names.push_back(headers[i]);
+                    io_entry.column_names.push_back(headers[i]);
                 }
             }
             
@@ -79,38 +79,24 @@ Table TableIO::load_csv(const std::string& filepath) {
                 } else {
                     // Regular data column
                     int32_t val = parse_value(values[i]);
-                    entry.attributes.push_back(val);
+                    io_entry.attributes.push_back(val);
                     
                     // Set join_attr to the first data column value
-                    if (entry.attributes.size() == 1) {
-                        entry.join_attr = val;
+                    if (io_entry.attributes.size() == 1) {
+                        io_entry.join_attr = val;
                     }
                 }
             }
             
-            // Initialize only essential fields
-            // All metadata will be properly initialized to NULL_VALUE by InitializeAllTables
-            // using ecall_init_metadata_null for proper encryption handling
-            entry.is_encrypted = (nonce_column_index >= 0);  // Encrypted if nonce column exists
-            entry.nonce = nonce_value;
+            // Set encryption fields
+            io_entry.is_encrypted = (nonce_column_index >= 0);  // Encrypted if nonce column exists
+            io_entry.nonce = nonce_value;
             
-            // Initialize metadata to 0 temporarily - will be set to NULL_VALUE by enclave
-            // We can't set to NULL_VALUE here because encrypted entries need the enclave
-            // to decrypt, set to NULL_VALUE, then re-encrypt
-            entry.field_type = 0;
-            entry.equality_type = 0;
-            entry.original_index = 0;
-            entry.local_mult = 0;
-            entry.final_mult = 0;
-            entry.foreign_sum = 0;
-            entry.local_cumsum = 0;
-            entry.local_interval = 0;
-            entry.foreign_interval = 0;
-            entry.local_weight = 0;
-            entry.copy_index = 0;
-            entry.alignment_key = 0;
-            entry.dst_idx = 0;
-            entry.index = 0;
+            // Convert IO_Entry to regular Entry with fixed MAX_ATTRIBUTES
+            Entry entry = io_entry.to_entry();
+            
+            // Metadata is already initialized to 0 by IO_Entry::to_entry()
+            // It will be set to NULL_VALUE by enclave later
             
             table.add_entry(entry);
         }
@@ -152,9 +138,12 @@ void TableIO::save_csv(const Table& table, const std::string& filepath) {
         // Write data
         for (size_t row = 0; row < table.size(); ++row) {
             const auto& entry = table.get_entry(row);
-            for (size_t col = 0; col < entry.attributes.size(); ++col) {
-                if (col > 0) file << ",";
+            // Write only non-empty columns
+            bool first = true;
+            for (size_t col = 0; col < headers.size(); ++col) {
+                if (!first) file << ",";
                 file << static_cast<int64_t>(entry.attributes[col]);
+                first = false;
             }
             file << "\n";
         }

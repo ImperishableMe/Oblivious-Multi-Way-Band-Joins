@@ -61,8 +61,8 @@ crypto_status_t aes_encrypt_entry(entry_t* entry) {
     uint8_t ctr[16] = {0};
     memcpy(ctr, &entry->nonce, 8);
     
-    // Calculate what needs to be encrypted
-    // We encrypt everything except: is_encrypted, nonce, column_names
+    // Simplified encryption: encrypt entire attributes array
+    // We keep is_encrypted, nonce, and column_names unencrypted
     size_t is_encrypted_offset = offsetof(entry_t, is_encrypted);
     size_t nonce_offset = offsetof(entry_t, nonce);
     size_t column_names_offset = offsetof(entry_t, column_names);
@@ -72,18 +72,17 @@ crypto_status_t aes_encrypt_entry(entry_t* entry) {
     uint8_t encrypted_data[sizeof(entry_t)];
     memcpy(encrypted_data, entry_bytes, sizeof(entry_t));
     
-    // Calculate regions to encrypt
+    // Simplified: just two regions to encrypt
     struct {
         size_t start;
         size_t end;
     } regions[] = {
         {0, is_encrypted_offset},  // Before is_encrypted (includes field_type, equality_type)
-        {is_encrypted_offset + sizeof(uint8_t), nonce_offset},  // Between is_encrypted and nonce
-        {nonce_offset + sizeof(uint64_t), column_names_offset}  // Between nonce and column_names
+        {nonce_offset + sizeof(uint64_t), column_names_offset}  // After nonce to column_names (entire attributes array)
     };
     
-    // Encrypt each region
-    for (int i = 0; i < 3; i++) {
+    // Encrypt each region (now just 2 regions)
+    for (int i = 0; i < 2; i++) {
         size_t region_size = regions[i].end - regions[i].start;
         if (region_size > 0) {
             sgx_status_t status = sgx_aes_ctr_encrypt(
@@ -102,7 +101,7 @@ crypto_status_t aes_encrypt_entry(entry_t* entry) {
     }
     
     // Copy encrypted data back to entry (except excluded fields)
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
         size_t region_size = regions[i].end - regions[i].start;
         if (region_size > 0) {
             memcpy(entry_bytes + regions[i].start, 
@@ -137,7 +136,7 @@ crypto_status_t aes_decrypt_entry(entry_t* entry) {
     uint8_t ctr[16] = {0};
     memcpy(ctr, &entry->nonce, 8);
     
-    // Calculate regions to decrypt (same as encrypt)
+    // Simplified decryption: matches encryption with two regions
     size_t is_encrypted_offset = offsetof(entry_t, is_encrypted);
     size_t nonce_offset = offsetof(entry_t, nonce);
     size_t column_names_offset = offsetof(entry_t, column_names);
@@ -150,13 +149,12 @@ crypto_status_t aes_decrypt_entry(entry_t* entry) {
         size_t start;
         size_t end;
     } regions[] = {
-        {0, is_encrypted_offset},
-        {is_encrypted_offset + sizeof(uint8_t), nonce_offset},
-        {nonce_offset + sizeof(uint64_t), column_names_offset}
+        {0, is_encrypted_offset},  // Before is_encrypted
+        {nonce_offset + sizeof(uint64_t), column_names_offset}  // After nonce (entire attributes array)
     };
     
-    // Decrypt each region (AES-CTR decryption is the same as encryption)
-    for (int i = 0; i < 3; i++) {
+    // Decrypt each region (now just 2 regions)
+    for (int i = 0; i < 2; i++) {
         size_t region_size = regions[i].end - regions[i].start;
         if (region_size > 0) {
             sgx_status_t status = sgx_aes_ctr_decrypt(
@@ -175,7 +173,7 @@ crypto_status_t aes_decrypt_entry(entry_t* entry) {
     }
     
     // Copy decrypted data back
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
         size_t region_size = regions[i].end - regions[i].start;
         if (region_size > 0) {
             memcpy(entry_bytes + regions[i].start, 

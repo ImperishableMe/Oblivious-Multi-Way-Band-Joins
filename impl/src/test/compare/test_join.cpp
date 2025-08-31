@@ -62,10 +62,8 @@ std::multiset<std::string> table_to_multiset(const Table& table) {
     
     // Get table schema for column names
     std::vector<std::string> schema = table.get_schema();
-    if (schema.empty() && table.size() > 0) {
-        // Fallback to Entry column_names if schema not available
-        // TODO: Remove this fallback once all tables have schema
-        schema = table[0].column_names;
+    if (schema.empty()) {
+        throw std::runtime_error("Table has no schema set - cannot compare tables");
     }
     
     for (const auto& entry : table) {

@@ -91,9 +91,10 @@ void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node, sgx_enc
         
         // Additional debug: Show all attributes to verify
         DEBUG_INFO("First entry attributes for verification:");
+        std::vector<std::string> schema = table.get_schema();
         for (size_t j = 0; j < first_entry.attributes.size(); j++) {
             DEBUG_INFO("  attr[%zu]=%d (column: %s)", j, first_entry.attributes[j], 
-                      j < first_entry.column_names.size() ? first_entry.column_names[j].c_str() : "unknown");
+                      j < schema.size() ? schema[j].c_str() : "unknown");
         }
     }
 }

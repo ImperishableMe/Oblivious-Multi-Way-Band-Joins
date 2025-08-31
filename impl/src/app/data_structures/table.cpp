@@ -116,15 +116,7 @@ size_t Table::get_column_index(const std::string& col_name) const {
             return i;
         }
     }
-    // If not found in schema, fall back to checking first entry (backward compatibility)
-    if (!entries.empty()) {
-        const Entry& first = entries[0];
-        for (size_t i = 0; i < first.column_names.size(); i++) {
-            if (first.column_names[i] == col_name) {
-                return i;
-            }
-        }
-    }
+    // Column not found in schema
     throw std::runtime_error("Column not found: " + col_name);
 }
 
@@ -135,15 +127,7 @@ bool Table::has_column(const std::string& col_name) const {
             return true;
         }
     }
-    // Fall back to checking first entry (backward compatibility)
-    if (!entries.empty()) {
-        const Entry& first = entries[0];
-        for (const auto& name : first.column_names) {
-            if (name == col_name) {
-                return true;
-            }
-        }
-    }
+    // Not found in schema
     return false;
 }
 

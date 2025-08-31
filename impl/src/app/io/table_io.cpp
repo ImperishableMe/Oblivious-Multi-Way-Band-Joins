@@ -62,12 +62,7 @@ Table TableIO::load_csv(const std::string& filepath) {
             // Data line - create Entry
             Entry entry;
             
-            // Build column names (excluding nonce if present)
-            for (size_t i = 0; i < headers.size(); ++i) {
-                if (static_cast<int>(i) != nonce_column_index) {
-                    entry.column_names.push_back(headers[i]);
-                }
-            }
+            // Note: Column names are now managed by Table schema, not Entry
             
             // Parse values
             uint64_t nonce_value = 0;
@@ -137,10 +132,12 @@ void TableIO::save_csv(const Table& table, const std::string& filepath) {
     if (table.size() > 0) {
         std::vector<std::string> headers = table.get_schema();
         
-        // If no schema set, fall back to first entry's column names
-        if (headers.empty()) {
+        // If no schema set, generate generic column names
+        if (headers.empty() && table.size() > 0) {
             const auto& first_entry = table.get_entry(0);
-            headers = first_entry.column_names;
+            for (size_t i = 0; i < first_entry.attributes.size(); i++) {
+                headers.push_back("col" + std::to_string(i));
+            }
         }
         
         for (size_t i = 0; i < headers.size(); ++i) {

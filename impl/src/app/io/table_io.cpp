@@ -63,6 +63,7 @@ Table TableIO::load_csv(const std::string& filepath) {
             Entry entry;
             
             // Build column names (excluding nonce if present)
+            // TODO: Remove this once entry_t no longer needs column_names for counting
             for (size_t i = 0; i < headers.size(); ++i) {
                 if (static_cast<int>(i) != nonce_column_index) {
                     entry.column_names.push_back(headers[i]);
@@ -137,10 +138,9 @@ void TableIO::save_csv(const Table& table, const std::string& filepath) {
     if (table.size() > 0) {
         std::vector<std::string> headers = table.get_schema();
         
-        // If no schema set, fall back to first entry's column names
+        // Table should always have schema set
         if (headers.empty()) {
-            const auto& first_entry = table.get_entry(0);
-            headers = first_entry.column_names;
+            throw std::runtime_error("Table has no schema set");
         }
         
         for (size_t i = 0; i < headers.size(); ++i) {

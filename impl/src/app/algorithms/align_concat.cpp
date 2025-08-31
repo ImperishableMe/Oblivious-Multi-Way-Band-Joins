@@ -163,8 +163,8 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     }
     
     // Get attribute counts for concatenation
-    int32_t left_attr_count = result.size() > 0 ? result[0].column_names.size() : 0;
-    int32_t right_attr_count = aligned_child.size() > 0 ? aligned_child[0].column_names.size() : 0;
+    int32_t left_attr_count = result.size() > 0 ? result[0].attributes.size() : 0;
+    int32_t right_attr_count = aligned_child.size() > 0 ? aligned_child[0].attributes.size() : 0;
     
     // Pass attribute counts as extra parameters
     int32_t concat_params[MAX_EXTRA_PARAMS] = {left_attr_count, right_attr_count, 0, 0};

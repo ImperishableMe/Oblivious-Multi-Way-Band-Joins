@@ -60,12 +60,20 @@ Table decrypt_table(const Table& encrypted_table) {
 std::multiset<std::string> table_to_multiset(const Table& table) {
     std::multiset<std::string> result;
     
+    // Get table schema for column names
+    std::vector<std::string> schema = table.get_schema();
+    if (schema.empty() && table.size() > 0) {
+        // Fallback to Entry column_names if schema not available
+        // TODO: Remove this fallback once all tables have schema
+        schema = table[0].column_names;
+    }
+    
     for (const auto& entry : table) {
         // Create pairs of (column_name, value) and sort by column name
         std::vector<std::pair<std::string, int32_t>> column_value_pairs;
         
-        for (size_t i = 0; i < entry.attributes.size() && i < entry.column_names.size(); i++) {
-            column_value_pairs.emplace_back(entry.column_names[i], entry.attributes[i]);
+        for (size_t i = 0; i < entry.attributes.size() && i < schema.size(); i++) {
+            column_value_pairs.emplace_back(schema[i], entry.attributes[i]);
         }
         
         // Sort by column name alphabetically

@@ -31,22 +31,41 @@ bool SubtreeVerifier::RowMatchesOriginal(
     const Entry& original,
     const std::string& table_name) {
     
-    // Get all attributes from original
-    auto orig_attrs = original.get_attributes_map();
-    
-    // Check if result row contains all original attributes
-    for (const auto& [col_name, value] : orig_attrs) {
-        // Try with and without table prefix
-        if (result_row.has_attribute(col_name)) {
-            if (result_row.get_attribute(col_name) != value) {
-                return false;
+    // Check each attribute from original by index
+    for (size_t i = 0; i < original.attributes.size() && i < original.column_names.size(); i++) {
+        const std::string& col_name = original.column_names[i];
+        int32_t value = original.attributes[i];
+        
+        // Find this column in result_row
+        bool found = false;
+        
+        // Try exact match first
+        for (size_t j = 0; j < result_row.column_names.size() && j < result_row.attributes.size(); j++) {
+            if (result_row.column_names[j] == col_name) {
+                if (result_row.attributes[j] != value) {
+                    return false;
+                }
+                found = true;
+                break;
             }
-        } else if (result_row.has_attribute(table_name + "." + col_name)) {
-            if (result_row.get_attribute(table_name + "." + col_name) != value) {
-                return false;
+        }
+        
+        // Try with table prefix if not found
+        if (!found) {
+            std::string prefixed = table_name + "." + col_name;
+            for (size_t j = 0; j < result_row.column_names.size() && j < result_row.attributes.size(); j++) {
+                if (result_row.column_names[j] == prefixed) {
+                    if (result_row.attributes[j] != value) {
+                        return false;
+                    }
+                    found = true;
+                    break;
+                }
             }
-        } else {
-            // Column not found in result
+        }
+        
+        // Column not found in result
+        if (!found) {
             return false;
         }
     }

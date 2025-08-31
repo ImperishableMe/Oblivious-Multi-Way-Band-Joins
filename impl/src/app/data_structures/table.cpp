@@ -130,6 +130,14 @@ bool Table::has_column(const std::string& col_name) const {
     return false;
 }
 
+std::vector<std::string> Table::generate_generic_schema(size_t num_columns) {
+    std::vector<std::string> schema;
+    for (size_t i = 0; i < num_columns; i++) {
+        schema.push_back("col" + std::to_string(i + 1));
+    }
+    return schema;
+}
+
 int32_t Table::get_attribute(size_t row, const std::string& col_name) const {
     if (row >= entries.size()) {
         throw std::out_of_range("Row index out of bounds");

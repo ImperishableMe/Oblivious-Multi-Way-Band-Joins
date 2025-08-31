@@ -57,6 +57,9 @@ public:
     size_t get_column_index(const std::string& col_name) const;
     bool has_column(const std::string& col_name) const;
     
+    // Generate generic schema for combined tables
+    static std::vector<std::string> generate_generic_schema(size_t num_columns);
+    
     // Named attribute access using schema
     int32_t get_attribute(size_t row, const std::string& col_name) const;
     void set_attribute(size_t row, const std::string& col_name, int32_t value);

@@ -111,25 +111,18 @@ void SQLiteGroundTruth::load_table(const std::string& name, const Table& table) 
 void SQLiteGroundTruth::insert_table_data(const std::string& table_name, const Table& table) {
     if (table.size() == 0) return;
     
-    // Get column names - prefer Table schema, fallback to Entry
+    // Get column names from Table schema (required)
     std::vector<std::string> schema_cols = table.get_schema();
+    if (schema_cols.empty()) {
+        throw std::runtime_error("Table has no schema set - cannot insert data into SQLite");
+    }
+    
     std::map<std::string, int32_t> fields;
     
-    if (!schema_cols.empty()) {
-        // Use Table schema - create map with dummy values
-        Entry first = table[0];
-        for (size_t i = 0; i < schema_cols.size() && i < first.attributes.size(); i++) {
-            fields[schema_cols[i]] = first.attributes[i];
-        }
-    } else {
-        // Build attributes map using available data
-        // Since we don't have schema, just use indexed access
-        Entry first = table[0];
-        for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-            if (!first.column_names[i].empty()) {
-                fields[first.column_names[i]] = first.attributes[i];
-            }
-        }
+    // Use Table schema - create map with dummy values
+    Entry first = table[0];
+    for (size_t i = 0; i < schema_cols.size() && i < first.attributes.size(); i++) {
+        fields[schema_cols[i]] = first.attributes[i];
     }
     
     // Build column list

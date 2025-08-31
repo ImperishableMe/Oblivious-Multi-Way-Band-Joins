@@ -5,10 +5,27 @@
 #include "../Enclave_u.h"
 #include "../batch/ecall_batch_collector.h"
 
-Table::Table() : num_columns(0) {
+// Default constructor - creates invalid table (for STL containers)
+Table::Table() : table_name("INVALID"), num_columns(0) {
+    // This creates an invalid table - should be replaced by assignment
 }
 
+// New constructor with required schema
+Table::Table(const std::string& name, const std::vector<std::string>& schema) 
+    : table_name(name), num_columns(schema.size()), schema_column_names(schema) {
+    if (schema.empty()) {
+        throw std::runtime_error("Table '" + name + "' cannot be created with empty schema");
+    }
+    if (schema.size() > MAX_ATTRIBUTES) {
+        throw std::runtime_error("Table '" + name + "' schema has " + std::to_string(schema.size()) + 
+                               " columns, exceeds MAX_ATTRIBUTES=" + std::to_string(MAX_ATTRIBUTES));
+    }
+}
+
+// Deprecated constructor - kept temporarily for migration
 Table::Table(const std::string& name) : table_name(name), num_columns(0) {
+    // This constructor should not be used - will be removed after migration
+    DEBUG_WARN("Table '%s' created without schema - this is deprecated!", name.c_str());
 }
 
 void Table::add_entry(const Entry& entry) {
@@ -458,9 +475,8 @@ Table Table::oblivious_expand(sgx_enclave_id_t /*eid*/) const {
         total_size += mult;
     }
     
-    // Create expanded table
-    Table expanded;
-    expanded.set_table_name(table_name + "_expanded");
+    // Create expanded table with same schema
+    Table expanded(table_name + "_expanded", schema_column_names);  // Preserve schema
     
     // Expand each entry according to its multiplicity
     for (size_t i = 0; i < size(); i++) {
@@ -483,7 +499,7 @@ Table Table::oblivious_expand(sgx_enclave_id_t /*eid*/) const {
 Table Table::batched_map(sgx_enclave_id_t eid, OpEcall op_type, int32_t* params) const {
     DEBUG_TRACE("Table::batched_map: Starting with %zu entries, op_type=%d", entries.size(), op_type);
     
-    Table result(table_name + "_mapped");
+    Table result(table_name + "_mapped", schema_column_names);  // Preserve schema
     result.set_num_columns(num_columns);
     
     // Copy entries to result first (since we can't modify const entries)

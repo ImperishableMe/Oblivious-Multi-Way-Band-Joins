@@ -23,8 +23,9 @@ private:
     
 public:
     // Constructors
-    Table();
-    Table(const std::string& name);
+    Table();  // Default constructor for STL containers - creates invalid table
+    Table(const std::string& name, const std::vector<std::string>& schema);
+    Table(const std::string& name);  // Deprecated - will be removed, use schema version
     
     // Entry management
     void add_entry(const Entry& entry);

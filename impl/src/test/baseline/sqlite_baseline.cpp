@@ -162,6 +162,9 @@ Table execute_sqlite_join(sqlite3* db, const std::string& join_query) {
     
     // Query executed
     
+    // Set the schema for the result table
+    result.table.set_schema(result.column_names);
+    
     return result.table;
 }
 

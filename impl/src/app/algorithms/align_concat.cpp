@@ -197,6 +197,16 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     // Use parallel_pass to concatenate attributes from aligned_child
     result.batched_parallel_pass(aligned_child, eid, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);
     
+    // Update the result table's schema to include columns from both tables
+    std::vector<std::string> combined_schema = result.get_schema();
+    std::vector<std::string> child_schema = aligned_child.get_schema();
+    
+    // Append child schema to the combined schema
+    combined_schema.insert(combined_schema.end(), child_schema.begin(), child_schema.end());
+    result.set_schema(combined_schema);
+    
+    DEBUG_INFO("Updated schema after concatenation: %zu columns", combined_schema.size());
+    
     // Debug: Dump final result - show concatenated attributes WITH ALL COLUMNS
     debug_dump_table(result, ("final_result_" + concat_label).c_str(), 
                     ("align_step5_" + concat_label).c_str(), static_cast<uint32_t>(eid),

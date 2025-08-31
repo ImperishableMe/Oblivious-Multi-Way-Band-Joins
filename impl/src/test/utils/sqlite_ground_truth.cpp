@@ -226,6 +226,11 @@ Table SQLiteGroundTruth::execute_query(const std::string& sql) {
         throw std::runtime_error("Query execution failed: " + error);
     }
     
+    // Set the schema for the result table
+    if (!result.column_names.empty()) {
+        result.result_table.set_schema(result.column_names);
+    }
+    
     return result.result_table;
 }
 

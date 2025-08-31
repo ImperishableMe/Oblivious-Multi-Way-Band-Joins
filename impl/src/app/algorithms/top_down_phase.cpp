@@ -105,8 +105,8 @@ Table TopDownPhase::CombineTableForForeign(
     Table end_entries = child.batched_map(eid, OP_ECALL_TRANSFORM_TO_END, end_params);
     
     // Combine all three tables
-    Table combined;
-    combined.set_table_name("combined_foreign");
+    // Use parent schema for combined table (all three should have same schema)
+    Table combined("combined_foreign", parent.get_schema().empty() ? child.get_schema() : parent.get_schema());
     
     // Add source entries (parent)
     for (const auto& entry : source_entries) {

@@ -127,8 +127,9 @@ Table BottomUpPhase::CombineTable(
     // Combine all three tables
     DEBUG_INFO("Combining tables: source=%zu, start=%zu, end=%zu",
                source_entries.size(), start_entries.size(), end_entries.size());
-    Table combined;
-    combined.set_table_name("combined");
+    
+    // Use source schema for combined table (all three should have same schema)
+    Table combined("combined", source.get_schema().empty() ? target.get_schema() : source.get_schema());
     
     // Add source entries
     DEBUG_INFO("Adding source entries");

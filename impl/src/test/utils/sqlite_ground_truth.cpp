@@ -67,9 +67,8 @@ std::string SQLiteGroundTruth::create_table_schema(const std::string& table_name
             fields[column_names[i]] = first.attributes[i];
         }
     } else {
-        // Fallback to Entry's get_attributes_map
-        Entry first = table[0];
-        fields = first.get_attributes_map();
+        // Table must have schema set for SQLite ground truth
+        throw std::runtime_error("Table has no schema set - cannot create SQLite table");
     }
     
     std::stringstream sql;

@@ -192,19 +192,13 @@ void TableIO::save_encrypted_csv(const Table& table,
         throw std::runtime_error("Cannot create encrypted CSV file: " + filepath);
     }
     
-    // Write headers (prefer Table schema, fallback to first entry)
+    // Write headers from Table schema (required)
     if (entries.size() > 0) {
         std::vector<std::string> headers = table_copy.get_schema();
         
-        // If no schema set, fall back to first entry's column names
+        // Schema must be set for saving
         if (headers.empty()) {
-            for (size_t i = 0; i < MAX_ATTRIBUTES; ++i) {
-                if (entries[0].column_names[i][0] != '\0') {
-                    headers.push_back(std::string(entries[0].column_names[i]));
-                } else {
-                    break;
-                }
-            }
+            throw std::runtime_error("Cannot save table without schema");
         }
         
         // Write column headers
@@ -217,17 +211,12 @@ void TableIO::save_encrypted_csv(const Table& table,
         
         // Write encrypted data as integers with nonce
         for (const auto& entry : entries) {
-            bool first = true;
-            for (size_t i = 0; i < MAX_ATTRIBUTES; ++i) {
-                if (entry.column_names[i][0] != '\0') {
-                    if (!first) file << ",";
-                    // Write the encrypted integer value directly
-                    // Cast to int32_t since that's what the encrypted values are
-                    file << static_cast<int32_t>(entry.attributes[i]);
-                    first = false;
-                } else {
-                    break;
-                }
+            // Write attributes based on schema size
+            for (size_t i = 0; i < headers.size(); ++i) {
+                if (i > 0) file << ",";
+                // Write the encrypted integer value directly
+                // Cast to int32_t since that's what the encrypted values are
+                file << static_cast<int32_t>(entry.attributes[i]);
             }
             // Add the nonce value
             file << "," << entry.nonce << "\n";

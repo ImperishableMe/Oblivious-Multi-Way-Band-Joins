@@ -162,8 +162,15 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
                    child_first.alignment_key, child_first.copy_index);
     }
     
+    // Get attribute counts for concatenation
+    int32_t left_attr_count = result.size() > 0 ? result[0].column_names.size() : 0;
+    int32_t right_attr_count = aligned_child.size() > 0 ? aligned_child[0].column_names.size() : 0;
+    
+    // Pass attribute counts as extra parameters
+    int32_t concat_params[MAX_EXTRA_PARAMS] = {left_attr_count, right_attr_count, 0, 0};
+    
     // Use parallel_pass to concatenate attributes from aligned_child
-    result.batched_parallel_pass(aligned_child, eid, OP_ECALL_CONCAT_ATTRIBUTES);
+    result.batched_parallel_pass(aligned_child, eid, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);
     
     // Debug: Dump final result - show concatenated attributes WITH ALL COLUMNS
     debug_dump_table(result, ("final_result_" + concat_label).c_str(), 

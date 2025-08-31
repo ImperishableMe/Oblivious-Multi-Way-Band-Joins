@@ -26,15 +26,15 @@ SQLite Output Size: 45 rows
 Match: YES
 
 === Performance ===
-SGX Time: 0.455139 seconds
-SQLite Time: 0.480725 seconds
+SGX Time: 0.511665 seconds
+SQLite Time: 0.472604 seconds
 
 === SGX Phase Timings ===
-Bottom-Up: 0.011798 seconds
-Top-Down: 0.011444 seconds
-Distribute-Expand: 0.009803 seconds
-Align-Concat: 0.020452 seconds
-Total (phases): 0.053504 seconds
+Bottom-Up: 0.018318 seconds
+Top-Down: 0.019119 seconds
+Distribute-Expand: 0.014843 seconds
+Align-Concat: 0.041335 seconds
+Total (phases): 0.093622 seconds
 
 === SGX Phase Ecalls ===
 Bottom-Up: 62 ecalls
@@ -50,6 +50,6 @@ Distribute-Expand: 90 rows in tree
 Align-Concat (result): 45 rows
 
 === Align-Concat Sorting Details ===
-Total sorting: 0.019538 seconds (42 ecalls)
-  - Accumulator sorts: 0.009797 seconds (21 ecalls)
-  - Child sorts: 0.009742 seconds (21 ecalls)
+Total sorting: 0.039002 seconds (42 ecalls)
+  - Accumulator sorts: 0.019716 seconds (21 ecalls)
+  - Child sorts: 0.019286 seconds (21 ecalls)

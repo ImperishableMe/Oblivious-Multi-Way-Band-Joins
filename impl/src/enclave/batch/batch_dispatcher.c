@@ -281,9 +281,15 @@ void ecall_batch_dispatcher(entry_t* data_array, size_t data_count,
         case OP_ECALL_CONCAT_ATTRIBUTES:
             for (size_t i = 0; i < ops_count; i++) {
                 if (ops_array[i].idx2 != BATCH_NO_PARAM) {
+                    // Get attribute counts from extra parameters
+                    int32_t left_attr_count = ops_array[i].extra_params[0];
+                    int32_t right_attr_count = ops_array[i].extra_params[1];
+                    
                     // Concatenate attributes from right to left
                     concat_attributes_op(&data_array[ops_array[i].idx1],
-                                        &data_array[ops_array[i].idx2]);
+                                        &data_array[ops_array[i].idx2],
+                                        left_attr_count,
+                                        right_attr_count);
                 }
             }
             break;

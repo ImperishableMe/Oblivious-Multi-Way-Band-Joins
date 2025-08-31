@@ -114,7 +114,7 @@ void transform_compute_alignment_key_op(entry_t* entry);  // Raw operation witho
 void window_update_copy_index(entry_t* e1, entry_t* e2);
 void window_update_copy_index_op(entry_t* e1, entry_t* e2);  // Raw operation without decrypt/encrypt
 void concat_attributes(entry_t* left, entry_t* right);
-void concat_attributes_op(entry_t* left, entry_t* right);  // Raw operation without decrypt/encrypt
+void concat_attributes_op(entry_t* left, entry_t* right, int32_t left_attr_count, int32_t right_attr_count);  // Raw operation without decrypt/encrypt
 
 /**
  * Join attribute setting

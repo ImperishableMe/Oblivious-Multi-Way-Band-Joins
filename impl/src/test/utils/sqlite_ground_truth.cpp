@@ -187,12 +187,15 @@ int SQLiteGroundTruth::query_callback(void* data, int argc, char** argv, char** 
     
     // Create entry for this row
     Entry entry;
+    // Set column names for the entry (will be removed later)
+    entry.column_names = result->column_names;
+    // Add attribute values
     for (int i = 0; i < argc; i++) {
         if (argv[i]) {
             int32_t value = std::stoi(argv[i]);
-            entry.add_attribute(result->column_names[i], value);
+            entry.attributes.push_back(value);
         } else {
-            entry.add_attribute(result->column_names[i], 0);  // NULL as 0
+            entry.attributes.push_back(0);  // NULL as 0
         }
     }
     

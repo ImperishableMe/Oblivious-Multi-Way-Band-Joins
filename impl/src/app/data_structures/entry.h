@@ -59,6 +59,7 @@ public:
     // Conversion methods
     entry_t to_entry_t() const;
     void from_entry_t(const entry_t& c_entry);
+    void from_entry_t(const entry_t& c_entry, const std::vector<std::string>& schema);
     
     // Utility methods
     void clear();

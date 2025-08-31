@@ -109,6 +109,43 @@ void Entry::from_entry_t(const entry_t& c_entry) {
     }
 }
 
+void Entry::from_entry_t(const entry_t& c_entry, const std::vector<std::string>& schema) {
+    // Copy all metadata fields
+    field_type = c_entry.field_type;
+    equality_type = c_entry.equality_type;
+    is_encrypted = c_entry.is_encrypted;
+    nonce = c_entry.nonce;
+    join_attr = c_entry.join_attr;
+    original_index = c_entry.original_index;
+    local_mult = c_entry.local_mult;
+    final_mult = c_entry.final_mult;
+    foreign_sum = c_entry.foreign_sum;
+    local_cumsum = c_entry.local_cumsum;
+    local_interval = c_entry.local_interval;
+    foreign_interval = c_entry.foreign_interval;
+    local_weight = c_entry.local_weight;
+    copy_index = c_entry.copy_index;
+    alignment_key = c_entry.alignment_key;
+    dst_idx = c_entry.dst_idx;
+    index = c_entry.index;
+    
+    // Use provided schema to determine number of attributes
+    size_t num_attributes = schema.size();
+    if (num_attributes > MAX_ATTRIBUTES) {
+        num_attributes = MAX_ATTRIBUTES;
+    }
+    
+    // Copy column names from schema
+    column_names.clear();
+    column_names = schema;
+    
+    // Copy attributes based on schema size
+    attributes.clear();
+    for (size_t i = 0; i < num_attributes; i++) {
+        attributes.push_back(c_entry.attributes[i]);
+    }
+}
+
 void Entry::clear() {
     *this = Entry();  // Reset to default values
 }

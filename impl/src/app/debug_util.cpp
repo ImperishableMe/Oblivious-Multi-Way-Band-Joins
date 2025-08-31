@@ -444,11 +444,10 @@ void debug_dump_selected_columns(const Table& table, const char* label, const ch
                     file << "," << entry.foreign_sum;
                 } else if (col == "ALL_ATTRIBUTES") {
                     // Special keyword to dump all attribute values
-                    // Dump all non-empty attributes
-                    for (int j = 0; j < MAX_ATTRIBUTES; j++) {
-                        if (!entry.column_names[j].empty()) {
-                            file << ",attr" << j << "=" << entry.attributes[j];
-                        }
+                    // Use table schema to determine actual attributes
+                    std::vector<std::string> schema = table.get_schema();
+                    for (size_t j = 0; j < schema.size() && j < MAX_ATTRIBUTES; j++) {
+                        file << "," << schema[j] << "=" << entry.attributes[j];
                     }
                 } else {
                     // Check if it's a data column by name
@@ -497,22 +496,13 @@ void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid) {
     ss << ", type=" << static_cast<int>(decrypted.field_type);
     ss << ", eq=" << static_cast<int>(decrypted.equality_type);
     
-    // Print non-empty attributes
-    bool has_attrs = false;
+    // Print all attributes (cannot determine actual count without schema)
+    ss << ", data=[";
     for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (!decrypted.column_names[i].empty()) {
-            if (!has_attrs) {
-                ss << ", data=[";
-                has_attrs = true;
-            } else {
-                ss << ",";
-            }
-            ss << decrypted.attributes[i];
-        }
+        if (i > 0) ss << ",";
+        ss << decrypted.attributes[i];
     }
-    if (has_attrs) {
-        ss << "]";
-    }
+    ss << "]";
     
     DEBUG_DEBUG("%s", ss.str().c_str());
 }

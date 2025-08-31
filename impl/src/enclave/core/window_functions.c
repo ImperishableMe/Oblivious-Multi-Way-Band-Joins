@@ -298,7 +298,7 @@ void window_update_copy_index(entry_t* e1, entry_t* e2) {
  * This adds all attributes from right to left, preserving left's existing attributes
  */
 void concat_attributes_op(entry_t* left, entry_t* right, int32_t left_attr_count, int32_t right_attr_count) {
-    // Use the provided attribute counts instead of checking column_names
+    // Use the provided attribute counts
     
     // Copy attributes from right to left (after left's existing attributes)
     int total_attrs = left_attr_count + right_attr_count;
@@ -307,13 +307,8 @@ void concat_attributes_op(entry_t* left, entry_t* right, int32_t left_attr_count
     }
     
     for (int i = 0; i < right_attr_count && (left_attr_count + i) < MAX_ATTRIBUTES; i++) {
-        // Copy attribute value
+        // Copy attribute value only (column_names no longer exist in entry_t)
         left->attributes[left_attr_count + i] = right->attributes[i];
-        
-        // Copy column name
-        for (int j = 0; j < MAX_COLUMN_NAME_LEN; j++) {
-            left->column_names[left_attr_count + i][j] = right->column_names[i][j];
-        }
     }
 }
 

@@ -138,8 +138,7 @@ enclave {
         // Update copy index based on original_index comparison
         public void ecall_window_update_copy_index([in,out] entry_t* e1, [in,out] entry_t* e2);
         
-        // Concatenate attributes from right entry into left entry
-        public void ecall_concat_attributes([in,out] entry_t* left, [in,out] entry_t* right);
+        // Concatenate attributes - removed, using batch dispatcher with parameters instead
         
         // Get output size from last entry
         public void ecall_obtain_output_size([out] int32_t* retval, [in] const entry_t* entry);

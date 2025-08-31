@@ -200,6 +200,4 @@ void ecall_window_update_copy_index(entry_t* e1, entry_t* e2) {
     window_update_copy_index(e1, e2);
 }
 
-void ecall_concat_attributes(entry_t* left, entry_t* right) {
-    concat_attributes(left, right);
-}
+// ecall_concat_attributes removed - using batch dispatcher with parameters instead

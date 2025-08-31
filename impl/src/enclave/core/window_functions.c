@@ -297,24 +297,8 @@ void window_update_copy_index(entry_t* e1, entry_t* e2) {
  * Concatenate attributes from right entry into left entry
  * This adds all attributes from right to left, preserving left's existing attributes
  */
-void concat_attributes_op(entry_t* left, entry_t* right) {
-    // Find the number of existing attributes in left
-    int left_attr_count = 0;
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (left->column_names[i][0] == '\0') {
-            break;
-        }
-        left_attr_count++;
-    }
-    
-    // Find the number of attributes in right
-    int right_attr_count = 0;
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (right->column_names[i][0] == '\0') {
-            break;
-        }
-        right_attr_count++;
-    }
+void concat_attributes_op(entry_t* left, entry_t* right, int32_t left_attr_count, int32_t right_attr_count) {
+    // Use the provided attribute counts instead of checking column_names
     
     // Copy attributes from right to left (after left's existing attributes)
     int total_attrs = left_attr_count + right_attr_count;
@@ -333,6 +317,5 @@ void concat_attributes_op(entry_t* left, entry_t* right) {
     }
 }
 
-void concat_attributes(entry_t* left, entry_t* right) {
-    apply_to_decrypted_pair(left, right, concat_attributes_op);
-}
+// Note: concat_attributes wrapper removed as we now call concat_attributes_op 
+// directly from batch dispatcher with attribute count parameters

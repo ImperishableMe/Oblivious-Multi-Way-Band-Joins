@@ -83,7 +83,6 @@ typedef struct {
     
     // Data attributes (all integers for our use case)
     int32_t attributes[MAX_ATTRIBUTES];
-    char column_names[MAX_ATTRIBUTES][MAX_COLUMN_NAME_LEN];
 } entry_t;
 
 #endif // ENCLAVE_TYPES_H

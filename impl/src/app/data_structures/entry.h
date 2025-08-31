@@ -49,9 +49,8 @@ public:
     int32_t index;
     
     // Data attributes - fixed array of MAX_ATTRIBUTES
-    // Always process all MAX_ATTRIBUTES - empty slots have empty strings and zeros
+    // Always process all MAX_ATTRIBUTES - empty slots have zeros
     int32_t attributes[MAX_ATTRIBUTES];
-    std::string column_names[MAX_ATTRIBUTES];
     
     // Constructors
     Entry();

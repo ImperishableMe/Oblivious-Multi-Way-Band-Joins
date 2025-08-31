@@ -61,11 +61,10 @@ crypto_status_t aes_encrypt_entry(entry_t* entry) {
     uint8_t ctr[16] = {0};
     memcpy(ctr, &entry->nonce, 8);
     
-    // Simplified encryption: encrypt entire attributes array
-    // We keep is_encrypted, nonce, and column_names unencrypted
+    // Simplified encryption: encrypt entire structure except is_encrypted and nonce
+    // We keep is_encrypted and nonce unencrypted
     size_t is_encrypted_offset = offsetof(entry_t, is_encrypted);
     size_t nonce_offset = offsetof(entry_t, nonce);
-    size_t column_names_offset = offsetof(entry_t, column_names);
     
     // Encrypt in chunks to avoid the excluded fields
     uint8_t* entry_bytes = (uint8_t*)entry;
@@ -78,7 +77,7 @@ crypto_status_t aes_encrypt_entry(entry_t* entry) {
         size_t end;
     } regions[] = {
         {0, is_encrypted_offset},  // Before is_encrypted (includes field_type, equality_type)
-        {nonce_offset + sizeof(uint64_t), column_names_offset}  // After nonce to column_names (entire attributes array)
+        {nonce_offset + sizeof(uint64_t), sizeof(entry_t)}  // After nonce to end (entire attributes array)
     };
     
     // Encrypt each region (now just 2 regions)
@@ -139,7 +138,6 @@ crypto_status_t aes_decrypt_entry(entry_t* entry) {
     // Simplified decryption: matches encryption with two regions
     size_t is_encrypted_offset = offsetof(entry_t, is_encrypted);
     size_t nonce_offset = offsetof(entry_t, nonce);
-    size_t column_names_offset = offsetof(entry_t, column_names);
     
     uint8_t* entry_bytes = (uint8_t*)entry;
     uint8_t decrypted_data[sizeof(entry_t)];
@@ -150,7 +148,7 @@ crypto_status_t aes_decrypt_entry(entry_t* entry) {
         size_t end;
     } regions[] = {
         {0, is_encrypted_offset},  // Before is_encrypted
-        {nonce_offset + sizeof(uint64_t), column_names_offset}  // After nonce (entire attributes array)
+        {nonce_offset + sizeof(uint64_t), sizeof(entry_t)}  // After nonce to end (entire attributes array)
     };
     
     // Decrypt each region (now just 2 regions)

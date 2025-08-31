@@ -98,7 +98,7 @@ void create_sqlite_table(sqlite3* db, const std::string& table_name, const Table
     // Insert data
     for (const auto& entry : table) {
         // Convert Entry to IO_Entry for easier attribute access
-        IO_Entry io_entry(entry);
+        IO_Entry io_entry(entry, schema);
         std::string insert_sql = "INSERT INTO " + table_name + " VALUES (";
         for (size_t i = 0; i < io_entry.attributes.size(); i++) {
             if (i > 0) insert_sql += ", ";

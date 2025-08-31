@@ -1,5 +1,6 @@
 #include "entry.h"
 #include <cstring>
+#include <cstdio>
 #include <algorithm>
 #include <sstream>
 #include "../common/debug_util.h"
@@ -24,7 +25,6 @@ Entry::Entry()
       index(0) {
     // Initialize arrays
     memset(attributes, 0, sizeof(attributes));
-    // column_names are automatically initialized as empty strings
 }
 
 Entry::Entry(const entry_t& c_entry) {
@@ -59,8 +59,6 @@ entry_t Entry::to_entry_t() const {
     // Copy all MAX_ATTRIBUTES - simpler and consistent
     for (int i = 0; i < MAX_ATTRIBUTES; i++) {
         result.attributes[i] = attributes[i];
-        strncpy(result.column_names[i], column_names[i].c_str(), MAX_COLUMN_NAME_LEN - 1);
-        result.column_names[i][MAX_COLUMN_NAME_LEN - 1] = '\0';
     }
     
     return result;
@@ -88,9 +86,8 @@ void Entry::from_entry_t(const entry_t& c_entry) {
     index = c_entry.index;
     
     // Copy all MAX_ATTRIBUTES - no need to figure out actual size
-    // Empty entries will just have empty strings and zeros
+    // Empty entries will just have zeros
     for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        column_names[i] = std::string(c_entry.column_names[i]);
         attributes[i] = c_entry.attributes[i];
     }
 }
@@ -120,15 +117,8 @@ void Entry::from_entry_t(const entry_t& c_entry, const std::vector<std::string>&
         attributes[i] = c_entry.attributes[i];
     }
     
-    // Set column names from schema
-    size_t schema_size = std::min(schema.size(), (size_t)MAX_ATTRIBUTES);
-    for (size_t i = 0; i < schema_size; i++) {
-        column_names[i] = schema[i];
-    }
-    // Clear remaining column names
-    for (size_t i = schema_size; i < MAX_ATTRIBUTES; i++) {
-        column_names[i].clear();
-    }
+    // Schema is now managed at Table level only
+    // No column_names in Entry anymore
 }
 
 void Entry::clear() {

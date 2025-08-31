@@ -41,13 +41,6 @@ private:
      */
     static void SetJoinAttributesForNode(JoinTreeNodePtr node, sgx_enclave_id_t eid);
     
-    /**
-     * Get column index from column name
-     * @param entry The entry to check
-     * @param column_name The column to find
-     * @return Column index or -1 if not found
-     */
-    static int32_t GetColumnIndex(const Entry& entry, const std::string& column_name);
 };
 
 #endif // JOIN_ATTRIBUTE_SETTER_H

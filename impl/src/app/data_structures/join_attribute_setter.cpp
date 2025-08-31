@@ -89,43 +89,21 @@ void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node, sgx_enc
     }
 }
 
-int32_t JoinAttributeSetter::GetColumnIndex(const Entry& entry, const std::string& column_name) {
-    // Search through column names to find index
-    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (!entry.column_names[i].empty() && entry.column_names[i] == column_name) {
-            return static_cast<int32_t>(i);
-        }
-    }
-    
-    // Not found
-    return -1;
-}
-
 void JoinAttributeSetter::SetJoinAttributesForTable(Table& table, const std::string& column_name, sgx_enclave_id_t eid) {
     if (table.size() == 0) {
         DEBUG_WARN("Table is empty, cannot set join attributes");
         return;
     }
     
-    // Get column index from table schema (prefer) or first entry (fallback)
+    // Get column index from table schema
     int32_t column_index = -1;
     
-    // Try to get column index from table schema first
     try {
         size_t idx = table.get_column_index(column_name);
         column_index = static_cast<int32_t>(idx);
         DEBUG_DEBUG("Found column %s at index %d using table schema", column_name.c_str(), column_index);
     } catch (const std::runtime_error& e) {
-        // Fall back to Entry column names if schema not available
-        column_index = GetColumnIndex(table[0], column_name);
-        if (column_index >= 0) {
-            DEBUG_DEBUG("Found column %s at index %d using entry column names (fallback)", 
-                       column_name.c_str(), column_index);
-        }
-    }
-    
-    if (column_index < 0) {
-        DEBUG_ERROR("Column %s not found in table", column_name.c_str());
+        DEBUG_ERROR("Column %s not found in table schema: %s", column_name.c_str(), e.what());
         return;
     }
     

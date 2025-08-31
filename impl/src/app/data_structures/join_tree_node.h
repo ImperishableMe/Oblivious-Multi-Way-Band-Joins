@@ -50,7 +50,9 @@ public:
     JoinTreeNode() = default;
     
     explicit JoinTreeNode(const std::string& name) 
-        : table_name(name), table_data(name) {}
+        : table_name(name), table_data() {
+        // Table will be set later with proper schema
+    }
     
     JoinTreeNode(const std::string& name, const Table& table) 
         : table_name(name), table_data(table) {

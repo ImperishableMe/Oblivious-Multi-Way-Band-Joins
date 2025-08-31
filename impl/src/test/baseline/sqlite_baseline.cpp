@@ -48,14 +48,6 @@ Table decrypt_table(const Table& encrypted_table) {
         }
     }
     
-    // Set Table schema from first decrypted entry if not already set
-    if (decrypted.get_schema().empty() && decrypted.size() > 0) {
-        const Entry& first = decrypted[0];
-        if (!first.column_names.empty()) {
-            decrypted.set_schema(first.column_names);
-        }
-    }
-    
     return decrypted;
 }
 
@@ -79,21 +71,14 @@ void create_sqlite_table(sqlite3* db, const std::string& table_name, const Table
         throw std::runtime_error("Cannot create table from empty data");
     }
     
-    // Get column names from Table schema
-    std::vector<std::string> col_names = table.get_schema();
-    if (col_names.empty() && table.size() > 0) {
-        // Fallback: generate generic column names based on attribute count
-        const Entry& first = table[0];
-        for (size_t i = 0; i < first.attributes.size(); i++) {
-            col_names.push_back("col" + std::to_string(i));
-        }
-    }
+    // Get column names from first entry
+    const Entry& first = table[0];
     
     // Build CREATE TABLE statement
     std::string create_sql = "CREATE TABLE " + table_name + " (";
-    for (size_t i = 0; i < col_names.size(); i++) {
+    for (size_t i = 0; i < first.column_names.size(); i++) {
         if (i > 0) create_sql += ", ";
-        create_sql += col_names[i] + " INTEGER";
+        create_sql += first.column_names[i] + " INTEGER";
     }
     create_sql += ")";
     
@@ -106,11 +91,10 @@ void create_sqlite_table(sqlite3* db, const std::string& table_name, const Table
         throw std::runtime_error(error);
     }
     
-    // Insert data - use the number of columns from the schema, not all attributes
+    // Insert data
     for (const auto& entry : table) {
         std::string insert_sql = "INSERT INTO " + table_name + " VALUES (";
-        // Use col_names.size() to determine how many values to insert
-        for (size_t i = 0; i < col_names.size() && i < entry.attributes.size(); i++) {
+        for (size_t i = 0; i < entry.attributes.size(); i++) {
             if (i > 0) insert_sql += ", ";
             insert_sql += std::to_string(entry.attributes[i]);
         }
@@ -145,8 +129,9 @@ static int query_callback(void* data, int argc, char** argv, char** col_names) {
         result->first_row = false;
     }
     
-    // Create entry for this row (without column_names)
+    // Create entry for this row
     Entry entry;
+    entry.column_names = result->column_names;
     for (int i = 0; i < argc; i++) {
         entry.attributes.push_back(argv[i] ? std::stoi(argv[i]) : 0);
     }
@@ -168,10 +153,7 @@ Table execute_sqlite_join(sqlite3* db, const std::string& join_query) {
         throw std::runtime_error(error);
     }
     
-    // Set the Table schema with column names from query
-    if (!result.column_names.empty()) {
-        result.table.set_schema(result.column_names);
-    }
+    // Query executed
     
     return result.table;
 }

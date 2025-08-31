@@ -59,8 +59,12 @@ entry_t Entry::to_entry_t() const {
         result.attributes[i] = attributes[i];
     }
     
-    // Column names are now managed by Table, not Entry
-    // (commented out during migration to slim mode)
+    // Copy column names (up to MAX_ATTRIBUTES)
+    size_t col_count = std::min(column_names.size(), (size_t)MAX_ATTRIBUTES);
+    for (size_t i = 0; i < col_count; i++) {
+        strncpy(result.column_names[i], column_names[i].c_str(), MAX_COLUMN_NAME_LEN - 1);
+        result.column_names[i][MAX_COLUMN_NAME_LEN - 1] = '\0';
+    }
     
     return result;
 }
@@ -87,14 +91,20 @@ void Entry::from_entry_t(const entry_t& c_entry) {
     index = c_entry.index;
     
     // Clear and copy column names first to determine actual column count
-    // Column names are now managed by Table, not Entry
-    // Just copy all non-zero attributes
-    attributes.clear();
+    column_names.clear();
+    int actual_columns = 0;
     for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (c_entry.attributes[i] == NULL_VALUE) {
-            // Stop at NULL_VALUE marker
+        if (strlen(c_entry.column_names[i]) == 0) {
+            // Stop at first empty column name
             break;
         }
+        column_names.push_back(std::string(c_entry.column_names[i]));
+        actual_columns++;
+    }
+    
+    // Clear and copy only the actual number of attributes
+    attributes.clear();
+    for (int i = 0; i < actual_columns && i < MAX_ATTRIBUTES; i++) {
         attributes.push_back(c_entry.attributes[i]);
     }
 }
@@ -104,32 +114,58 @@ void Entry::clear() {
 }
 
 int32_t Entry::get_attribute(const std::string& column_name) const {
-    // Column names are now managed by Table
-    // This method is deprecated and returns 0
-    return 0;
+    // Find the column index
+    for (size_t i = 0; i < column_names.size(); i++) {
+        if (column_names[i] == column_name) {
+            if (i < attributes.size()) {
+                return attributes[i];
+            }
+            break;
+        }
+    }
+    return 0;  // Return 0 if column not found
 }
 
 bool Entry::has_attribute(const std::string& column_name) const {
-    // Column names are now managed by Table
-    // This method is deprecated and returns false
+    for (const auto& name : column_names) {
+        if (name == column_name) {
+            return true;
+        }
+    }
     return false;
 }
 
 void Entry::set_attribute(const std::string& column_name, int32_t value) {
-    // Column names are now managed by Table
-    // This method is deprecated and does nothing
+    // Find the column index
+    for (size_t i = 0; i < column_names.size(); i++) {
+        if (column_names[i] == column_name) {
+            if (i < attributes.size()) {
+                attributes[i] = value;
+            } else {
+                // Extend attributes vector if needed
+                while (attributes.size() < i) {
+                    attributes.push_back(0);
+                }
+                attributes.push_back(value);
+            }
+            return;
+        }
+    }
+    // If column not found, add it
+    add_attribute(column_name, value);
 }
 
 void Entry::add_attribute(const std::string& column_name, int32_t value) {
-    // Column names are now managed by Table
-    // Just add the value
+    column_names.push_back(column_name);
     attributes.push_back(value);
 }
 
 std::map<std::string, int32_t> Entry::get_attributes_map() const {
-    // Column names are now managed by Table
-    // This method is deprecated and returns empty map
-    return std::map<std::string, int32_t>();
+    std::map<std::string, int32_t> result;
+    for (size_t i = 0; i < column_names.size() && i < attributes.size(); i++) {
+        result[column_names[i]] = attributes[i];
+    }
+    return result;
 }
 
 bool Entry::operator<(const Entry& other) const {
@@ -151,7 +187,11 @@ std::string Entry::to_string() const {
        << ", attrs=[";
     for (size_t i = 0; i < attributes.size(); i++) {
         if (i > 0) ss << ", ";
-        ss << attributes[i];
+        if (i < column_names.size()) {
+            ss << column_names[i] << "=" << attributes[i];
+        } else {
+            ss << attributes[i];
+        }
     }
     ss << "]}";
     return ss.str();

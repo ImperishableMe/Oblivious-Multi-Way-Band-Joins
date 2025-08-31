@@ -258,14 +258,12 @@ void debug_dump_table(const Table& table, const char* label, const char* step_na
         
         // Add data columns if requested
         if (include_attributes && table.size() > 0) {
-            // Get column headers from Table schema
+            // Prefer Table schema, fallback to Entry column_names
             std::vector<std::string> column_headers = table.get_schema();
             if (column_headers.empty()) {
-                // Generate generic column names if no schema
+                // Fallback to first entry's column names for backward compatibility
                 const Entry& first_entry = table[0];
-                for (size_t j = 0; j < first_entry.attributes.size(); j++) {
-                    column_headers.push_back("attr_" + std::to_string(j));
-                }
+                column_headers = first_entry.column_names;
             }
             for (const auto& col_name : column_headers) {
                 file << "," << col_name;
@@ -462,8 +460,14 @@ void debug_dump_selected_columns(const Table& table, const char* label, const ch
                             found = true;
                         }
                     } catch (const std::runtime_error& e) {
-                        // Column not found in schema
-                        found = false;
+                        // Fallback to Entry column_names for backward compatibility
+                        for (size_t j = 0; j < entry.column_names.size(); j++) {
+                            if (entry.column_names[j] == col) {
+                                file << "," << entry.attributes[j];
+                                found = true;
+                                break;
+                            }
+                        }
                     }
                     
                     if (!found) {

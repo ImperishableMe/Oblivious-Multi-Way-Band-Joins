@@ -91,18 +91,22 @@ void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node, sgx_enc
         
         // Additional debug: Show all attributes to verify
         DEBUG_INFO("First entry attributes for verification:");
-        std::vector<std::string> schema = table.get_schema();
         for (size_t j = 0; j < first_entry.attributes.size(); j++) {
             DEBUG_INFO("  attr[%zu]=%d (column: %s)", j, first_entry.attributes[j], 
-                      j < schema.size() ? schema[j].c_str() : "unknown");
+                      j < first_entry.column_names.size() ? first_entry.column_names[j].c_str() : "unknown");
         }
     }
 }
 
 int32_t JoinAttributeSetter::GetColumnIndex(const Entry& entry, const std::string& column_name) {
-    // NOTE: This function is deprecated during migration to Table schema
-    // Column index should be obtained from Table::get_column_index()
-    // Returning -1 to indicate not found - caller should use Table schema
+    // Search through column names to find index
+    for (size_t i = 0; i < entry.column_names.size(); i++) {
+        if (entry.column_names[i] == column_name) {
+            return static_cast<int32_t>(i);
+        }
+    }
+    
+    // Not found
     return -1;
 }
 

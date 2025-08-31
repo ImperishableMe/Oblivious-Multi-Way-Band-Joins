@@ -135,18 +135,20 @@ Entry SimpleJoinExecutor::concatenate_entries(
     
     Entry result;
     
-    // Copy ALL attributes from left entry (preserving original names)
-    auto left_attrs = left.get_attributes_map();
-    for (const auto& [col_name, value] : left_attrs) {
-        // Just use the column name as-is (SQLite style)
-        result.add_attribute(col_name, value);
+    // Copy ALL attributes from left entry by index
+    for (size_t i = 0; i < left.attributes.size(); i++) {
+        result.attributes.push_back(left.attributes[i]);
+        if (i < left.column_names.size()) {
+            result.column_names.push_back(left.column_names[i]);
+        }
     }
     
-    // Copy ALL attributes from right entry (preserving original names)
-    // All TPC-H column names are unique, so no duplicates to worry about
-    auto right_attrs = right.get_attributes_map();
-    for (const auto& [col_name, value] : right_attrs) {
-        result.add_attribute(col_name, value);
+    // Copy ALL attributes from right entry by index
+    for (size_t i = 0; i < right.attributes.size(); i++) {
+        result.attributes.push_back(right.attributes[i]);
+        if (i < right.column_names.size()) {
+            result.column_names.push_back(right.column_names[i]);
+        }
     }
     
     // Set other properties
@@ -156,19 +158,21 @@ Entry SimpleJoinExecutor::concatenate_entries(
 }
 
 int32_t SimpleJoinExecutor::get_column_value(const Entry& entry, const std::string& column_name) {
-    // Try exact match first
-    if (entry.has_attribute(column_name)) {
-        return entry.get_attribute(column_name);
-    }
-    
-    // Try with any table prefix (e.g., "table.column")
-    auto attrs = entry.get_attributes_map();
-    for (const auto& [name, value] : attrs) {
+    // Search through column names by index
+    for (size_t i = 0; i < entry.column_names.size() && i < entry.attributes.size(); i++) {
+        const std::string& name = entry.column_names[i];
+        
+        // Try exact match
+        if (name == column_name) {
+            return entry.attributes[i];
+        }
+        
+        // Try with any table prefix (e.g., "table.column")
         size_t dot_pos = name.find('.');
         if (dot_pos != std::string::npos) {
             std::string col_part = name.substr(dot_pos + 1);
             if (col_part == column_name) {
-                return value;
+                return entry.attributes[i];
             }
         }
     }

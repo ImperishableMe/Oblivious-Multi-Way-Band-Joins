@@ -72,13 +72,20 @@ void create_sqlite_table(sqlite3* db, const std::string& table_name, const Table
     }
     
     // Get column names from first entry
-    const Entry& first = table[0];
+    // Get column names from table schema
+    std::vector<std::string> schema = table.get_schema();
+    if (schema.empty()) {
+        // Fallback to first entry's column names if schema not available
+        // TODO: Remove this fallback once all tables have schema
+        const Entry& first = table[0];
+        schema = first.column_names;
+    }
     
     // Build CREATE TABLE statement
     std::string create_sql = "CREATE TABLE " + table_name + " (";
-    for (size_t i = 0; i < first.column_names.size(); i++) {
+    for (size_t i = 0; i < schema.size(); i++) {
         if (i > 0) create_sql += ", ";
-        create_sql += first.column_names[i] + " INTEGER";
+        create_sql += schema[i] + " INTEGER";
     }
     create_sql += ")";
     

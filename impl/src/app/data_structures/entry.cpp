@@ -156,13 +156,9 @@ std::string Entry::to_string() const {
        << ", local_mult=" << local_mult
        << ", final_mult=" << final_mult
        << ", attrs=[";
-    bool first = true;
     for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (!column_names[i].empty()) {
-            if (!first) ss << ", ";
-            ss << column_names[i] << "=" << attributes[i];
-            first = false;
-        }
+        if (i > 0) ss << ", ";
+        ss << attributes[i];
     }
     ss << "]}";
     return ss.str();

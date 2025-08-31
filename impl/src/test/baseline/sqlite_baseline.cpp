@@ -71,14 +71,10 @@ void create_sqlite_table(sqlite3* db, const std::string& table_name, const Table
         throw std::runtime_error("Cannot create table from empty data");
     }
     
-    // Get column names from first entry
     // Get column names from table schema
     std::vector<std::string> schema = table.get_schema();
     if (schema.empty()) {
-        // Fallback to first entry's column names if schema not available
-        // TODO: Remove this fallback once all tables have schema
-        const Entry& first = table[0];
-        schema = first.column_names;
+        throw std::runtime_error("Table has no schema set - cannot create SQLite table");
     }
     
     // Build CREATE TABLE statement

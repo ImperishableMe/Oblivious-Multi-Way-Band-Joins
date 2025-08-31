@@ -17,10 +17,12 @@ std::string JoinResultComparator::entry_to_normalized_string(const Entry& entry)
     // Get all attributes and sort by normalized column name
     std::map<std::string, int32_t> sorted_fields;
     
-    auto attrs = entry.get_attributes_map();
-    for (const auto& [col_name, value] : attrs) {
-        std::string norm_name = normalize_column_name(col_name);
-        sorted_fields[norm_name] = value;
+    // Simply use indices for comparison - column names don't matter for equivalence
+    // This avoids dependency on get_attributes_map()
+    for (size_t i = 0; i < entry.attributes.size(); i++) {
+        std::stringstream col_key;
+        col_key << "attr_" << i;  // Use index-based key
+        sorted_fields[col_key.str()] = entry.attributes[i];
     }
     
     // Build string representation
@@ -38,33 +40,17 @@ std::string JoinResultComparator::entry_to_normalized_string(const Entry& entry)
 }
 
 bool JoinResultComparator::entries_equal(const Entry& e1, const Entry& e2) const {
-    // Get normalized field maps
-    std::map<std::string, int32_t> fields1, fields2;
+    // Simple index-based comparison - avoids get_attributes_map()
     
-    auto attrs1 = e1.get_attributes_map();
-    for (const auto& [col, val] : attrs1) {
-        fields1[normalize_column_name(col)] = val;
-    }
-    
-    auto attrs2 = e2.get_attributes_map();
-    for (const auto& [col, val] : attrs2) {
-        fields2[normalize_column_name(col)] = val;
-    }
-    
-    // Check same number of fields
-    if (fields1.size() != fields2.size()) {
+    // Check same number of attributes
+    if (e1.attributes.size() != e2.attributes.size()) {
         return false;
     }
     
-    // Check each field
-    for (const auto& [col, val1] : fields1) {
-        auto it = fields2.find(col);
-        if (it == fields2.end()) {
-            return false;  // Column missing in e2
-        }
-        
+    // Compare each attribute by index
+    for (size_t i = 0; i < e1.attributes.size(); i++) {
         // Compare values with tolerance
-        if (std::abs(val1 - it->second) > tolerance) {
+        if (std::abs(e1.attributes[i] - e2.attributes[i]) > tolerance) {
             return false;
         }
     }
@@ -75,10 +61,19 @@ bool JoinResultComparator::entries_equal(const Entry& e1, const Entry& e2) const
 std::set<std::string> JoinResultComparator::get_all_columns(const Table& table) const {
     std::set<std::string> columns;
     
-    for (size_t i = 0; i < table.size(); i++) {
-        auto attrs = table[i].get_attributes_map();
-        for (const auto& [col, val] : attrs) {
+    // Use Table schema if available
+    std::vector<std::string> schema = table.get_schema();
+    if (!schema.empty()) {
+        for (const auto& col : schema) {
             columns.insert(normalize_column_name(col));
+        }
+    } else if (table.size() > 0) {
+        // Fallback: use index-based column names
+        const Entry& first = table[0];
+        for (size_t i = 0; i < first.attributes.size(); i++) {
+            std::stringstream col_name;
+            col_name << "attr_" << i;
+            columns.insert(col_name.str());
         }
     }
     

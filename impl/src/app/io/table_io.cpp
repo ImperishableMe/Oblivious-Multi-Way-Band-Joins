@@ -21,45 +21,48 @@ Table TableIO::load_csv(const std::string& filepath) {
         throw std::runtime_error("Cannot open CSV file: " + filepath);
     }
     
-    Table table(extract_table_name(filepath));
     std::string line;
     std::vector<std::string> headers;
-    bool first_line = true;
     int nonce_column_index = -1;  // -1 means no nonce column
     
+    // Read first line to get headers
+    if (!std::getline(file, line)) {
+        throw std::runtime_error("CSV file is empty: " + filepath);
+    }
+    
+    // Parse headers from first line
+    headers = parse_csv_line(line);
+    
+    // Check if any column is "nonce"
+    for (size_t i = 0; i < headers.size(); ++i) {
+        if (headers[i] == "nonce") {
+            nonce_column_index = static_cast<int>(i);
+            break;
+        }
+    }
+    
+    // Build schema (excluding nonce column if present)
+    std::vector<std::string> schema_columns;
+    for (size_t i = 0; i < headers.size(); ++i) {
+        if (static_cast<int>(i) != nonce_column_index) {
+            schema_columns.push_back(headers[i]);
+        }
+    }
+    
+    // Now create table with proper schema
+    Table table(extract_table_name(filepath), schema_columns);
+    
+    // Set num_columns (excluding nonce column if present)
+    size_t data_columns = (nonce_column_index >= 0) ? headers.size() - 1 : headers.size();
+    table.set_num_columns(data_columns);
+    
+    // Process data lines
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         
         auto values = parse_csv_line(line);
         
-        if (first_line) {
-            // First line contains column headers
-            headers = values;
-            
-            // Check if any column is "nonce"
-            for (size_t i = 0; i < headers.size(); ++i) {
-                if (headers[i] == "nonce") {
-                    nonce_column_index = static_cast<int>(i);
-                    break;
-                }
-            }
-            
-            // Build schema (excluding nonce column if present)
-            std::vector<std::string> schema_columns;
-            for (size_t i = 0; i < headers.size(); ++i) {
-                if (static_cast<int>(i) != nonce_column_index) {
-                    schema_columns.push_back(headers[i]);
-                }
-            }
-            
-            // Set table schema for slim mode preparation
-            table.set_schema(schema_columns);
-            
-            // Set num_columns (excluding nonce column if present)
-            size_t data_columns = (nonce_column_index >= 0) ? headers.size() - 1 : headers.size();
-            table.set_num_columns(data_columns);
-            first_line = false;
-        } else {
+        {
             // Data line - create IO_Entry for dynamic size handling
             IO_Entry io_entry;
             

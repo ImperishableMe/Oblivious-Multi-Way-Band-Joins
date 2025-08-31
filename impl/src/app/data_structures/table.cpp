@@ -22,11 +22,6 @@ Table::Table(const std::string& name, const std::vector<std::string>& schema)
     }
 }
 
-// Deprecated constructor - kept temporarily for migration
-Table::Table(const std::string& name) : table_name(name), num_columns(0) {
-    // This constructor should not be used - will be removed after migration
-    DEBUG_WARN("Table '%s' created without schema - this is deprecated!", name.c_str());
-}
 
 void Table::add_entry(const Entry& entry) {
     entries.push_back(entry);

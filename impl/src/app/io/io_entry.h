@@ -27,14 +27,12 @@ public:
     // Constructors
     IO_Entry() : is_encrypted(false), nonce(0), join_attr(0) {}
     
-    // Conversion from/to regular Entry
-    IO_Entry(const Entry& entry) {
-        // Copy only non-empty attributes
-        for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-            if (!entry.column_names[i].empty()) {
-                attributes.push_back(entry.attributes[i]);
-                column_names.push_back(entry.column_names[i]);
-            }
+    // Conversion from regular Entry (without column_names)
+    IO_Entry(const Entry& entry, const std::vector<std::string>& schema) {
+        // Copy attributes based on schema size
+        for (size_t i = 0; i < schema.size() && i < MAX_ATTRIBUTES; i++) {
+            attributes.push_back(entry.attributes[i]);
+            column_names.push_back(schema[i]);
         }
         is_encrypted = entry.is_encrypted;
         nonce = entry.nonce;
@@ -48,13 +46,12 @@ public:
         size_t copy_count = std::min(attributes.size(), (size_t)MAX_ATTRIBUTES);
         for (size_t i = 0; i < copy_count; i++) {
             entry.attributes[i] = attributes[i];
-            entry.column_names[i] = column_names[i];
+            // Note: column_names are no longer stored in Entry
         }
         
         // Clear remaining array elements
         for (size_t i = copy_count; i < MAX_ATTRIBUTES; i++) {
             entry.attributes[i] = 0;
-            entry.column_names[i].clear();
         }
         
         entry.is_encrypted = is_encrypted;

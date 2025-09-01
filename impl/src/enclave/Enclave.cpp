@@ -8,8 +8,12 @@
 #include "secure_key.h"
 
 /**
- * AES-CTR Encryption/Decryption Ecall Implementations
- * These functions use AES-CTR with secure key stored inside the enclave
+ * Essential Ecall Implementations
+ * Only 4 ecalls remain after batching optimization:
+ * 1. encrypt_entry - For file I/O and debug
+ * 2. decrypt_entry - For file I/O and debug  
+ * 3. obtain_output_size - Get output size from last entry
+ * 4. batch_dispatcher - Handles all 36+ batched operations
  */
 
 crypto_status_t ecall_encrypt_entry(entry_t* entry) {
@@ -22,182 +26,10 @@ crypto_status_t ecall_decrypt_entry(entry_t* entry) {
     return aes_decrypt_entry(entry);
 }
 
-/**
- * Transform Function Ecall Implementations
- */
-
-void ecall_transform_set_local_mult_one(entry_t* entry) {
-    transform_set_local_mult_one(entry);
-}
-
-void ecall_transform_add_metadata(entry_t* entry) {
-    transform_add_metadata(entry);
-}
-
-void ecall_transform_set_index(entry_t* entry, uint32_t index) {
-    transform_set_index(entry, index);
-}
-
-void ecall_transform_init_local_temps(entry_t* entry) {
-    transform_init_local_temps(entry);
-}
-
-void ecall_transform_init_final_mult(entry_t* entry) {
-    transform_init_final_mult(entry);
-}
-
-void ecall_transform_init_foreign_temps(entry_t* entry) {
-    transform_init_foreign_temps(entry);
-}
-
-void ecall_transform_to_source(entry_t* entry) {
-    transform_to_source(entry);
-}
-
-void ecall_transform_to_start(entry_t* entry, int32_t deviation, equality_type_t equality) {
-    transform_to_start(entry, deviation, equality);
-}
-
-void ecall_transform_to_end(entry_t* entry, int32_t deviation, equality_type_t equality) {
-    transform_to_end(entry, deviation, equality);
-}
-
-void ecall_transform_set_sort_padding(entry_t* entry) {
-    transform_set_sort_padding(entry);
-}
-
-void ecall_transform_set_join_attr(entry_t* entry, int32_t column_index) {
-    transform_set_join_attr(entry, column_index);
-}
-
-/**
- * Window Function Ecall Implementations
- */
-
-void ecall_window_set_original_index(entry_t* e1, entry_t* e2) {
-    window_set_original_index(e1, e2);
-}
-
-void ecall_window_compute_local_sum(entry_t* e1, entry_t* e2) {
-    window_compute_local_sum(e1, e2);
-}
-
-void ecall_window_compute_local_interval(entry_t* e1, entry_t* e2) {
-    window_compute_local_interval(e1, e2);
-}
-
-void ecall_window_compute_foreign_sum(entry_t* e1, entry_t* e2) {
-    window_compute_foreign_sum(e1, e2);
-}
-
-void ecall_window_compute_foreign_interval(entry_t* e1, entry_t* e2) {
-    window_compute_foreign_interval(e1, e2);
-}
-
-void ecall_window_propagate_foreign_interval(entry_t* e1, entry_t* e2) {
-    window_propagate_foreign_interval(e1, e2);
-}
-
-void ecall_update_target_multiplicity(entry_t* e1, entry_t* e2) {
-    // e1 is source (with intervals), e2 is target (to update)
-    update_target_multiplicity(e1, e2);
-}
-
-void ecall_update_target_final_multiplicity(entry_t* e1, entry_t* e2) {
-    // e1 is source (with foreign intervals), e2 is target (to update)
-    update_target_final_multiplicity(e1, e2);
-}
-
-/**
- * Comparator Ecall Implementations
- */
-
-void ecall_comparator_join_attr(entry_t* e1, entry_t* e2) {
-    comparator_join_attr(e1, e2);
-}
-
-void ecall_comparator_pairwise(entry_t* e1, entry_t* e2) {
-    comparator_pairwise(e1, e2);
-}
-
-void ecall_comparator_end_first(entry_t* e1, entry_t* e2) {
-    comparator_end_first(e1, e2);
-}
-
-void ecall_comparator_join_then_other(entry_t* e1, entry_t* e2) {
-    comparator_join_then_other(e1, e2);
-}
-
-void ecall_comparator_original_index(entry_t* e1, entry_t* e2) {
-    comparator_original_index(e1, e2);
-}
-
-void ecall_comparator_alignment_key(entry_t* e1, entry_t* e2) {
-    comparator_alignment_key(e1, e2);
-}
-
-// Metadata initialization function
-
-void ecall_init_metadata_null(entry_t* entry, uint32_t field_mask) {
-    transform_init_metadata_null(entry, field_mask);
-}
-
-// Distribute-expand phase functions
-
-void ecall_transform_init_dst_idx(entry_t* entry) {
-    transform_init_dst_idx(entry);
-}
-
-void ecall_transform_init_index(entry_t* entry) {
-    transform_init_index(entry);
-}
-
-void ecall_transform_mark_zero_mult_padding(entry_t* entry) {
-    transform_mark_zero_mult_padding(entry);
-}
-
-void ecall_transform_create_dist_padding(entry_t* entry) {
-    transform_create_dist_padding(entry);
-}
-
-void ecall_window_compute_dst_idx(entry_t* e1, entry_t* e2) {
-    window_compute_dst_idx(e1, e2);
-}
-
-void ecall_window_increment_index(entry_t* e1, entry_t* e2) {
-    window_increment_index(e1, e2);
-}
-
-void ecall_window_expand_copy(entry_t* e1, entry_t* e2) {
-    window_expand_copy(e1, e2);
-}
-
-void ecall_comparator_padding_last(entry_t* e1, entry_t* e2) {
-    comparator_padding_last(e1, e2);
-}
-
-void ecall_comparator_distribute(entry_t* e1, entry_t* e2) {
-    comparator_distribute(e1, e2);
-}
-
 void ecall_obtain_output_size(int32_t* retval, const entry_t* entry) {
     *retval = obtain_output_size(entry);
 }
 
-// ============================================================================
-// Align-Concat Phase ECalls
-// ============================================================================
+// Note: ecall_batch_dispatcher is implemented in enclave/batch/batch_dispatcher.c
 
-void ecall_transform_init_copy_index(entry_t* entry) {
-    transform_init_copy_index(entry);
-}
-
-void ecall_transform_compute_alignment_key(entry_t* entry) {
-    transform_compute_alignment_key(entry);
-}
-
-void ecall_window_update_copy_index(entry_t* e1, entry_t* e2) {
-    window_update_copy_index(e1, e2);
-}
-
-// ecall_concat_attributes removed - using batch dispatcher with parameters instead
+// Note: ocall_debug_print is implemented in untrusted code (app side), not here

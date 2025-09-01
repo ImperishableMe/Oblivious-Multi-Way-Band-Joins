@@ -6,163 +6,31 @@ enclave {
     from "TestEnclave.edl" import *;
     
     trusted {
-        /* Transform functions for Map operations */
-        
-        // Set local_mult = 1 (for initializing all tables in bottom-up phase)
-        public void ecall_transform_set_local_mult_one([in,out] entry_t* entry);
-        
-        // Add metadata columns with null placeholders
-        public void ecall_transform_add_metadata([in,out] entry_t* entry);
-        
-        // Set original index (used with sequential counter)
-        public void ecall_transform_set_index([in,out] entry_t* entry, uint32_t index);
-        
-        // Initialize temporary fields for bottom-up computation
-        public void ecall_transform_init_local_temps([in,out] entry_t* entry);
-        
-        // Initialize final_mult from local_mult (for root in top-down)
-        public void ecall_transform_init_final_mult([in,out] entry_t* entry);
-        
-        // Initialize foreign temporary fields for top-down
-        public void ecall_transform_init_foreign_temps([in,out] entry_t* entry);
-        
-        // Create SOURCE entry from source table tuple
-        public void ecall_transform_to_source([in,out] entry_t* entry);
-        
-        // Create START entry from target table tuple
-        public void ecall_transform_to_start([in,out] entry_t* entry, 
-                                             int32_t deviation, 
-                                             equality_type_t equality);
-        
-        // Create END entry from target table tuple
-        public void ecall_transform_to_end([in,out] entry_t* entry,
-                                           int32_t deviation,
-                                           equality_type_t equality);
-        
-        // Set entry as SORT_PADDING (for padding in bitonic sort)
-        public void ecall_transform_set_sort_padding([in,out] entry_t* entry);
-        
-        // Set join_attr from a specific column index
-        public void ecall_transform_set_join_attr([in,out] entry_t* entry, int32_t column_index);
-        
-        /* Window functions for multiplicity computation */
-        
-        // Assign sequential indices during initialization
-        public void ecall_window_set_original_index([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Bottom-up phase: accumulate local multiplicities
-        public void ecall_window_compute_local_sum([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Bottom-up phase: compute difference between START/END pairs
-        public void ecall_window_compute_local_interval([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Top-down phase: track foreign and local weight counters
-        public void ecall_window_compute_foreign_sum([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Top-down phase: compute foreign multiplicity from cumulative sums
-        public void ecall_window_compute_foreign_interval([in,out] entry_t* e1, [in,out] entry_t* e2);
-        public void ecall_window_propagate_foreign_interval([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Bottom-up parallel: multiply target's local_mult by source's interval
-        // e1 = source (with intervals), e2 = target (to update)
-        public void ecall_update_target_multiplicity([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Top-down parallel: set target's final_mult and foreign_sum from source
-        // e1 = source (with foreign intervals), e2 = target (to update)
-        public void ecall_update_target_final_multiplicity([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        /* Comparator functions for oblivious sorting */
-        
-        // Sort by join attribute, then precedence
-        public void ecall_comparator_join_attr([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Group TARGET entries, then by original_index
-        public void ecall_comparator_pairwise([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // END entries first, then by original_index
-        public void ecall_comparator_end_first([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Sort by join attribute, then original_index
-        public void ecall_comparator_join_then_other([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Sort by original_index only
-        public void ecall_comparator_original_index([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Sort by alignment_key field
-        public void ecall_comparator_alignment_key([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        /* Metadata initialization functions */
-        
-        // Initialize metadata fields to NULL_VALUE based on field mask
-        // Use METADATA_* constants from enclave_types.h to specify which fields
-        public void ecall_init_metadata_null([in,out] entry_t* entry, uint32_t field_mask);
-        
-        /* Distribute-expand phase functions */
-        
-        // Initialize destination index to 0
-        public void ecall_transform_init_dst_idx([in,out] entry_t* entry);
-        
-        // Initialize index field to 0
-        public void ecall_transform_init_index([in,out] entry_t* entry);
-        
-        // Mark entries with final_mult=0 as DIST_PADDING
-        public void ecall_transform_mark_zero_mult_padding([in,out] entry_t* entry);
-        
-        // Create a distribution padding entry
-        public void ecall_transform_create_dist_padding([in,out] entry_t* entry);
-        
-        // Compute destination index as cumulative sum
-        public void ecall_window_compute_dst_idx([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Increment index field
-        public void ecall_window_increment_index([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Expand by copying to fill padding
-        public void ecall_window_expand_copy([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Sort padding entries to end
-        public void ecall_comparator_padding_last([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Distribute comparator for variable-distance passes
-        public void ecall_comparator_distribute([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // ============================================================================
-        // Align-Concat Phase Functions
-        // ============================================================================
-        
-        // Initialize copy index to 0
-        public void ecall_transform_init_copy_index([in,out] entry_t* entry);
-        
-        // Compute alignment key = foreign_sum + (copy_index / local_mult)
-        public void ecall_transform_compute_alignment_key([in,out] entry_t* entry);
-        
-        // Update copy index based on original_index comparison
-        public void ecall_window_update_copy_index([in,out] entry_t* e1, [in,out] entry_t* e2);
-        
-        // Concatenate attributes - removed, using batch dispatcher with parameters instead
-        
-        // Get output size from last entry
-        public void ecall_obtain_output_size([out] int32_t* retval, [in] const entry_t* entry);
-        
-        // ============================================================================
-        // Batch Operations
-        // ============================================================================
-        
-        // Batch dispatcher for executing multiple operations in a single ecall
-        // Note: BatchOperation and OpEcall types must be included separately in untrusted code
-        // ops_array is passed as byte buffer with size in bytes
-        public void ecall_batch_dispatcher([in, out, count=data_count] entry_t* data_array, size_t data_count,
-                                          [in, size=ops_size] void* ops_array, size_t ops_count, size_t ops_size,
-                                          int32_t op_type);
+        /* Essential ecalls only - all other operations go through batch dispatcher */
         
         /* AES-CTR Encryption/Decryption functions */
         /* The encryption key is stored securely inside the enclave and never exposed */
         /* Uses AES-128 in CTR mode with unique nonce for each encryption */
         
         // Encrypt/decrypt single entry using secure enclave-only key
-        // Process one entry at a time for memory efficiency in SGX
+        // Used for file I/O and debug operations
         public crypto_status_t ecall_encrypt_entry([in,out] entry_t* entry);
         public crypto_status_t ecall_decrypt_entry([in,out] entry_t* entry);
+        
+        // Get output size from last entry
+        public void ecall_obtain_output_size([out] int32_t* retval, [in] const entry_t* entry);
+        
+        // ============================================================================
+        // Batch Operations - Primary interface for all transform/window/comparator ops
+        // ============================================================================
+        
+        // Batch dispatcher for executing multiple operations in a single ecall
+        // This is the main interface for 36+ different operations that were previously
+        // individual ecalls. Dramatically reduces SGX transition overhead.
+        // ops_array is passed as byte buffer with size in bytes
+        public void ecall_batch_dispatcher([in, out, count=data_count] entry_t* data_array, size_t data_count,
+                                          [in, size=ops_size] void* ops_array, size_t ops_count, size_t ops_size,
+                                          int32_t op_type);
     };
     
     untrusted {

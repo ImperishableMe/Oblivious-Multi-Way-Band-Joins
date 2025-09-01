@@ -4,6 +4,7 @@
 #include "../../common/debug_util.h"
 #include "../counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
 #include "../../enclave/enclave_types.h"  // For METADATA_* constants
+#include "../batch/ecall_batch_collector.h"  // For batch operations
 
 // Debug functions are declared in debug_util.h
 
@@ -69,10 +70,13 @@ void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node, sgx_enclave_id_t e
     // Set original indices using LinearPass with window function
     Table& table = node->get_table();
     if (table.size() > 0) {
-        // Set first entry's index to 0
-        entry_t first = table[0].to_entry_t();
-        counted_ecall_transform_set_index(eid, &first, 0);
-        table[0].from_entry_t(first);
+        // Set first entry's index to 0 using batch operation
+        {
+            EcallBatchCollector collector(eid, OP_ECALL_TRANSFORM_SET_INDEX);
+            int32_t params[MAX_EXTRA_PARAMS] = {0, BATCH_NO_PARAM, BATCH_NO_PARAM, BATCH_NO_PARAM};
+            collector.add_operation(table[0], params);
+            collector.flush();
+        }
         
         // Use batched window function to set consecutive indices
         if (table.size() > 1) {

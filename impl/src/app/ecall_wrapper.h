@@ -22,21 +22,12 @@ size_t get_ecall_count();
         _status; \
     })
 
-// For backwards compatibility - these can be used directly
-inline sgx_status_t counted_ecall_transform_set_index(sgx_enclave_id_t eid, entry_t* entry, uint32_t index) {
-    sgx_status_t status = ecall_transform_set_index(eid, entry, index);
-    if (status == SGX_SUCCESS) {
-        g_ecall_count.fetch_add(1, std::memory_order_relaxed);
-    }
-    return status;
-}
-
-inline sgx_status_t counted_ecall_obtain_output_size(sgx_enclave_id_t eid, int32_t* retval, const entry_t* last_entry) {
-    sgx_status_t status = ecall_obtain_output_size(eid, retval, last_entry);
-    if (status == SGX_SUCCESS) {
-        g_ecall_count.fetch_add(1, std::memory_order_relaxed);
-    }
-    return status;
-}
+// Note: All individual ecall wrappers have been moved to counted_ecalls.h
+// After batching optimization, only 4 ecalls remain:
+// 1. encrypt_entry
+// 2. decrypt_entry  
+// 3. obtain_output_size
+// 4. batch_dispatcher
+// These are now defined in counted_ecalls.h for better organization
 
 #endif // ECALL_WRAPPER_H

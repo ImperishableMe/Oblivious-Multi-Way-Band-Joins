@@ -347,12 +347,20 @@ void Table::oblivious_sort(sgx_enclave_id_t eid,
         padding_needed = padded_size - n;
         
         // Add padding SORT_PADDING entries using ecall
+        // Create all padding entries first
         for (size_t i = 0; i < padding_needed; i++) {
             Entry dummy;
-            entry_t dummy_entry = dummy.to_entry_t();
-            ecall_transform_set_sort_padding(eid, &dummy_entry);
-            dummy.from_entry_t(dummy_entry);
             add_entry(dummy);
+        }
+        
+        // Batch transform all padding entries to SORT_PADDING type
+        if (padding_needed > 0) {
+            EcallBatchCollector collector(eid, OP_ECALL_TRANSFORM_SET_SORT_PADDING);
+            size_t start_idx = n;
+            for (size_t i = start_idx; i < size(); i++) {
+                collector.add_operation(entries[i]);
+            }
+            collector.flush();
         }
     }
     

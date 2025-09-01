@@ -83,11 +83,11 @@ private:
 public:
     BottomUpTest(bool encrypted = false) : use_encrypted(encrypted) {
         if (use_encrypted) {
-            data_dir = "/home/r33wei/omwj/memory_const/encrypted/data_0_001";
+            data_dir = "/home/r33wei/omwj/memory_const_public/encrypted/data_0_001";
         } else {
-            data_dir = "/home/r33wei/omwj/memory_const/plaintext/data_0_001";
+            data_dir = "/home/r33wei/omwj/memory_const_public/plaintext/data_0_001";
         }
-        query_dir = "/home/r33wei/omwj/memory_const/queries";
+        query_dir = "/home/r33wei/omwj/memory_const_public/queries";
     }
     
     BottomUpTest(const std::string& query_path, const std::string& data_path)

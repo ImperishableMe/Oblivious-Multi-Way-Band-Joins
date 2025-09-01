@@ -131,7 +131,7 @@ void debug_init_session(const char* session_name) {
     
     // Set up session directory with timestamp first for easier sorting
     debug_session_name = session_name;
-    debug_session_dir = std::string("/home/r33wei/omwj/memory_const/debug/") + timestamp + "_" + session_name;
+    debug_session_dir = std::string("/home/r33wei/omwj/memory_const_public/debug/") + timestamp + "_" + session_name;
     
     // Create session directory using POSIX mkdir
     mkdir(debug_session_dir.c_str(), 0777);

@@ -23,7 +23,7 @@ int initialize_enclave() {
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     
     /* Call sgx_create_enclave to initialize an enclave instance */
-    ret = sgx_create_enclave("/home/r33wei/omwj/memory_const/impl/src/enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
+    ret = sgx_create_enclave("/home/r33wei/omwj/memory_const_public/impl/src/enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
         std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
         return -1;

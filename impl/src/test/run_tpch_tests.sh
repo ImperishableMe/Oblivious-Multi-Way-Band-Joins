@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Run all TPCH queries with data_0_001 dataset
-QUERY_DIR="/home/r33wei/omwj/memory_const/input/queries"
-DATA_DIR="/home/r33wei/omwj/memory_const/input/encrypted/data_0_001"
+QUERY_DIR="/home/r33wei/omwj/memory_const_public/input/queries"
+DATA_DIR="/home/r33wei/omwj/memory_const_public/input/encrypted/data_0_001"
 TEST_PROG="./test/test_join"
 
 echo "=== Running TPCH Tests ==="
@@ -26,5 +26,5 @@ done
 
 echo "=== All TPCH Tests Complete ==="
 echo ""
-echo "Summary files written to: /home/r33wei/omwj/memory_const/output/"
-ls -la /home/r33wei/omwj/memory_const/output/*.txt 2>/dev/null
+echo "Summary files written to: /home/r33wei/omwj/memory_const_public/output/"
+ls -la /home/r33wei/omwj/memory_const_public/output/*.txt 2>/dev/null

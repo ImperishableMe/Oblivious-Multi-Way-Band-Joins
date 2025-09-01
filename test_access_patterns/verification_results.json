@@ -1,0 +1,202 @@
+{
+  "tb1": {
+    "status": "PASSED",
+    "output_size": 1801,
+    "stats_a": {
+      "supplier2": {
+        "total": 976,
+        "original": 150,
+        "padding": 826
+      },
+      "supplier1": {
+        "total": 151,
+        "original": 150,
+        "padding": 1
+      }
+    },
+    "stats_b": {
+      "supplier2": {
+        "total": 976,
+        "original": 150,
+        "padding": 826
+      },
+      "supplier1": {
+        "total": 151,
+        "original": 150,
+        "padding": 1
+      }
+    }
+  },
+  "tb2": {
+    "status": "PASSED",
+    "output_size": 1541,
+    "stats_a": {
+      "part1": {
+        "total": 151,
+        "original": 150,
+        "padding": 1
+      },
+      "part2": {
+        "total": 312,
+        "original": 150,
+        "padding": 162
+      }
+    },
+    "stats_b": {
+      "part2": {
+        "total": 312,
+        "original": 150,
+        "padding": 162
+      },
+      "part1": {
+        "total": 151,
+        "original": 150,
+        "padding": 1
+      }
+    }
+  },
+  "tm1": {
+    "status": "PASSED",
+    "output_size": 2400,
+    "stats_a": {
+      "lineitem": {
+        "total": 2400,
+        "original": 2400,
+        "padding": 0
+      },
+      "orders": {
+        "total": 600,
+        "original": 600,
+        "padding": 0
+      },
+      "customer": {
+        "total": 150,
+        "original": 150,
+        "padding": 0
+      }
+    },
+    "stats_b": {
+      "orders": {
+        "total": 600,
+        "original": 600,
+        "padding": 0
+      },
+      "lineitem": {
+        "total": 2400,
+        "original": 2400,
+        "padding": 0
+      },
+      "customer": {
+        "total": 150,
+        "original": 150,
+        "padding": 0
+      }
+    }
+  },
+  "tm2": {
+    "status": "PASSED",
+    "output_size": 1500,
+    "stats_a": {
+      "nation2": {
+        "total": 25,
+        "original": 25,
+        "padding": 0
+      },
+      "nation1": {
+        "total": 25,
+        "original": 25,
+        "padding": 0
+      },
+      "customer": {
+        "total": 150,
+        "original": 150,
+        "padding": 0
+      },
+      "supplier": {
+        "total": 50,
+        "original": 50,
+        "padding": 0
+      }
+    },
+    "stats_b": {
+      "supplier": {
+        "total": 50,
+        "original": 50,
+        "padding": 0
+      },
+      "nation1": {
+        "total": 25,
+        "original": 25,
+        "padding": 0
+      },
+      "customer": {
+        "total": 150,
+        "original": 150,
+        "padding": 0
+      },
+      "nation2": {
+        "total": 25,
+        "original": 25,
+        "padding": 0
+      }
+    }
+  },
+  "tm3": {
+    "status": "PASSED",
+    "output_size": 1200,
+    "stats_a": {
+      "lineitem": {
+        "total": 600,
+        "original": 600,
+        "padding": 0
+      },
+      "supplier": {
+        "total": 50,
+        "original": 50,
+        "padding": 0
+      },
+      "customer": {
+        "total": 150,
+        "original": 150,
+        "padding": 0
+      },
+      "orders": {
+        "total": 300,
+        "original": 300,
+        "padding": 0
+      },
+      "nation": {
+        "total": 25,
+        "original": 25,
+        "padding": 0
+      }
+    },
+    "stats_b": {
+      "nation": {
+        "total": 25,
+        "original": 25,
+        "padding": 0
+      },
+      "orders": {
+        "total": 300,
+        "original": 300,
+        "padding": 0
+      },
+      "supplier": {
+        "total": 50,
+        "original": 50,
+        "padding": 0
+      },
+      "lineitem": {
+        "total": 600,
+        "original": 600,
+        "padding": 0
+      },
+      "customer": {
+        "total": 150,
+        "original": 150,
+        "padding": 0
+      }
+    }
+  }
+}

@@ -3,11 +3,11 @@
 # Selective Test Runner for specific TPC-H queries
 # Usage: ./run_selected_tests.sh data_0_1
 #
-# This script runs only TB1 and TM2 queries on specified dataset
+# This script runs only TB1 and TM1 queries on specified dataset
 # with extended timeout for large scale factors
 
 # Configuration
-QUERIES=(tpch_tb1 tpch_tm2)  # Only TB1 and TM2
+QUERIES=(tpch_tb1 tpch_tm1)  # Only TB1 and TM1
 BASE_DIR="/home/r33wei/omwj/memory_const"
 QUERY_DIR="$BASE_DIR/input/queries"
 DATA_BASE="$BASE_DIR/input/encrypted"
@@ -40,7 +40,7 @@ FAILED_TESTS=0
 START_TIME=$(date +%s)
 
 echo "================================================"
-echo "Selective TPC-H Benchmark Tests (TB1 & TM2)"
+echo "Selective TPC-H Benchmark Tests (TB1 & TM1)"
 echo "Run ID: $RUN_ID"
 echo "Queries: ${QUERIES[*]}"
 echo "Dataset: $1"
@@ -79,14 +79,15 @@ for query in "${QUERIES[@]}"; do
     echo "  Expected output size:"
     if [ "$query" = "tpch_tb1" ] && [ "$data_dir" = "data_0_1" ]; then
         echo "    ~499,499 rows"
-    elif [ "$query" = "tpch_tm2" ] && [ "$data_dir" = "data_0_1" ]; then
+    elif [ "$query" = "tpch_tm1" ] && [ "$data_dir" = "data_0_1" ]; then
         echo "    ~2,999,594 rows"
     fi
     
     TEST_START=$(date +%s)
     
-    # Run the test with timeout
-    timeout $TIMEOUT $TEST_TOOL "$QUERY_FILE" "$FULL_DATA_PATH"
+    # Run the test with timeout and capture error output
+    ERROR_FILE="$OUTPUT_DIR/${query}_${data_dir}_error.log"
+    timeout $TIMEOUT $TEST_TOOL "$QUERY_FILE" "$FULL_DATA_PATH" 2>"$ERROR_FILE"
     RESULT=$?
     
     TEST_END=$(date +%s)
@@ -105,12 +106,22 @@ for query in "${QUERIES[@]}"; do
             mv "$SUMMARY_FILE" "$RUN_SUMMARY_FILE"
             echo "    Summary saved to: run_${RUN_ID}_selective/$(basename $RUN_SUMMARY_FILE)"
         fi
+        # Clean up empty error file
+        if [ ! -s "$ERROR_FILE" ]; then
+            rm -f "$ERROR_FILE"
+        fi
     elif [ $RESULT -eq 124 ]; then
         echo -e "${RED}  ✗ $query timed out after ${TIMEOUT}s (${TIMEOUT/3600} hours)${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     else
         echo -e "${RED}  ✗ $query failed with exit code $RESULT (${TEST_MINUTES}m ${TEST_SECONDS}s)${NC}"
         FAILED_TESTS=$((FAILED_TESTS + 1))
+        # Show error message if available
+        if [ -s "$ERROR_FILE" ]; then
+            echo "    Error details:"
+            head -5 "$ERROR_FILE" | sed 's/^/      /'
+            echo "    Full error log: $ERROR_FILE"
+        fi
     fi
     echo ""
 done

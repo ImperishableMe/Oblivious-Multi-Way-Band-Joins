@@ -236,8 +236,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     // Step 8: Truncate to parent size - now we have END entries with computed intervals
     // The first parent.size() entries are now the END entries with computed intervals
     DEBUG_INFO("Truncating to %zu entries (parent size)", parent.size());
-    Table truncated;
-    truncated.set_table_name("truncated");
+    Table truncated("truncated", parent.get_schema());
     
     for (size_t i = 0; i < parent.size() && i < combined.size(); i++) {
         truncated.add_entry(combined[i]);

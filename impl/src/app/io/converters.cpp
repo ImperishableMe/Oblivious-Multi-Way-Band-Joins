@@ -9,19 +9,7 @@
 
 // Note: Table::to_entry_t_vector() has been moved to Table class
 // Use Table::to_entry_t_vector() instead
-
-// Convert vector of entry_t structures back to Table
-Table entry_t_vector_to_table(const std::vector<entry_t>& entries) {
-    Table table;
-    
-    for (const auto& c_entry : entries) {
-        Entry entry;
-        entry.from_entry_t(c_entry);
-        table.add_entry(entry);
-    }
-    
-    return table;
-}
+// entry_t_vector_to_table has been removed - use Table::from_entry_t_vector() instead
 
 // Helper function to convert std::string to char array
 void string_to_char_array(const std::string& str, char* arr, size_t max_len) {
@@ -41,31 +29,6 @@ std::string char_array_to_string(const char* arr, size_t max_len) {
     return std::string(arr, len);
 }
 
-// Convert vector of strings to 2D char array
-void strings_to_char_array_2d(const std::vector<std::string>& strings, 
-                              char arr[][MAX_COLUMN_NAME_LEN], 
-                              size_t max_strings) {
-    // Clear the array first
-    memset(arr, 0, max_strings * MAX_COLUMN_NAME_LEN);
-    
-    size_t num_to_copy = std::min(strings.size(), max_strings);
-    for (size_t i = 0; i < num_to_copy; i++) {
-        string_to_char_array(strings[i], arr[i], MAX_COLUMN_NAME_LEN);
-    }
-}
-
-// Convert 2D char array to vector of strings
-std::vector<std::string> char_array_2d_to_strings(const char arr[][MAX_COLUMN_NAME_LEN], 
-                                                  size_t num_strings) {
-    std::vector<std::string> strings;
-    strings.reserve(num_strings);
-    
-    for (size_t i = 0; i < num_strings; i++) {
-        strings.push_back(char_array_to_string(arr[i], MAX_COLUMN_NAME_LEN));
-    }
-    
-    return strings;
-}
 
 // Convert vector of int32_t to fixed array
 void int32_to_array(const std::vector<int32_t>& vec, int32_t* arr, size_t max_size) {

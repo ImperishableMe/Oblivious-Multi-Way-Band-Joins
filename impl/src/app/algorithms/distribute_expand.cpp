@@ -86,8 +86,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     if (output_size == 0) {
         // All entries have final_mult = 0
-        Table empty;
-        empty.set_table_name(table.get_table_name());
+        Table empty(table.get_table_name(), table.get_schema());
         return empty;
     }
     
@@ -111,8 +110,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     // This handles cases where output_size < original_size
     if (working.size() > output_size) {
         DEBUG_INFO("Step 5b - Truncating table from %zu to %zu entries", working.size(), output_size);
-        Table truncated;
-        truncated.set_table_name(working.get_table_name());
+        Table truncated(working.get_table_name(), working.get_schema());
         for (size_t i = 0; i < output_size; i++) {
             truncated.add_entry(working[i]);
         }

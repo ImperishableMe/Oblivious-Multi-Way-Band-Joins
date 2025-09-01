@@ -3,6 +3,7 @@ enclave {
     include "crypto/entry_crypto.h"
     
     from "sgx_tstdc.edl" import *;
+    from "TestEnclave.edl" import *;
     
     trusted {
         /* Transform functions for Map operations */

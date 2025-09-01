@@ -46,14 +46,7 @@ private:
     JoinConstraint constraint_with_parent;
     
 public:
-    // Constructors
-    JoinTreeNode() = default;
-    
-    explicit JoinTreeNode(const std::string& name) 
-        : table_name(name), table_data() {
-        // Table will be set later with proper schema
-    }
-    
+    // Constructor
     JoinTreeNode(const std::string& name, const Table& table) 
         : table_name(name), table_data(table) {
         table_data.set_table_name(name);

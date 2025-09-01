@@ -22,8 +22,7 @@ private:
     std::vector<std::string> schema_column_names;  // NEW: Table's schema for slim mode
     
 public:
-    // Constructors
-    Table();  // Default constructor for STL containers - creates invalid table
+    // Constructor - requires schema
     Table(const std::string& name, const std::vector<std::string>& schema);
     
     // Entry management

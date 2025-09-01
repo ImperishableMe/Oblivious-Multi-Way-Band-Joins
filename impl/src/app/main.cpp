@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
                 
                 Table table = TableIO::load_csv(filepath);
                 table.set_table_name(table_name);
-                tables[table_name] = table;
+                tables.emplace(table_name, std::move(table));
             }
         }
         closedir(dir);

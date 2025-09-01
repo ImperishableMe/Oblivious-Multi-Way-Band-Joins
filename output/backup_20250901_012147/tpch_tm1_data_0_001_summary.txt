@@ -1,0 +1,55 @@
+=== Test Summary ===
+Query File: tpch_tm1.sql
+Dataset: data_0_001
+
+=== Input Table Sizes ===
+customer: 150 rows
+lineitem: 6005 rows
+nation: 25 rows
+nation1: 25 rows
+nation2: 25 rows
+orders: 1500 rows
+part: 200 rows
+part1: 200 rows
+part2: 200 rows
+partsupp: 800 rows
+region: 5 rows
+supplier: 10 rows
+supplier1: 10 rows
+supplier2: 10 rows
+
+=== Output ===
+SGX Output Size: 6005 rows
+SQLite Output Size: 6005 rows
+
+=== Results ===
+Match: YES
+
+=== Performance ===
+SGX Time: 29.019 seconds
+SQLite Time: 0.546566 seconds
+
+=== SGX Phase Timings ===
+Bottom-Up: 9.41069 seconds
+Top-Down: 11.2789 seconds
+Distribute-Expand: 2.34817 seconds
+Align-Concat: 5.59097 seconds
+Total (phases): 28.6299 seconds
+
+=== SGX Phase Ecalls ===
+Bottom-Up: 1830 ecalls
+Top-Down: 2095 ecalls
+Distribute-Expand: 555 ecalls
+Align-Concat: 1140 ecalls
+Total: 5620 ecalls
+
+=== SGX Phase Sizes ===
+Bottom-Up: 7655 rows in tree
+Top-Down: 7655 rows in tree
+Distribute-Expand: 18015 rows in tree
+Align-Concat (result): 6005 rows
+
+=== Align-Concat Sorting Details ===
+Total sorting: 5.48921 seconds (1092 ecalls)
+  - Accumulator sorts: 2.82793 seconds (546 ecalls)
+  - Child sorts: 2.66128 seconds (546 ecalls)

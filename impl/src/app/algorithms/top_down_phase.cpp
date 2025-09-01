@@ -208,8 +208,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 8: Truncate to child size
     DEBUG_INFO("Truncating to %zu entries (child size)", child.size());
-    Table truncated;
-    truncated.set_table_name("truncated_foreign");
+    Table truncated("truncated_foreign", child.get_schema());
     
     for (size_t i = 0; i < child.size() && i < combined.size(); i++) {
         truncated.add_entry(combined[i]);

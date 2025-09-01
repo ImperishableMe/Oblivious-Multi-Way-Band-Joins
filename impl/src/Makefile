@@ -138,7 +138,9 @@ Enclave_C_Files := enclave/crypto/aes_crypto.c \
                    enclave/core/transform_functions.c \
                    enclave/core/distribute_functions.c \
                    enclave/batch/batch_dispatcher.c \
-                   enclave/debug_wrapper.c
+                   enclave/debug_wrapper.c \
+                   enclave/test/test_ecalls.c \
+                   enclave/test/test_crypto_ecalls.c
 
 Enclave_Include_Paths := -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc \
                          -I$(SGX_SDK)/include/libcxx -Ienclave -Icommon

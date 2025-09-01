@@ -96,9 +96,18 @@ SQLite_Link_Flags := $(App_Link_Flags) -lsqlite3
 Test_Comparator := test_join
 Test_Objects := compare/test_join.o $(Shared_Cpp_Files:.cpp=.o) $(Gen_Untrusted_Object)
 
+Overhead_Test := overhead_measurement
+Overhead_Objects := overhead_measurement.o $(Shared_Cpp_Files:.cpp=.o) $(Gen_Untrusted_Object)
+
+Overhead_Test_V2 := overhead_measurement_v2
+Overhead_V2_Objects := overhead_measurement_v2.o $(Shared_Cpp_Files:.cpp=.o) $(Gen_Untrusted_Object)
+
+Crypto_Breakdown := overhead_crypto_breakdown
+Crypto_Breakdown_Objects := overhead_crypto_breakdown.o $(Shared_Cpp_Files:.cpp=.o) $(Gen_Untrusted_Object)
+
 .PHONY: all clean
 
-all: $(SQLite_Baseline) $(Test_Comparator)
+all: $(SQLite_Baseline) $(Test_Comparator) $(Overhead_Test) $(Overhead_Test_V2) $(Crypto_Breakdown)
 
 ######## SQLite Baseline Build ########
 
@@ -120,6 +129,36 @@ $(Test_Comparator): $(Test_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
+######## Overhead Measurement Build ########
+
+overhead_measurement.o: overhead_measurement.cpp
+	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
+$(Overhead_Test): $(Overhead_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
+######## Overhead V2 Build ########
+
+overhead_measurement_v2.o: overhead_measurement_v2.cpp
+	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
+$(Overhead_Test_V2): $(Overhead_V2_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
+######## Crypto Breakdown Build ########
+
+overhead_crypto_breakdown.o: overhead_crypto_breakdown.cpp
+	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
+$(Crypto_Breakdown): $(Crypto_Breakdown_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
 ######## Common Build Rules ########
 
 ../app/%.o: ../app/%.cpp
@@ -133,9 +172,9 @@ $(Gen_Untrusted_Object): $(Gen_Untrusted_Source)
 ######## Clean ########
 
 clean:
-	@rm -f $(SQLite_Baseline) $(Test_Comparator)
-	@rm -f baseline/*.o compare/*.o
-	@rm -f ../app/*.o ../app/io/*.o ../app/crypto/*.o ../app/data_structures/*.o
+	@rm -f $(SQLite_Baseline) $(Test_Comparator) $(Overhead_Test)
+	@rm -f baseline/*.o compare/*.o overhead_measurement.o
+	@rm -f ../app/*.o ../app/io/*.o ../app/crypto/*.o ../app/data_structures/*.o ../app/batch/*.o
 
 ######## Help ########
 

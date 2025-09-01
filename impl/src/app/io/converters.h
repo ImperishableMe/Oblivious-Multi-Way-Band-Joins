@@ -17,11 +17,7 @@ class Table;
 // Note: Table conversion functions moved to Table class methods
 // Use Table::to_entry_t_vector() and Table constructor/methods instead
 
-/**
- * Convert vector of entry_t structures back to Table
- * Used after SGX processing to reconstruct C++ table
- */
-Table entry_t_vector_to_table(const std::vector<entry_t>& entries);
+// NOTE: entry_t_vector_to_table has been removed - use Table::from_entry_t_vector() instead
 
 /**
  * Helper function to convert std::string to char array
@@ -35,20 +31,6 @@ void string_to_char_array(const std::string& str, char* arr, size_t max_len);
  */
 std::string char_array_to_string(const char* arr, size_t max_len);
 
-/**
- * Convert vector of strings to 2D char array
- * Used for column names conversion
- */
-void strings_to_char_array_2d(const std::vector<std::string>& strings, 
-                              char arr[][MAX_COLUMN_NAME_LEN], 
-                              size_t max_strings);
-
-/**
- * Convert 2D char array to vector of strings
- * Used for column names conversion
- */
-std::vector<std::string> char_array_2d_to_strings(const char arr[][MAX_COLUMN_NAME_LEN], 
-                                                  size_t num_strings);
 
 /**
  * Convert vector of int32_t to fixed array

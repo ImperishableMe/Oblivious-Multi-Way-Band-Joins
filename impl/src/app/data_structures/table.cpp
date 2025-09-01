@@ -5,12 +5,7 @@
 #include "../Enclave_u.h"
 #include "../batch/ecall_batch_collector.h"
 
-// Default constructor - creates invalid table (for STL containers)
-Table::Table() : table_name("INVALID"), num_columns(0) {
-    // This creates an invalid table - should be replaced by assignment
-}
-
-// New constructor with required schema
+// Constructor with required schema
 Table::Table(const std::string& name, const std::vector<std::string>& schema) 
     : table_name(name), num_columns(schema.size()), schema_column_names(schema) {
     if (schema.empty()) {
@@ -494,7 +489,7 @@ Table Table::oblivious_expand(sgx_enclave_id_t /*eid*/) const {
 Table Table::batched_map(sgx_enclave_id_t eid, OpEcall op_type, int32_t* params) const {
     DEBUG_TRACE("Table::batched_map: Starting with %zu entries, op_type=%d", entries.size(), op_type);
     
-    Table result(table_name + "_mapped", schema_column_names);  // Preserve schema
+    Table result(table_name, schema_column_names);  // Preserve schema
     result.set_num_columns(num_columns);
     
     // Copy entries to result first (since we can't modify const entries)

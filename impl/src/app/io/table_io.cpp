@@ -251,9 +251,10 @@ TableIO::load_csv_directory(const std::string& dir_path) {
         if (stat(full_path.c_str(), &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
             if (is_csv_file(filename)) {
                 std::string table_name = extract_table_name(filename);
-                tables[table_name] = load_csv(full_path);
+                Table loaded_table = load_csv(full_path);
                 std::cout << "Loaded table: " << table_name 
-                         << " (" << tables[table_name].size() << " rows)" << std::endl;
+                         << " (" << loaded_table.size() << " rows)" << std::endl;
+                tables.emplace(table_name, std::move(loaded_table));
             }
         }
     }

@@ -119,7 +119,7 @@ void create_sqlite_table(sqlite3* db, const std::string& table_name, const Table
 
 /* Callback for SQLite query results */
 struct QueryResult {
-    Table table;
+    Table* table = nullptr;  // Will be initialized when we know the schema
     std::vector<std::string> column_names;
     bool first_row = true;
 };
@@ -127,11 +127,13 @@ struct QueryResult {
 static int query_callback(void* data, int argc, char** argv, char** col_names) {
     QueryResult* result = (QueryResult*)data;
     
-    // On first row, get column names
+    // On first row, get column names and create table
     if (result->first_row) {
         for (int i = 0; i < argc; i++) {
             result->column_names.push_back(col_names[i]);
         }
+        // Now create the table with the schema
+        result->table = new Table("result", result->column_names);
         result->first_row = false;
     }
     
@@ -143,7 +145,7 @@ static int query_callback(void* data, int argc, char** argv, char** col_names) {
     }
     
     // Convert to fixed-size Entry and add to table
-    result->table.add_entry(io_entry.to_entry());
+    result->table->add_entry(io_entry.to_entry());
     return 0;
 }
 
@@ -162,10 +164,17 @@ Table execute_sqlite_join(sqlite3* db, const std::string& join_query) {
     
     // Query executed
     
-    // Set the schema for the result table
-    result.table.set_schema(result.column_names);
+    // If no results, create empty table with generic schema
+    if (!result.table) {
+        return Table("result", {"col1"});
+    }
     
-    return result.table;
+    // Set the schema for the result table (already set in callback)
+    // result.table->set_schema(result.column_names);  // Already done in callback
+    
+    Table ret_table = *result.table;
+    delete result.table;
+    return ret_table;
 }
 
 /* Read SQL query from file */
@@ -250,7 +259,7 @@ int main(int argc, char* argv[]) {
                 // Create SQLite table
                 create_sqlite_table(db, table_name, decrypted_table);
                 
-                tables[table_name] = decrypted_table;
+                tables.emplace(table_name, std::move(decrypted_table));
             }
         }
         closedir(dir);

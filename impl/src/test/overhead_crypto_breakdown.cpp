@@ -49,9 +49,14 @@ void test_crypto_operation_breakdown() {
         std::uniform_int_distribution<> dis(1, 1000000);
         
         for (size_t i = 0; i < count; i++) {
+            entries[i] = Entry();  // Properly initialize with default constructor
             entries[i].join_attr = dis(gen);
             entries[i].original_index = i;
             entries[i].is_encrypted = false;
+            // Initialize some attributes with test data
+            for (int j = 0; j < 10 && j < MAX_ATTRIBUTES; j++) {
+                entries[i].attributes[j] = dis(gen);
+            }
             // Encrypt outside enclave
             CryptoUtils::encrypt_entry(entries[i], global_eid);
         }
@@ -164,9 +169,14 @@ void test_batch_operation_breakdown() {
     std::uniform_int_distribution<> dis(1, 1000000);
     
     for (size_t i = 0; i < num_entries; i++) {
+        entries[i] = Entry();  // Properly initialize with default constructor
         entries[i].join_attr = dis(gen);
         entries[i].original_index = i;
         entries[i].is_encrypted = false;
+        // Initialize some attributes with test data
+        for (int j = 0; j < 10 && j < MAX_ATTRIBUTES; j++) {
+            entries[i].attributes[j] = dis(gen);
+        }
         CryptoUtils::encrypt_entry(entries[i], global_eid);
     }
     

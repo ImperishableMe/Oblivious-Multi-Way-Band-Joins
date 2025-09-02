@@ -3,9 +3,9 @@
 
 #include <memory>
 #include <vector>
-#include "../data_structures/types.h"
-#include "../data_structures/join_tree_node.h"
-#include "../Enclave_u.h"
+#include "../core/types.h"
+#include "../core/join_tree_node.h"
+#include "Enclave_u.h"
 #include "sgx_urts.h"
 
 /**

@@ -7,14 +7,14 @@
 #include <cassert>
 #include <map>
 #include <filesystem>
-#include "../app/utils/query_parser.h"
-#include "../app/utils/join_tree_builder.h"
+#include "../../src/query/query_parser.h"
+#include "../../src/core/join_tree_builder.h"
 #include "test_utils/simple_join_executor.h"
 #include "test_utils/sqlite_ground_truth.h"
 #include "test_utils/join_result_comparator.h"
-#include "../app/utils/table_io.h"
-#include "../app/crypto_utils.h"
-#include "../app/Enclave_u.h"
+#include "../../src/io/table_io.h"
+#include "../../src/crypto/crypto_utils.h"
+#include "Enclave_u.h"
 #include "sgx_urts.h"
 
 namespace fs = std::filesystem;

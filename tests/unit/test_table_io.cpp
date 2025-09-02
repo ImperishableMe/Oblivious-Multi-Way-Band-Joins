@@ -15,9 +15,9 @@
 #include <cstring>
 #include <vector>
 #include <cstdio>
-#include "../app/utils/table_io.h"
-#include "../app/crypto_utils.h"
-#include "../app/Enclave_u.h"
+#include "../../src/io/table_io.h"
+#include "../../src/crypto/crypto_utils.h"
+#include "Enclave_u.h"
 #include "sgx_urts.h"
 
 sgx_enclave_id_t global_eid = 0;

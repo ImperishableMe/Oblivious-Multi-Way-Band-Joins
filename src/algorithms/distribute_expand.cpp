@@ -2,8 +2,8 @@
 #include <iostream>
 #include <cmath>
 #include <cstring>
-#include "../../common/debug_util.h"
-#include "../counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
+#include "debug_util.h"
+#include "../utils/counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
 
 // Debug functions are declared in debug_util.h
 // debug_dump_table is already declared in debug_util.h

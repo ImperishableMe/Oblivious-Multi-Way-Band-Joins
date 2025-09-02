@@ -1,6 +1,6 @@
 #include "crypto_utils.h"
-#include "../data_structures/entry.h"
-#include "../counted_ecalls.h"  // Use counted ecalls instead of direct Enclave_u.h
+#include "../core/entry.h"
+#include "../utils/counted_ecalls.h"  // Use counted ecalls instead of direct Enclave_u.h
 #include <iostream>
 #include <random>
 #include <chrono>

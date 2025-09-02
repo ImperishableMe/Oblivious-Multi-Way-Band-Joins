@@ -11,12 +11,12 @@
 #include <cstring>
 #include <dirent.h>
 #include <sys/stat.h>
-#include "../../app/data_structures/types.h"
-#include "../../app/io/table_io.h"
-#include "../../app/crypto/crypto_utils.h"
+#include "../../src/core/types.h"
+#include "../../src/io/table_io.h"
+#include "../../src/crypto/crypto_utils.h"
 #include "sgx_urts.h"
-#include "../../app/Enclave_u.h"
-#include "../../common/debug_util.h"
+#include "Enclave_u.h"
+#include "debug_util.h"
 
 /* Global enclave ID for decryption */
 sgx_enclave_id_t global_eid = 0;

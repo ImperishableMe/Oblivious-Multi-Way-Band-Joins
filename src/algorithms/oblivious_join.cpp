@@ -7,10 +7,10 @@
 #include <sstream>
 #include <functional>
 #include <chrono>
-#include "../../common/debug_util.h"
+#include "debug_util.h"
 
 // Include counted ecalls (includes Enclave_u.h and ecall_wrapper.h)
-#include "../counted_ecalls.h"
+#include "../utils/counted_ecalls.h"
 
 // Helper function to calculate total size of all tables in tree
 static size_t GetTotalTreeSize(JoinTreeNodePtr node) {

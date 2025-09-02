@@ -11,13 +11,13 @@
 #include <string>
 #include <vector>
 #include <map>
-#include "../../app/algorithms/bottom_up_phase.h"
-#include "../../app/algorithms/top_down_phase.h"
-#include "../../app/query/query_parser.h"
-#include "../../app/data_structures/join_tree_builder.h"
-#include "../../app/io/table_io.h"
-#include "../../app/Enclave_u.h"
-#include "../../common/debug_util.h"
+#include "../../src/algorithms/bottom_up_phase.h"
+#include "../../src/algorithms/top_down_phase.h"
+#include "../../src/query/query_parser.h"
+#include "../../src/core/join_tree_builder.h"
+#include "../../src/io/table_io.h"
+#include "Enclave_u.h"
+#include "debug_util.h"
 #include "sgx_urts.h"
 
 class TopDownTest {

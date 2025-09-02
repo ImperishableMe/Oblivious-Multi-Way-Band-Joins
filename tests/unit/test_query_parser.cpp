@@ -5,8 +5,8 @@
 #include <iostream>
 #include <cassert>
 #include <fstream>
-#include "../app/utils/query_parser.h"
-#include "../app/utils/query_tokenizer.h"
+#include "../../src/query/query_parser.h"
+#include "../../src/query/query_tokenizer.h"
 
 void test_tokenizer_basic() {
     std::cout << "\n=== Testing Basic Tokenization ===" << std::endl;

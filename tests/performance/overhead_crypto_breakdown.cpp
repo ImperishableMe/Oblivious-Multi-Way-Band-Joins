@@ -8,9 +8,9 @@
 #include <cstring>
 #include <random>
 #include <iomanip>
-#include "../app/data_structures/entry.h"
-#include "../app/crypto/crypto_utils.h"
-#include "../app/Enclave_u.h"
+#include "../src/core/entry.h"
+#include "../src/crypto/crypto_utils.h"
+#include "Enclave_u.h"
 #include "sgx_urts.h"
 
 using namespace std::chrono;

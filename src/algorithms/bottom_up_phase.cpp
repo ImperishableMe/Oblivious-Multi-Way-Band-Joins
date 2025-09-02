@@ -1,9 +1,9 @@
 #include "bottom_up_phase.h"
-#include "../data_structures/join_attribute_setter.h"
+#include "../core/join_attribute_setter.h"
 #include <iostream>
-#include "../../common/debug_util.h"
-#include "../counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
-#include "../../enclave/enclave_types.h"  // For METADATA_* constants
+#include "debug_util.h"
+#include "../utils/counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
+#include "enclave_types.h"  // For METADATA_* constants
 #include "../batch/ecall_batch_collector.h"  // For batch operations
 
 // Debug functions are declared in debug_util.h

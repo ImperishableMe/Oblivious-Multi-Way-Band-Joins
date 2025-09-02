@@ -1,9 +1,9 @@
 #ifndef TOP_DOWN_PHASE_H
 #define TOP_DOWN_PHASE_H
 
-#include "../data_structures/join_tree_node.h"
-#include "../data_structures/table.h"
-#include "../data_structures/join_constraint.h"
+#include "../core/join_tree_node.h"
+#include "../core/table.h"
+#include "../core/join_constraint.h"
 #include "sgx_eid.h"
 #include <vector>
 

@@ -5,9 +5,9 @@
 #include <random>
 #include <limits>
 #include "sgx_urts.h"
-#include "../../app/Enclave_u.h"
-#include "../../app/data_structures/entry.h"
-#include "../../app/crypto/crypto_utils.h"
+#include "Enclave_u.h"
+#include "../../src/core/entry.h"
+#include "../../src/crypto/crypto_utils.h"
 
 // Test result tracking
 static int tests_passed = 0;

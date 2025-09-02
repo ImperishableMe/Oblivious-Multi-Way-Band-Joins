@@ -12,14 +12,14 @@
 #include <chrono>
 #include <map>
 #include <cassert>
-#include "../../app/algorithms/bottom_up_phase.h"
-#include "../../app/query/query_parser.h"
-#include "../../app/data_structures/join_tree_builder.h"
-#include "../../app/io/table_io.h"
-#include "../../app/crypto/crypto_utils.h"
-#include "../../app/Enclave_u.h"
+#include "../../src/algorithms/bottom_up_phase.h"
+#include "../../src/query/query_parser.h"
+#include "../../src/core/join_tree_builder.h"
+#include "../../src/io/table_io.h"
+#include "../../src/crypto/crypto_utils.h"
+#include "Enclave_u.h"
 #include "../utils/subtree_verifier.h"
-#include "../../common/debug_util.h"
+#include "debug_util.h"
 #include "sgx_urts.h"
 
 sgx_enclave_id_t global_eid = 0;

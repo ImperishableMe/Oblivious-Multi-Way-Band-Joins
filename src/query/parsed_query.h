@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
-#include "../data_structures/join_constraint.h"
+#include "../core/join_constraint.h"
 
 /**
  * ParsedQuery - Represents a parsed SQL query

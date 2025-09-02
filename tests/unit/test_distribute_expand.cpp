@@ -2,12 +2,12 @@
 #include <cassert>
 #include <vector>
 #include <cstring>
-#include "../../app/algorithms/distribute_expand.h"
-#include "../../app/data_structures/table.h"
-#include "../../app/data_structures/join_tree_node.h"
-#include "../../app/io/table_io.h"
-#include "../../common/constants.h"
-#include "../../common/debug_util.h"
+#include "../../src/algorithms/distribute_expand.h"
+#include "../../src/core/table.h"
+#include "../../src/core/join_tree_node.h"
+#include "../../src/io/table_io.h"
+#include "constants.h"
+#include "debug_util.h"
 #include "sgx_urts.h"
 
 #define ENCLAVE_FILENAME "enclave.signed.so"

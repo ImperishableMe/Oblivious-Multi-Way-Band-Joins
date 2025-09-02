@@ -20,8 +20,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "sgx_urts.h"
-#include "../io/table_io.h"
-#include "../Enclave_u.h"
+#include "../src/io/table_io.h"
+#include "Enclave_u.h"
 
 // Global enclave ID
 sgx_enclave_id_t global_eid = 0;

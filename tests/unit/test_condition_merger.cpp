@@ -4,8 +4,8 @@
 
 #include <iostream>
 #include <cassert>
-#include "../app/utils/condition_merger.h"
-#include "../app/utils/join_constraint.h"
+#include "../../src/query/condition_merger.h"
+#include "../../src/core/join_constraint.h"
 
 void test_basic_band_merge() {
     std::cout << "\n=== Testing Basic Band Merge (tpch_tb1 style) ===" << std::endl;

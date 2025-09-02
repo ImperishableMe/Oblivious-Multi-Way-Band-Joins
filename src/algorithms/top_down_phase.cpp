@@ -1,8 +1,8 @@
 #include "top_down_phase.h"
-#include "../data_structures/join_attribute_setter.h"
+#include "../core/join_attribute_setter.h"
 #include <iostream>
-#include "../../common/debug_util.h"
-#include "../counted_ecalls.h"  // Use counted ecalls
+#include "debug_util.h"
+#include "../utils/counted_ecalls.h"  // Use counted ecalls
 
 // Debug functions are declared in debug_util.h
 

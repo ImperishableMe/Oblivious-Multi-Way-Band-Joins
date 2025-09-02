@@ -11,12 +11,12 @@
 #include <cstring>
 #include <random>
 #include <iomanip>
-#include "../app/data_structures/entry.h"
-#include "../app/data_structures/table.h"
-#include "../app/crypto/crypto_utils.h"
-#include "../app/batch/ecall_batch_collector.h"
-#include "../app/counted_ecalls.h"
-#include "../app/Enclave_u.h"
+#include "../src/core/entry.h"
+#include "../src/core/table.h"
+#include "../src/crypto/crypto_utils.h"
+#include "../src/batch/ecall_batch_collector.h"
+#include "../src/utils/counted_ecalls.h"
+#include "Enclave_u.h"
 #include "sgx_urts.h"
 
 using namespace std::chrono;

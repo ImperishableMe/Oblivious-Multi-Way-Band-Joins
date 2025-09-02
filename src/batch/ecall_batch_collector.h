@@ -7,9 +7,9 @@
 #include <string>
 #include "sgx_eid.h"
 #include "sgx_error.h"
-#include "../../common/batch_types.h"
-#include "../../common/types_common.h"
-#include "../data_structures/entry.h"
+#include "batch_types.h"
+#include "types_common.h"
+#include "../core/entry.h"
 
 // Statistics for performance monitoring
 struct BatchStats {

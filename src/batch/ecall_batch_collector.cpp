@@ -1,6 +1,6 @@
 #include "ecall_batch_collector.h"
-#include "../counted_ecalls.h"  // Use counted ecalls instead of direct Enclave_u.h
-#include "../../common/debug_util.h"
+#include "../utils/counted_ecalls.h"  // Use counted ecalls instead of direct Enclave_u.h
+#include "debug_util.h"
 #include <stdexcept>
 #include <sstream>
 

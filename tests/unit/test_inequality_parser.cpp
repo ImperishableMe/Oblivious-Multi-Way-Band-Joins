@@ -4,8 +4,8 @@
 
 #include <iostream>
 #include <cassert>
-#include "../app/utils/inequality_parser.h"
-#include "../app/utils/condition_merger.h"
+#include "../../src/query/inequality_parser.h"
+#include "../../src/query/condition_merger.h"
 
 void test_equality_parsing() {
     std::cout << "\n=== Testing Equality Condition Parsing ===" << std::endl;

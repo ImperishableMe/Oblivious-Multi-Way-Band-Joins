@@ -1,5 +1,5 @@
-#include "../enclave/crypto/entry_crypto.h"
-#include "../enclave/enclave_types.h"
+#include "entry_crypto.h"
+#include "enclave_types.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>

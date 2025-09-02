@@ -5,8 +5,8 @@
 #include <iostream>
 #include <cstring>
 #include "sgx_urts.h"
-#include "../app/Enclave_u.h"
-#include "../enclave/enclave_types.h"
+#include "Enclave_u.h"
+#include "enclave_types.h"
 
 // Global enclave ID
 sgx_enclave_id_t global_eid = 0;

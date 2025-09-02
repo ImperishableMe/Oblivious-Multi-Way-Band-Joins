@@ -7,13 +7,12 @@
 #include <dirent.h>
 #include "sgx_urts.h"
 #include "Enclave_u.h"
-#include "../../src/algorithms/oblivious_join.h"
-#include "../../src/core/join_tree_node.h"
-#include "../../src/core/join_tree_builder.h"
-#include "../../src/query/query_parser.h"
+#include "algorithms/oblivious_join.h"
+#include "core/join_tree_node.h"
+#include "core/join_tree_builder.h"
+#include "query/query_parser.h"
 #include "debug_util.h"
-#include "../../src/io/table_io.h"
-#include "debug_util.h"
+#include "io/table_io.h"
 
 /* Global enclave ID */
 sgx_enclave_id_t global_eid = 0;

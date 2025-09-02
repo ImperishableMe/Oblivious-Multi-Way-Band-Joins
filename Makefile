@@ -60,32 +60,32 @@ else
 endif
 
 # App source files
-App_Cpp_Files := apps/sgx_join/main.cpp \
-                 src/crypto/crypto_utils.cpp \
-                 src/io/converters.cpp \
-                 src/io/table_io.cpp \
-                 src/core/entry.cpp \
-                 src/core/table.cpp \
-                 src/core/join_condition.cpp \
-                 src/core/join_constraint.cpp \
-                 src/core/join_tree_builder.cpp \
-                 src/core/join_attribute_setter.cpp \
-                 src/query/query_tokenizer.cpp \
-                 src/query/query_parser.cpp \
-                 src/query/inequality_parser.cpp \
-                 src/query/condition_merger.cpp \
-                 src/algorithms/bottom_up_phase.cpp \
-                 src/algorithms/top_down_phase.cpp \
-                 src/algorithms/distribute_expand.cpp \
-                 src/algorithms/align_concat.cpp \
-                 src/algorithms/oblivious_join.cpp \
-                 src/batch/ecall_batch_collector.cpp \
-                 src/utils/ecall_wrapper.cpp \
-                 src/debug/debug_util.cpp \
-                 src/debug/debug_manager.cpp
+App_Cpp_Files := main/sgx_join/main.cpp \
+                 app/crypto/crypto_utils.cpp \
+                 app/io/converters.cpp \
+                 app/io/table_io.cpp \
+                 app/core/entry.cpp \
+                 app/core/table.cpp \
+                 app/core/join_condition.cpp \
+                 app/core/join_constraint.cpp \
+                 app/core/join_tree_builder.cpp \
+                 app/core/join_attribute_setter.cpp \
+                 app/query/query_tokenizer.cpp \
+                 app/query/query_parser.cpp \
+                 app/query/inequality_parser.cpp \
+                 app/query/condition_merger.cpp \
+                 app/algorithms/bottom_up_phase.cpp \
+                 app/algorithms/top_down_phase.cpp \
+                 app/algorithms/distribute_expand.cpp \
+                 app/algorithms/align_concat.cpp \
+                 app/algorithms/oblivious_join.cpp \
+                 app/batch/ecall_batch_collector.cpp \
+                 app/utils/ecall_wrapper.cpp \
+                 app/debug/debug_util.cpp \
+                 app/debug/debug_manager.cpp
 
 # Include paths - common is first priority
-App_Include_Paths := -I$(SGX_SDK)/include -Icommon -Isrc -Ienclave/untrusted
+App_Include_Paths := -I$(SGX_SDK)/include -Icommon -Iapp -Ienclave/untrusted
 
 App_Compile_CFlags := -fPIC -Wno-attributes $(App_Include_Paths)
 
@@ -215,11 +215,11 @@ $(Gen_Untrusted_Object): $(Gen_Untrusted_Source)
 	@echo "CC   <=  $<"
 
 # Compile app source files
-apps/%.o: apps/%.cpp
+main/%.o: main/%.cpp
 	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
-src/%.o: src/%.cpp
+app/%.o: app/%.cpp
 	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 

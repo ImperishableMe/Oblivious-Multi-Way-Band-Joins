@@ -1,7 +1,7 @@
 #ifndef INEQUALITY_PARSER_H
 #define INEQUALITY_PARSER_H
 
-#include "../core/join_constraint.h"
+#include "../join/join_constraint.h"
 #include <string>
 #include <vector>
 #include <regex>

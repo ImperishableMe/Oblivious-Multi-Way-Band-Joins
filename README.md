@@ -32,7 +32,6 @@ Based on the research paper: "Oblivious Multi-Way Joins with Constant Memory Ove
 ## Building
 
 ```bash
-cd impl/src
 make clean
 make
 ```
@@ -68,8 +67,7 @@ DEBUG=1 make
 
 ```bash
 # Run comparison tests against SQLite baseline
-cd impl/src
-./test/test_join input/queries/tpch_tb1.sql input/encrypted/data_0_001
+./tests/integration/test_join input/queries/tpch_tb1.sql input/encrypted/data_0_001
 ```
 
 ## SQL Query Format

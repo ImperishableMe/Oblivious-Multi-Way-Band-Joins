@@ -1,5 +1,5 @@
 #include "bottom_up_phase.h"
-#include "../core/join_attribute_setter.h"
+#include "../join/join_attribute_setter.h"
 #include <iostream>
 #include "debug_util.h"
 #include "../utils/counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h

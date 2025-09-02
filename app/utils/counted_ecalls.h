@@ -15,7 +15,7 @@
  */
 
 #include "Enclave_u.h"
-#include "ecall_wrapper.h"
+#include "../batch/ecall_wrapper.h"
 
 // Counted wrapper functions for the 4 essential ecalls
 // These automatically increment the global ecall counter

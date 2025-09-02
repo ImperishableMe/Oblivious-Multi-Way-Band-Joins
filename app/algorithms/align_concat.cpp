@@ -1,5 +1,5 @@
 #include "align_concat.h"
-#include "../core/join_attribute_setter.h"
+#include "../join/join_attribute_setter.h"
 #include <iostream>
 #include <chrono>
 #include "debug_util.h"

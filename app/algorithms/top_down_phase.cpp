@@ -1,5 +1,5 @@
 #include "top_down_phase.h"
-#include "../core/join_attribute_setter.h"
+#include "../join/join_attribute_setter.h"
 #include <iostream>
 #include "debug_util.h"
 #include "../utils/counted_ecalls.h"  // Use counted ecalls

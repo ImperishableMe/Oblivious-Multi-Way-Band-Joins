@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 #include "../core/types.h"
-#include "../core/join_tree_node.h"
+#include "../join/join_tree_node.h"
 #include "Enclave_u.h"
 #include "sgx_urts.h"
 

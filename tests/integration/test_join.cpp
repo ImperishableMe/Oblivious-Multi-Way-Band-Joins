@@ -11,12 +11,12 @@
 #include <cstring>
 #include <dirent.h>
 #include <sys/stat.h>
-#include "../../src/core/types.h"
-#include "../../src/io/table_io.h"
-#include "../../src/crypto/crypto_utils.h"
+#include "app/core/types.h"
+#include "app/io/table_io.h"
+#include "app/crypto/crypto_utils.h"
 #include "sgx_urts.h"
-#include "Enclave_u.h"
-#include "debug_util.h"
+#include "enclave/untrusted/Enclave_u.h"
+#include "common/debug_util.h"
 
 /* Global enclave ID for decryption */
 sgx_enclave_id_t global_eid = 0;
@@ -25,7 +25,7 @@ sgx_enclave_id_t global_eid = 0;
 int initialize_enclave() {
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     
-    ret = sgx_create_enclave("/home/r33wei/omwj/memory_const_public/impl/src/enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
+    ret = sgx_create_enclave("enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
         std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
         return -1;
@@ -340,13 +340,13 @@ int main(int argc, char* argv[]) {
         
         // Run SGX oblivious join
         // Running SGX
-        std::string sgx_cmd = "/home/r33wei/omwj/memory_const_public/impl/src/sgx_app " + sql_file + " " + data_dir + " " + sgx_output + " 2>&1";
+        std::string sgx_cmd = "./sgx_app " + sql_file + " " + data_dir + " " + sgx_output + " 2>&1";
         CommandResult sgx_result = run_command_with_output(sgx_cmd);
         // SGX done
         
         // Run SQLite baseline
         // Running SQLite
-        std::string sqlite_cmd = "/home/r33wei/omwj/memory_const_public/impl/src/test/sqlite_baseline " + sql_file + " " + data_dir + " " + sqlite_output;
+        std::string sqlite_cmd = "./sqlite_baseline " + sql_file + " " + data_dir + " " + sqlite_output;
         double sqlite_time = run_timed_command(sqlite_cmd);
         // SQLite done
         

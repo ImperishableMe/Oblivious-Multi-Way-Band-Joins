@@ -1,7 +1,7 @@
 #ifndef DISTRIBUTE_EXPAND_H
 #define DISTRIBUTE_EXPAND_H
 
-#include "../core/join_tree_node.h"
+#include "../join/join_tree_node.h"
 #include "../core/table.h"
 #include "sgx_eid.h"
 #include <vector>

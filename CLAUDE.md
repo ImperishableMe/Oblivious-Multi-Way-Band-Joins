@@ -21,9 +21,9 @@ This document contains comprehensive instructions and context for AI assistants 
 - **All tests must go to test folder**, isolated from the main implementation
 
 ## Compilation Rules
-- **ALWAYS compile using separate commands from the correct directory**:
-  - Main code: `cd impl/src && make`
-  - Test utilities: `cd impl/src/test && make`
+- **ALWAYS compile using separate commands from the project root**:
+  - Main code: `make`
+  - Test utilities: `make tests`
 - **NEVER use combined commands** like `cd test && make && cd ..` 
 - **Use absolute paths** when referencing files outside current directory
 
@@ -89,7 +89,6 @@ This document contains comprehensive instructions and context for AI assistants 
 
 ```bash
 # Standard build
-cd impl/src
 make clean && make
 
 # Debug build (enables debug output to files)
@@ -98,9 +97,12 @@ DEBUG=1 make
 # Slim entry mode (reduces memory overhead)
 make SLIM_ENTRY=1
 
-# Build tests
-cd test
-make
+# Build test programs
+make tests
+
+# Build individual test programs
+make test_join        # Comparison test
+make sqlite_baseline  # SQLite reference implementation
 ```
 
 ## Build Modes
@@ -135,10 +137,10 @@ make
 ### Testing
 ```bash
 # Compare SGX output with SQLite baseline
-./test/test_join <query.sql> <encrypted_data_dir>
+./test_join <query.sql> <encrypted_data_dir>
 
 # Run all TPC-H tests
-./run_tpch_tests.sh
+./scripts/run_tpch_tests.sh
 ```
 
 ## SQL Query Format
@@ -164,17 +166,47 @@ WHERE T1.attr = T2.attr AND T2.attr = T3.attr;
 
 ### test_join
 - **Purpose**: Compares SGX output with SQLite baseline
-- **Usage**: `./test/test_join <sql_file> <encrypted_data_dir>`
+- **Usage**: `./test_join <sql_file> <encrypted_data_dir>`
+- **Build**: `make test_join` or `make tests` to build all tests
 - **Note**: Both SGX and SQLite must be compiled in same mode (fat/slim)
 
 ### sqlite_baseline
 - **Purpose**: Reference implementation using SQLite
 - **Process**: Decrypts input → Runs SQL → Re-encrypts output
-- **Usage**: `./test/sqlite_baseline <sql_file> <encrypted_data_dir> <output_file>`
+- **Usage**: `./sqlite_baseline <sql_file> <encrypted_data_dir> <output_file>`
+- **Build**: `make sqlite_baseline` or `make tests` to build all tests
 
 ### Performance Tests
 - `overhead_measurement`: Measures SGX overhead
 - `overhead_crypto_breakdown`: Analyzes encryption costs
+
+## Building and Running Tests
+
+### Build all tests
+```bash
+make tests
+```
+
+### Build individual test programs
+```bash
+make test_join        # Build comparison test
+make sqlite_baseline  # Build SQLite baseline
+```
+
+### Run tests
+```bash
+# Compare SGX with SQLite baseline
+./test_join input/queries/tpch_tb1.sql input/encrypted/data_0_001
+
+# Run SQLite baseline directly
+./sqlite_baseline input/queries/tpch_tb1.sql input/encrypted/data_0_001 output.csv
+
+# Run SGX join directly
+./sgx_app input/queries/tpch_tb1.sql input/encrypted/data_0_001 output.csv
+
+# Run all TPC-H tests with script
+./scripts/run_tpch_tests.sh [scale]  # scale: 0_001 (default) or 0_01
+```
 
 ## Test Data
 - Scale 0.001: ~150 rows per table (included)
@@ -217,8 +249,8 @@ WHERE T1.attr = T2.attr AND T2.attr = T3.attr;
 # ============== PROJECT STRUCTURE ==============
 
 ```
-impl/src/
-├── app/                    # Main application code
+.
+├── app/                    # Main application code (non-enclave)
 │   ├── algorithms/         # Join algorithm implementations
 │   │   ├── oblivious_join.cpp    # Main orchestrator
 │   │   ├── bottom_up_phase.cpp   # Build join tree
@@ -226,31 +258,38 @@ impl/src/
 │   │   ├── distribute_expand.cpp # Core oblivious operations
 │   │   └── align_concat.cpp      # Data alignment
 │   ├── batch/              # Ecall batching system
+│   ├── core/               # Core data structures (Entry, Table, etc.)
 │   ├── crypto/             # Encryption utilities
-│   ├── data_structures/    # Core data types
+│   ├── debug/              # Debug utilities
 │   ├── io/                 # File I/O operations
-│   └── tools/              # Standalone utilities
+│   ├── query/              # SQL query parsing
+│   └── utils/              # Helper utilities
 ├── enclave/                # SGX enclave code
-│   ├── core/               # Core enclave operations
-│   ├── crypto/             # Secure crypto operations
-│   └── batch/              # Batch operation dispatcher
-├── common/                 # Shared code
+│   ├── trusted/            # Trusted enclave code
+│   └── untrusted/          # Generated untrusted edge routines
+├── common/                 # Shared headers between app and enclave
 │   ├── types_common.h      # Shared type definitions
+│   ├── enclave_types.h     # Entry structure definition
 │   ├── batch_types.h       # Batch operation types
 │   └── debug_util.h        # Debug utilities
-└── test/                   # Test suite
-    ├── unit/               # Unit tests
-    ├── compare/            # Comparison tests
-    └── baseline/           # SQLite baseline
-
-input/
-├── queries/                # SQL test queries
-├── plaintext/              # Unencrypted test data
-│   ├── data_0_001/        # Scale 0.001
-│   └── data_0_01/         # Scale 0.01
-└── encrypted/              # Encrypted test data
-    ├── data_0_001/        # Scale 0.001
-    └── data_0_01/         # Scale 0.01
+├── main/                   # Entry point programs
+│   ├── sgx_join/           # Main SGX join application
+│   └── tools/              # Standalone tools (encrypt_tables, etc.)
+├── tests/                  # Test suite
+│   ├── integration/        # Integration tests (test_join)
+│   ├── baseline/           # SQLite baseline implementation
+│   ├── performance/        # Performance tests
+│   └── unit/               # Unit tests (organized by module)
+├── scripts/                # Build and test scripts
+├── input/                  # Test data
+│   ├── queries/            # SQL test queries
+│   ├── plaintext/          # Unencrypted test data
+│   │   ├── data_0_001/    # Scale 0.001
+│   │   └── data_0_01/     # Scale 0.01
+│   └── encrypted/          # Encrypted test data
+│       ├── data_0_001/    # Scale 0.001
+│       └── data_0_01/     # Scale 0.01
+└── output/                 # Test outputs and results
 ```
 
 # ============== KEY ALGORITHMS ==============

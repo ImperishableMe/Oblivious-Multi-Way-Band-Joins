@@ -5,13 +5,13 @@
 #include <map>
 #include <dirent.h>
 #include <sqlite3.h>
-#include "../../src/core/types.h"
-#include "../../src/io/table_io.h"
-#include "../../src/io/io_entry.h"  // Use IO_Entry for dynamic data
-#include "../../src/crypto/crypto_utils.h"
+#include "app/core/types.h"
+#include "app/io/table_io.h"
+#include "app/io/io_entry.h"  // Use IO_Entry for dynamic data
+#include "app/crypto/crypto_utils.h"
 #include "sgx_urts.h"
-#include "debug_util.h"
-#include "Enclave_u.h"
+#include "common/debug_util.h"
+#include "enclave/untrusted/Enclave_u.h"
 
 /* Global enclave ID for decryption/encryption */
 sgx_enclave_id_t global_eid = 0;

@@ -5,7 +5,7 @@
 #include <string>
 #include <cstring>
 #include "../core/types.h"
-#include "enclave_types.h"
+#include "../../common/enclave_types.h"
 
 // Forward declarations
 class Entry;

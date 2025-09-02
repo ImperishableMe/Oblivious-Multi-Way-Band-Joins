@@ -1,113 +1,293 @@
-# Important Absolute Paths for the Project
+# Project Structure and Paths
 
-## Main Algorithm Implementation
-- **Main SGX Application**: `/home/r33wei/omwj/memory_const_public/impl/src/sgx_app`
-- **Encryption Tool**: `/home/r33wei/omwj/memory_const_public/impl/src/encrypt_tables`
-- **Source Code Directory**: `/home/r33wei/omwj/memory_const_public/impl/src/`
-- **Algorithm Implementations**: `/home/r33wei/omwj/memory_const_public/impl/src/app/algorithms/`
-  - Bottom-up Phase: `/home/r33wei/omwj/memory_const_public/impl/src/app/algorithms/bottom_up_phase.cpp`
-  - Top-down Phase: `/home/r33wei/omwj/memory_const_public/impl/src/app/algorithms/top_down_phase.cpp`
-  - Distribute-Expand: `/home/r33wei/omwj/memory_const_public/impl/src/app/algorithms/distribute_expand.cpp`
-  - Align-Concat: `/home/r33wei/omwj/memory_const_public/impl/src/app/algorithms/align_concat.cpp`
-  - Oblivious Join (main): `/home/r33wei/omwj/memory_const_public/impl/src/app/algorithms/oblivious_join.cpp`
+## Project Root
+`/home/r33wei/omwj/memory_const_public/`
 
-## Test Infrastructure
-- **Test Join Comparator**: `/home/r33wei/omwj/memory_const_public/impl/src/test/test_join`
-- **SQLite Baseline**: `/home/r33wei/omwj/memory_const_public/impl/src/test/sqlite_baseline`
-- **Test Runner Script**: `/home/r33wei/omwj/memory_const_public/impl/src/run_tpch_tests.sh`
+This document describes the complete structure of the Memory-Constrained Oblivious Multi-Way Join project after reorganization.
 
-## Test Cases
-- **Test Case Directory**: `/home/r33wei/omwj/memory_const_public/test_cases/`
-- **Test Queries**: `/home/r33wei/omwj/memory_const_public/test_cases/queries/`
-  - Two-center chain: `/home/r33wei/omwj/memory_const_public/test_cases/queries/two_center_chain.sql`
-  - Three-table chain: `/home/r33wei/omwj/memory_const_public/test_cases/queries/three_table_chain.sql`
-  - Two-table basic: `/home/r33wei/omwj/memory_const_public/test_cases/queries/two_table_basic.sql`
-- **Test Data**: 
-  - Encrypted: `/home/r33wei/omwj/memory_const_public/test_cases/encrypted/`
-  - Plaintext: `/home/r33wei/omwj/memory_const_public/test_cases/plaintext/`
+## Documentation Files (Root Level)
+- `README.md` - Project overview and quick start guide
+- `PATHS.md` - This file - complete directory structure reference
+- `CLAUDE.md` - AI assistant instructions and project context
+- `Makefile` - Build system configuration
 
-## TPC-H Data and Queries
-- **TPC-H Queries**: `/home/r33wei/omwj/memory_const_public/input/queries/`
-  - TB1 (Two-table equality): `/home/r33wei/omwj/memory_const_public/input/queries/tpch_tb1.sql`
-  - TB2 (Two-table inequality): `/home/r33wei/omwj/memory_const_public/input/queries/tpch_tb2.sql`
-  - TM1 (Three-table): `/home/r33wei/omwj/memory_const_public/input/queries/tpch_tm1.sql`
-- **TPC-H Data**:
-  - Encrypted Data: `/home/r33wei/omwj/memory_const_public/input/encrypted/`
-    - Scale 0.001: `/home/r33wei/omwj/memory_const_public/input/encrypted/data_0_001/`
-    - Scale 0.01: `/home/r33wei/omwj/memory_const_public/input/encrypted/data_0_01/`
-    - Scale 0.1: `/home/r33wei/omwj/memory_const_public/input/encrypted/data_0_1/`
-    - Scale 1.0: `/home/r33wei/omwj/memory_const_public/input/encrypted/data_1/`
-  - Plaintext Data: `/home/r33wei/omwj/memory_const_public/input/plaintext/`
-    - Scale 0.001: `/home/r33wei/omwj/memory_const_public/input/plaintext/data_0_001/`
-    - Scale 0.01: `/home/r33wei/omwj/memory_const_public/input/plaintext/data_0_01/`
-    - Scale 0.1: `/home/r33wei/omwj/memory_const_public/input/plaintext/data_0_1/`
-    - Scale 1.0: `/home/r33wei/omwj/memory_const_public/input/plaintext/data_1/`
+---
 
-## Debug and Output
-- **Debug Sessions**: `/home/r33wei/omwj/memory_const_public/debug/`
-- **Output Directory**: `/home/r33wei/omwj/memory_const_public/output/`
-- **Debug Utilities**: `/home/r33wei/omwj/memory_const_public/impl/src/common/debug_util.h`
-- **Debug Implementation**: `/home/r33wei/omwj/memory_const_public/impl/src/app/debug_util.cpp`
+## Directory Structure Overview
 
-## Build System
-- **Makefile**: `/home/r33wei/omwj/memory_const_public/impl/src/Makefile`
-- **Build Script**: `/home/r33wei/omwj/memory_const_public/impl/build.sh` (Note: Currently empty, use `make` directly)
+### `/app/` - Host Application Code
+Code that runs outside the SGX enclave on the regular host system. Uses C++ STL.
 
-## Usage Examples
+- **`algorithms/`** - Join algorithm implementations
+  - `oblivious_join.cpp/h` - Main orchestrator combining all phases
+  - `bottom_up_phase.cpp/h` - Compute local multiplicities going up the tree
+  - `top_down_phase.cpp/h` - Propagate final multiplicities down the tree
+  - `distribute_expand.cpp/h` - Oblivious tuple replication
+  - `align_concat.cpp/h` - Oblivious alignment and concatenation
 
-**Important**: All commands should be run from `/home/r33wei/omwj/memory_const_public/impl/src/`
+- **`batch/`** - Ecall batching system
+  - `ecall_batch_collector.cpp/h` - Collects operations to reduce SGX transitions
+  - `ecall_wrapper.cpp/h` - Wrapper for SGX ecalls with counting
+  - Reduces overhead by bundling multiple operations into single ecalls
+
+- **`core/`** - Core data structures
+  - `entry.cpp/h` - Entry structure (row representation)
+  - `table.cpp/h` - Table structure (collection of entries)
+  - `types.h` - Type definitions used by host application
+
+- **`crypto/`** - Encryption utilities
+  - `crypto_utils.cpp/h` - AES encryption/decryption for data at rest
+  - Handles encryption outside the enclave
+
+- **`debug/`** - Debug utilities
+  - `debug_util.cpp/h` - Debug logging functionality
+  - `debug_manager.cpp/h` - Manages debug sessions and output
+
+- **`io/`** - Input/Output operations
+  - `table_io.cpp/h` - Read/write tables from/to files
+  - `converters.cpp/h` - Convert between formats (CSV, encrypted)
+
+- **`join/`** - Join framework components
+  - `join_condition.cpp/h` - Join condition representation
+  - `join_constraint.cpp/h` - Join constraint handling
+  - `join_tree_node.h` - Join tree node structure
+  - `join_tree_builder.cpp/h` - Builds join tree from conditions
+  - `join_attribute_setter.cpp/h` - Manages join attribute extraction
+
+- **`query/`** - SQL query processing
+  - `query_parser.cpp/h` - Parse SQL SELECT statements
+  - `query_tokenizer.cpp/h` - Tokenize SQL queries
+  - `inequality_parser.cpp/h` - Parse inequality conditions
+  - `condition_merger.cpp/h` - Merge multiple conditions
+
+- **`utils/`** - Helper utilities
+  - `counted_ecalls.h` - Track ecall counts for performance
+
+### `/enclave/` - SGX Enclave Components
+
+- **`trusted/`** - Code running INSIDE the secure SGX enclave
+  - Has access to decrypted sensitive data
+  - Protected from host OS and other processes
+  - Written in C (no STL due to SGX constraints)
+  - Files in root:
+    - `Enclave.cpp` - Main enclave entry point
+    - `Enclave.edl` - Enclave Definition Language interface
+    - `Enclave.lds` - Linker script
+    - `Enclave.config.xml` - Enclave configuration
+    - `Enclave_private.pem` - Private key for signing
+    - `debug_wrapper.c` - Debug support in enclave
+    - `secure_key.h` - Secure key management
+    - `enclave_types.h` - Type definitions for enclave
+    - `core.h` - Core function declarations
+    - `Enclave_t.c/h` - Generated trusted proxy (auto-generated)
+  - **`crypto/`** - Cryptographic operations
+    - `aes_crypto.c/h` - AES encryption/decryption
+    - `crypto_helpers.c/h` - Helper functions for crypto
+    - `entry_crypto.h` - Entry-specific crypto definitions
+    - `aes_operations.c` - Additional AES operations
+  - **`operations/`** - Core data operations
+    - `comparators.c` - Comparison functions
+    - `transform_functions.c` - Data transformation
+    - `distribute_functions.c` - Distribution operations
+    - `window_functions.c` - Window-based operations
+  - **`batch/`** - Batch processing
+    - `batch_dispatcher.c/h` - Dispatch batched operations
+  - **`test/`** - Test ecalls
+    - `test_ecalls.c` - Test ecall implementations
+    - `test_crypto_ecalls.c` - Crypto test ecalls
+  - **`core/`** - Legacy core operations (kept for compatibility)
+
+- **`untrusted/`** - Bridge between host and enclave
+  - Auto-generated by SGX edger8r tool
+  - `Enclave_u.c/h` - Untrusted proxy functions (host side)
+  - Marshals data across the enclave boundary
+
+### `/common/` - Shared Headers
+Headers and definitions shared between host and enclave code.
+
+- `types_common.h` - Common type definitions
+- `enclave_types.h` - Entry structure shared definition
+- `batch_types.h` - Batch operation type definitions
+- `constants.h` - System-wide constants
+- `debug_util.h` - Debug utilities shared
+- `debug_config.h` - Debug configuration
+
+### `/main/` - Entry Point Programs
+
+- **`sgx_join/`** - Main SGX join application
+  - `main.cpp` - Entry point for sgx_app executable
+
+### `/tests/` - Test Infrastructure
+
+- **`baseline/`** - Reference implementation
+  - `sqlite_baseline.cpp` - SQLite-based reference for correctness testing
+
+- **`integration/`** - Integration tests
+  - `test_join.cpp` - Compare SGX output with SQLite baseline
+
+- **`performance/`** - Performance tests
+  - Performance benchmarking tools
+
+- **`unit/`** - Unit tests
+  - Unit tests for individual components
+
+### `/input/` - Input Data and Queries
+
+- **`queries/`** - SQL test queries
+  - `tpch_tb1.sql` - Two-table equality join
+  - `tpch_tb2.sql` - Two-table inequality join
+  - `tpch_tm1.sql` - Three-table join
+  - `tpch_tm2.sql` - Three-table complex join
+  - `tpch_tm3.sql` - Three-table chain join
+
+- **`plaintext/`** - Unencrypted test data
+  - `data_0_001/` - TPC-H scale 0.001 (~150 rows/table)
+  - `data_0_01/` - TPC-H scale 0.01 (~1,500 rows/table)
+
+- **`encrypted/`** - Encrypted test data
+  - `data_0_001/` - Encrypted TPC-H scale 0.001
+  - `data_0_01/` - Encrypted TPC-H scale 0.01
+
+### `/output/` - Program Outputs
+Directory for storing join results and debug outputs.
+
+### `/scripts/` - Build and Test Scripts
+- `build.sh` - Build script
+- `test.sh` - Test runner
+- `run_tpch_tests.sh` - Run all TPC-H tests
+- `setup_env.sh` - Environment setup
+
+---
+
+## Build Instructions
+
+All builds should be executed from the project root:
 
 ```bash
-# Change to the source directory first
-cd /home/r33wei/omwj/memory_const_public/impl/src
+cd /home/r33wei/omwj/memory_const_public
 
-# Run the two-center test case
-./test/test_join /home/r33wei/omwj/memory_const_public/test_cases/queries/two_center_chain.sql /home/r33wei/omwj/memory_const_public/test_cases/encrypted
-
-# Run TPC-H TB1 test (two-table equality join)
-./test/test_join /home/r33wei/omwj/memory_const_public/input/queries/tpch_tb1.sql /home/r33wei/omwj/memory_const_public/input/encrypted/data_0_001
-
-# Run TPC-H TB2 test (two-table inequality join)
-./test/test_join /home/r33wei/omwj/memory_const_public/input/queries/tpch_tb2.sql /home/r33wei/omwj/memory_const_public/input/encrypted/data_0_001
-
-# Run SGX application directly (3 arguments required)
-./sgx_app <sql_file> <encrypted_data_dir> <output_file>
-# Example:
-./sgx_app /home/r33wei/omwj/memory_const_public/input/queries/tpch_tb1.sql /home/r33wei/omwj/memory_const_public/input/encrypted/data_0_001 output.csv
-
-# Run SQLite baseline (3 arguments required)
-./test/sqlite_baseline <sql_file> <plaintext_data_dir> <output_file>
-# Example:
-./test/sqlite_baseline /home/r33wei/omwj/memory_const_public/input/queries/tpch_tb1.sql /home/r33wei/omwj/memory_const_public/input/plaintext/data_0_001 baseline.csv
-
-# Run all TPC-H tests automatically
-./run_tpch_tests.sh
-
-# Compile the project
+# Build main application and enclave
 make
+
+# Build with debug output
+DEBUG=1 make
+
+# Build in slim entry mode (reduced memory)
+make SLIM_ENTRY=1
+
+# Build test programs
+make tests
+
+# Build specific test
+make test_join
+make sqlite_baseline
 
 # Clean and rebuild
 make clean && make
-
-# Enable debug output (compile with debug flag)
-DEBUG=1 make
 ```
 
-## Command Usage Reference
+---
 
-- **test_join**: `./test/test_join <sql_file> <data_dir>`
-  - Compares SGX results with SQLite baseline
-  - Takes only 2 arguments (no output file parameter)
-  - Automatically runs both SGX and SQLite and compares results
+## Executable Locations
 
-- **sgx_app**: `./sgx_app <query_file> <input_dir> <output_file>`
-  - Runs the oblivious join algorithm in SGX enclave
-  - Requires 3 arguments including output file
+After building, executables are located in project root:
 
-- **sqlite_baseline**: `./test/sqlite_baseline <sql_file> <input_dir> <output_file>`
-  - Runs standard SQLite for comparison
-  - Requires 3 arguments including output file
+- `./sgx_app` - Main SGX join application
+- `./enclave.signed.so` - Signed enclave library
+- `./test_join` - Integration test tool
+- `./sqlite_baseline` - SQLite reference implementation
+- `./encrypt_tables` - Data encryption tool
 
-- **run_tpch_tests.sh**: `./run_tpch_tests.sh`
-  - Automatically runs all TPC-H queries in the queries directory
-  - No arguments needed (uses hardcoded paths)
+---
+
+## Usage Examples
+
+### Running the SGX Join Application
+```bash
+# From project root
+./sgx_app <query_file> <encrypted_data_dir> <output_file>
+
+# Example
+./sgx_app input/queries/tpch_tb1.sql input/encrypted/data_0_001 output.csv
+```
+
+### Running Integration Tests
+```bash
+# Compare SGX with SQLite baseline (2 arguments only)
+./test_join <query_file> <encrypted_data_dir>
+
+# Example
+./test_join input/queries/tpch_tb1.sql input/encrypted/data_0_001
+```
+
+### Running SQLite Baseline
+```bash
+# Run SQLite reference (3 arguments)
+./sqlite_baseline <query_file> <encrypted_data_dir> <output_file>
+
+# Example
+./sqlite_baseline input/queries/tpch_tb1.sql input/encrypted/data_0_001 baseline.csv
+```
+
+### Encrypting Data
+```bash
+# Encrypt plaintext CSV files
+./encrypt_tables <plaintext_dir> <encrypted_output_dir>
+
+# Example
+./encrypt_tables input/plaintext/data_0_001 /tmp/encrypted_data
+```
+
+### Running Test Suites
+```bash
+# Run all TPC-H tests with default scale (0.001)
+./scripts/run_tpch_tests.sh
+
+# Run with specific scale
+./scripts/run_tpch_tests.sh 0_01
+```
+
+---
+
+## Key Concepts
+
+### SGX Enclave Architecture
+- **Trusted Code**: Runs inside the enclave with access to sensitive data
+- **Untrusted Code**: Runs on regular host, orchestrates enclave operations
+- **EDL Interface**: Defines the boundary between trusted and untrusted code
+- **Ecalls**: Calls from untrusted to trusted code
+- **Ocalls**: Calls from trusted to untrusted code (minimized for security)
+
+### Data Flow
+1. Encrypted data stored on disk
+2. Host application reads encrypted data
+3. Data sent to enclave via ecalls
+4. Enclave decrypts and processes data
+5. Results encrypted before leaving enclave
+6. Host writes encrypted results to disk
+
+### Security Properties
+- Data never decrypted outside enclave
+- Memory access patterns are data-oblivious
+- Constant memory overhead regardless of data distribution
+- Side-channel resistant through oblivious algorithms
+
+---
+
+## Important Notes
+
+### Build Modes
+- **Fat Entry Mode** (default): ~2256 bytes per entry
+- **Slim Entry Mode**: ~260 bytes per entry (use `SLIM_ENTRY=1`)
+- Modes are incompatible - data encrypted in one mode cannot be decrypted in the other
+
+### Data Constraints
+- All data must be integers
+- Valid range: [-1,073,741,820, 1,073,741,820]
+- NULL represented as INT32_MAX
+- String data not supported (will parse as 0)
+
+### Debug Output
+- Debug output goes to files in `debug/` directory
+- Enable with `DEBUG=1` during compilation
+- Format: `debug/{date}_{time}_{test}/`

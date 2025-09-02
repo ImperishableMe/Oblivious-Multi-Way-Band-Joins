@@ -66,10 +66,10 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/io/table_io.cpp \
                  app/core/entry.cpp \
                  app/core/table.cpp \
-                 app/core/join_condition.cpp \
-                 app/core/join_constraint.cpp \
-                 app/core/join_tree_builder.cpp \
-                 app/core/join_attribute_setter.cpp \
+                 app/join/join_condition.cpp \
+                 app/join/join_constraint.cpp \
+                 app/join/join_tree_builder.cpp \
+                 app/join/join_attribute_setter.cpp \
                  app/query/query_tokenizer.cpp \
                  app/query/query_parser.cpp \
                  app/query/inequality_parser.cpp \
@@ -80,7 +80,7 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/algorithms/align_concat.cpp \
                  app/algorithms/oblivious_join.cpp \
                  app/batch/ecall_batch_collector.cpp \
-                 app/utils/ecall_wrapper.cpp \
+                 app/batch/ecall_wrapper.cpp \
                  app/debug/debug_util.cpp \
                  app/debug/debug_manager.cpp
 
@@ -137,16 +137,16 @@ Crypto_Library_Name := sgx_tcrypto
 
 # Enclave source files
 Enclave_Cpp_Files := enclave/trusted/Enclave.cpp
-Enclave_C_Files := enclave/trusted/aes_crypto.c \
-                   enclave/trusted/crypto_helpers.c \
-                   enclave/trusted/window_functions.c \
-                   enclave/trusted/comparators.c \
-                   enclave/trusted/transform_functions.c \
-                   enclave/trusted/distribute_functions.c \
-                   enclave/trusted/batch_dispatcher.c \
+Enclave_C_Files := enclave/trusted/crypto/aes_crypto.c \
+                   enclave/trusted/crypto/crypto_helpers.c \
+                   enclave/trusted/operations/window_functions.c \
+                   enclave/trusted/operations/comparators.c \
+                   enclave/trusted/operations/transform_functions.c \
+                   enclave/trusted/operations/distribute_functions.c \
+                   enclave/trusted/batch/batch_dispatcher.c \
                    enclave/trusted/debug_wrapper.c \
-                   enclave/trusted/test_ecalls.c \
-                   enclave/trusted/test_crypto_ecalls.c
+                   enclave/trusted/test/test_ecalls.c \
+                   enclave/trusted/test/test_crypto_ecalls.c
 
 # Include paths - common is first priority
 Enclave_Include_Paths := -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc \
@@ -250,6 +250,23 @@ enclave/trusted/%.o: enclave/trusted/%.c
 	@$(CC) $(SGX_COMMON_CFLAGS) $(Enclave_Compile_CFlags) -c $< -o $@
 	@echo "CC   <=  $<"
 
+# Compile enclave subdirectory source files
+enclave/trusted/crypto/%.o: enclave/trusted/crypto/%.c
+	@$(CC) $(SGX_COMMON_CFLAGS) $(Enclave_Compile_CFlags) -c $< -o $@
+	@echo "CC   <=  $<"
+
+enclave/trusted/operations/%.o: enclave/trusted/operations/%.c
+	@$(CC) $(SGX_COMMON_CFLAGS) $(Enclave_Compile_CFlags) -c $< -o $@
+	@echo "CC   <=  $<"
+
+enclave/trusted/batch/%.o: enclave/trusted/batch/%.c
+	@$(CC) $(SGX_COMMON_CFLAGS) $(Enclave_Compile_CFlags) -c $< -o $@
+	@echo "CC   <=  $<"
+
+enclave/trusted/test/%.o: enclave/trusted/test/%.c
+	@$(CC) $(SGX_COMMON_CFLAGS) $(Enclave_Compile_CFlags) -c $< -o $@
+	@echo "CC   <=  $<"
+
 # Link enclave
 $(Enclave_Name): enclave/trusted/Enclave_t.o $(Enclave_Objects)
 	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
@@ -261,10 +278,58 @@ $(Signed_Enclave_Name): $(Enclave_Name)
 		-enclave $(Enclave_Name) -out $@ -config $(Enclave_Config_File)
 	@echo "SIGN =>  $@"
 
+######## Test Programs ########
+
+# Test program settings
+Test_Include_Paths := -I$(SGX_SDK)/include -I. -Icommon -Iapp -Ienclave/untrusted
+Test_Compile_CFlags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(Test_Include_Paths)
+Test_Compile_CXXFlags := $(Test_Compile_CFlags) -std=c++17
+
+# Test programs
+Test_Join_Objects := tests/integration/test_join.o
+Sqlite_Baseline_Objects := tests/baseline/sqlite_baseline.o
+
+# Common objects needed by test programs (reuse from main app)
+Test_Common_Objects := app/crypto/crypto_utils.o \
+                      app/io/converters.o \
+                      app/io/table_io.o \
+                      app/core/entry.o \
+                      app/core/table.o \
+                      app/join/join_condition.o \
+                      app/join/join_attribute_setter.o \
+                      app/batch/ecall_batch_collector.o \
+                      app/batch/ecall_wrapper.o \
+                      app/debug/debug_util.o \
+                      app/debug/debug_manager.o \
+                      $(Gen_Untrusted_Object)
+
+# Test executables
+test_join: $(Test_Join_Objects) $(Test_Common_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags) -lsqlite3
+	@echo "LINK =>  $@"
+
+sqlite_baseline: $(Sqlite_Baseline_Objects) $(Test_Common_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags) -lsqlite3
+	@echo "LINK =>  $@"
+
+# Compile test source files
+tests/integration/%.o: tests/integration/%.cpp
+	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
+tests/baseline/%.o: tests/baseline/%.cpp
+	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
+# Build all tests
+tests: test_join sqlite_baseline
+	@echo "All tests built successfully"
+
 ######## Clean ########
 
 clean:
 	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name)
 	@rm -f $(App_Objects) $(Enclave_Objects) 
 	@rm -f enclave/trusted/Enclave_t.* $(Gen_Untrusted_Source) $(Gen_Untrusted_Object)
+	@rm -f test_join sqlite_baseline $(Test_Join_Objects) $(Sqlite_Baseline_Objects)
 	@rm -f .config_*

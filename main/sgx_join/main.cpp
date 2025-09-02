@@ -8,8 +8,8 @@
 #include "sgx_urts.h"
 #include "Enclave_u.h"
 #include "algorithms/oblivious_join.h"
-#include "core/join_tree_node.h"
-#include "core/join_tree_builder.h"
+#include "join/join_tree_node.h"
+#include "join/join_tree_builder.h"
 #include "query/query_parser.h"
 #include "debug_util.h"
 #include "io/table_io.h"
@@ -22,7 +22,7 @@ int initialize_enclave() {
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     
     /* Call sgx_create_enclave to initialize an enclave instance */
-    ret = sgx_create_enclave("/home/r33wei/omwj/memory_const_public/impl/src/enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
+    ret = sgx_create_enclave("enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
         std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
         return -1;

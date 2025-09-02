@@ -1,7 +1,7 @@
 #ifndef AES_CRYPTO_H
 #define AES_CRYPTO_H
 
-#include "../enclave_types.h"
+#include "enclave_types.h"
 #include "entry_crypto.h"  // For crypto_status_t
 #include <stdint.h>
 

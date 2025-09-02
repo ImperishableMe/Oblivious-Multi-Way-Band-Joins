@@ -1,8 +1,8 @@
 #include "Enclave_t.h"
 #include "enclave_types.h"
-#include "crypto/entry_crypto.h"
-#include "crypto/aes_crypto.h"
-#include "core/core.h"
+#include "entry_crypto.h"
+#include "aes_crypto.h"
+#include "core.h"
 
 // ENCLAVE_BUILD is already defined in Makefile
 #include "secure_key.h"

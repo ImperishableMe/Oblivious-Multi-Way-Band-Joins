@@ -1,7 +1,7 @@
-#include "../enclave_types.h"
-#include "../crypto/aes_crypto.h"
+#include "enclave_types.h"
+#include "aes_crypto.h"
 #include "crypto_helpers.h"
-#include "../../common/debug_util.h"
+#include "debug_util.h"
 #include <stdint.h>
 #include <string.h>
 #include <limits.h>

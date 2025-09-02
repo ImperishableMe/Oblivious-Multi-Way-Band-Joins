@@ -1,5 +1,5 @@
-#include "../Enclave_t.h"
-#include "../enclave_types.h"
+#include "Enclave_t.h"
+#include "enclave_types.h"
 
 /**
  * Test ecalls for measuring SGX overhead components

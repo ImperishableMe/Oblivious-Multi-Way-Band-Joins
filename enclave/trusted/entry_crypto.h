@@ -1,7 +1,7 @@
 #ifndef ENTRY_CRYPTO_H
 #define ENTRY_CRYPTO_H
 
-#include "../enclave_types.h"
+#include "enclave_types.h"
 #include <stdbool.h>
 #include <stddef.h>  // For size_t
 

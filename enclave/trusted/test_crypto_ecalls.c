@@ -1,7 +1,7 @@
-#include "../Enclave_t.h"
-#include "../enclave_types.h"
-#include "../crypto/aes_crypto.h"
-#include "../core/core.h"
+#include "Enclave_t.h"
+#include "enclave_types.h"
+#include "aes_crypto.h"
+#include "core.h"
 #include <string.h>
 
 /**

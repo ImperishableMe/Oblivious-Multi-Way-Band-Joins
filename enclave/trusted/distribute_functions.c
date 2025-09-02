@@ -1,6 +1,6 @@
-#include "../enclave_types.h"
-#include "../crypto/aes_crypto.h"
-#include "../../common/debug_util.h"
+#include "enclave_types.h"
+#include "aes_crypto.h"
+#include "debug_util.h"
 #include <stdint.h>
 
 /**

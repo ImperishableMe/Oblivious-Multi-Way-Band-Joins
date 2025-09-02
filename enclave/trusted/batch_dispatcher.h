@@ -2,8 +2,8 @@
 #define BATCH_DISPATCHER_H
 
 #include <stddef.h>
-#include "../enclave_types.h"
-#include "../../common/batch_types.h"
+#include "enclave_types.h"
+#include "batch_types.h"
 
 #ifdef __cplusplus
 extern "C" {

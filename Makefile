@@ -137,16 +137,16 @@ Crypto_Library_Name := sgx_tcrypto
 
 # Enclave source files
 Enclave_Cpp_Files := enclave/trusted/Enclave.cpp
-Enclave_C_Files := enclave/trusted/crypto/aes_crypto.c \
-                   enclave/trusted/core/crypto_helpers.c \
-                   enclave/trusted/core/window_functions.c \
-                   enclave/trusted/core/comparators.c \
-                   enclave/trusted/core/transform_functions.c \
-                   enclave/trusted/core/distribute_functions.c \
-                   enclave/trusted/batch/batch_dispatcher.c \
+Enclave_C_Files := enclave/trusted/aes_crypto.c \
+                   enclave/trusted/crypto_helpers.c \
+                   enclave/trusted/window_functions.c \
+                   enclave/trusted/comparators.c \
+                   enclave/trusted/transform_functions.c \
+                   enclave/trusted/distribute_functions.c \
+                   enclave/trusted/batch_dispatcher.c \
                    enclave/trusted/debug_wrapper.c \
-                   enclave/trusted/test/test_ecalls.c \
-                   enclave/trusted/test/test_crypto_ecalls.c
+                   enclave/trusted/test_ecalls.c \
+                   enclave/trusted/test_crypto_ecalls.c
 
 # Include paths - common is first priority
 Enclave_Include_Paths := -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc \
@@ -162,6 +162,7 @@ endif
 
 Enclave_Compile_CFlags += -nostdinc -ffreestanding -fvisibility=hidden \
                           -fpie -ffunction-sections -fdata-sections \
+                          -DENCLAVE_BUILD \
                           $(Enclave_Include_Paths)
 Enclave_Compile_CXXFlags := -nostdinc++ $(Enclave_Compile_CFlags) -std=c++11
 

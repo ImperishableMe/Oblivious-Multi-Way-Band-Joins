@@ -1,4 +1,4 @@
-#include "../enclave_types.h"
+#include "enclave_types.h"
 #include "crypto_helpers.h"
 #include <stdint.h>
 #include <string.h>

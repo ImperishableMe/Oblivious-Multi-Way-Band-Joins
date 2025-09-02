@@ -1,9 +1,9 @@
 #ifndef CRYPTO_HELPERS_H
 #define CRYPTO_HELPERS_H
 
-#include "../enclave_types.h"
-#include "../crypto/entry_crypto.h"
-#include "../crypto/aes_crypto.h"
+#include "enclave_types.h"
+#include "entry_crypto.h"
+#include "aes_crypto.h"
 
 /**
  * Crypto Helper Functions

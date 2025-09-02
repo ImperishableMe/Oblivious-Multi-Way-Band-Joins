@@ -3,7 +3,7 @@
 
 #include <string>
 #include <utility>
-#include "../core/entry.h"
+#include "../data_structures/entry.h"
 #include "../../common/types_common.h"
 
 /**

@@ -1,6 +1,6 @@
 #include "converters.h"
-#include "../core/entry.h"
-#include "../core/table.h"
+#include "../data_structures/entry.h"
+#include "../data_structures/table.h"
 #include <algorithm>
 #include <cstring>
 

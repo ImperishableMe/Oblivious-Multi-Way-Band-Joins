@@ -11,8 +11,8 @@
 #include <cstring>
 #include <dirent.h>
 #include <sys/stat.h>
-#include "app/core/types.h"
-#include "app/io/table_io.h"
+#include "app/data_structures/data_types.h"
+#include "app/file_io/table_io.h"
 #include "app/crypto/crypto_utils.h"
 #include "sgx_urts.h"
 #include "enclave/untrusted/Enclave_u.h"

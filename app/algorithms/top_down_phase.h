@@ -2,7 +2,7 @@
 #define TOP_DOWN_PHASE_H
 
 #include "../join/join_tree_node.h"
-#include "../core/table.h"
+#include "../data_structures/table.h"
 #include "../join/join_constraint.h"
 #include "sgx_eid.h"
 #include <vector>

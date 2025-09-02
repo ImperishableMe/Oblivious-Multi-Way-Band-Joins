@@ -5,7 +5,7 @@
 #include "../../src/algorithms/distribute_expand.h"
 #include "../../src/core/table.h"
 #include "../../src/core/join_tree_node.h"
-#include "../../src/io/table_io.h"
+#include "../../app/file_io/table_io.h"
 #include "constants.h"
 #include "debug_util.h"
 #include "sgx_urts.h"

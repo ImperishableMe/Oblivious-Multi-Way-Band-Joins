@@ -15,7 +15,7 @@
 #include "../../src/algorithms/bottom_up_phase.h"
 #include "../../src/query/query_parser.h"
 #include "../../src/core/join_tree_builder.h"
-#include "../../src/io/table_io.h"
+#include "../../app/file_io/table_io.h"
 #include "../../src/crypto/crypto_utils.h"
 #include "Enclave_u.h"
 #include "../utils/subtree_verifier.h"

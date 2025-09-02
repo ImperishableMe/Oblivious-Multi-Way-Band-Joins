@@ -15,7 +15,7 @@
 #include <cstring>
 #include <vector>
 #include <cstdio>
-#include "../../src/io/table_io.h"
+#include "../../app/file_io/table_io.h"
 #include "../../src/crypto/crypto_utils.h"
 #include "Enclave_u.h"
 #include "sgx_urts.h"

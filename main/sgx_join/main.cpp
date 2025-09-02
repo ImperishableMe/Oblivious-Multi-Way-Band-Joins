@@ -12,7 +12,7 @@
 #include "join/join_tree_builder.h"
 #include "query/query_parser.h"
 #include "debug_util.h"
-#include "io/table_io.h"
+#include "file_io/table_io.h"
 
 /* Global enclave ID */
 sgx_enclave_id_t global_eid = 0;

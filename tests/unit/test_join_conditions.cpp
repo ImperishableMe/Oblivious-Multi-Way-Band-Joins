@@ -11,8 +11,8 @@
 
 #include <iostream>
 #include <cassert>
-#include "../../src/core/join_constraint.h"
-#include "../../src/core/types.h"
+#include "../../app/join/join_constraint.h"
+#include "../../app/data_structures/data_types.h"
 
 void test_equality_join() {
     std::cout << "\n=== Testing Equality Join ===" << std::endl;

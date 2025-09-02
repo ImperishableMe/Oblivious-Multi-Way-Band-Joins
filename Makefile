@@ -62,10 +62,10 @@ endif
 # App source files
 App_Cpp_Files := main/sgx_join/main.cpp \
                  app/crypto/crypto_utils.cpp \
-                 app/io/converters.cpp \
-                 app/io/table_io.cpp \
-                 app/core/entry.cpp \
-                 app/core/table.cpp \
+                 app/file_io/converters.cpp \
+                 app/file_io/table_io.cpp \
+                 app/data_structures/entry.cpp \
+                 app/data_structures/table.cpp \
                  app/join/join_condition.cpp \
                  app/join/join_constraint.cpp \
                  app/join/join_tree_builder.cpp \
@@ -291,10 +291,10 @@ Sqlite_Baseline_Objects := tests/baseline/sqlite_baseline.o
 
 # Common objects needed by test programs (reuse from main app)
 Test_Common_Objects := app/crypto/crypto_utils.o \
-                      app/io/converters.o \
-                      app/io/table_io.o \
-                      app/core/entry.o \
-                      app/core/table.o \
+                      app/file_io/converters.o \
+                      app/file_io/table_io.o \
+                      app/data_structures/entry.o \
+                      app/data_structures/table.o \
                       app/join/join_condition.o \
                       app/join/join_attribute_setter.o \
                       app/batch/ecall_batch_collector.o \

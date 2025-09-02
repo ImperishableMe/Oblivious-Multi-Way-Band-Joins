@@ -1,7 +1,7 @@
 #ifndef CRYPTO_UTILS_H
 #define CRYPTO_UTILS_H
 
-#include "../core/types.h"
+#include "../data_structures/data_types.h"
 #include "entry_crypto.h"
 #include "sgx_urts.h"
 #include <string>

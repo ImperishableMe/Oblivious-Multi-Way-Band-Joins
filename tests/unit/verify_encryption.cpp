@@ -2,7 +2,7 @@
  * Verify that encrypted tables can be loaded and decrypted correctly
  */
 #include <iostream>
-#include "../../src/io/table_io.h"
+#include "../../app/file_io/table_io.h"
 #include "../../src/crypto/crypto_utils.h"
 #include "Enclave_u.h"
 #include "sgx_urts.h"

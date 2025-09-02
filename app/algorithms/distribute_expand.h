@@ -2,7 +2,7 @@
 #define DISTRIBUTE_EXPAND_H
 
 #include "../join/join_tree_node.h"
-#include "../core/table.h"
+#include "../data_structures/table.h"
 #include "sgx_eid.h"
 #include <vector>
 

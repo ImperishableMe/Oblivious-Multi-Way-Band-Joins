@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
-#include "../core/entry.h"
+#include "../data_structures/entry.h"
 
 /**
  * IO_Entry - A lightweight entry type for I/O operations only

@@ -30,10 +30,10 @@ Code that runs outside the SGX enclave on the regular host system. Uses C++ STL.
   - `ecall_wrapper.cpp/h` - Wrapper for SGX ecalls with counting
   - Reduces overhead by bundling multiple operations into single ecalls
 
-- **`core/`** - Core data structures
+- **`data_structures/`** - Core data structures
   - `entry.cpp/h` - Entry structure (row representation)
   - `table.cpp/h` - Table structure (collection of entries)
-  - `types.h` - Type definitions used by host application
+  - `data_types.h` - Type definitions used by host application
 
 - **`crypto/`** - Encryption utilities
   - `crypto_utils.cpp/h` - AES encryption/decryption for data at rest
@@ -43,9 +43,10 @@ Code that runs outside the SGX enclave on the regular host system. Uses C++ STL.
   - `debug_util.cpp/h` - Debug logging functionality
   - `debug_manager.cpp/h` - Manages debug sessions and output
 
-- **`io/`** - Input/Output operations
+- **`file_io/`** - File Input/Output operations
   - `table_io.cpp/h` - Read/write tables from/to files
   - `converters.cpp/h` - Convert between formats (CSV, encrypted)
+  - `io_entry.h` - Entry structure for dynamic I/O operations
 
 - **`join/`** - Join framework components
   - `join_condition.cpp/h` - Join condition representation

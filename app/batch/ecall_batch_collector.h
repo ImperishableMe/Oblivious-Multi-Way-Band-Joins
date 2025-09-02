@@ -9,7 +9,7 @@
 #include "sgx_error.h"
 #include "batch_types.h"
 #include "types_common.h"
-#include "../core/entry.h"
+#include "../data_structures/entry.h"
 
 // Statistics for performance monitoring
 struct BatchStats {

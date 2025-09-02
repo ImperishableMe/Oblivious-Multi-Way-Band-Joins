@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <memory>
 #include <fstream>
-#include "../data_structures/data_types.h"
+#include "../data_structures/data_structures.h"
 #include "../crypto/crypto_utils.h"
 #include "sgx_urts.h"
 

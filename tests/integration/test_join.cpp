@@ -11,7 +11,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <sys/stat.h>
-#include "app/data_structures/data_types.h"
+#include "app/data_structures/data_structures.h"
 #include "app/file_io/table_io.h"
 #include "app/crypto/crypto_utils.h"
 #include "sgx_urts.h"

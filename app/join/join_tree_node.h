@@ -6,7 +6,7 @@
 #include <string>
 #include <stdexcept>
 #include <iostream>
-#include "../data_structures/data_types.h"
+#include "../data_structures/data_structures.h"
 #include "join_constraint.h"
 
 /**

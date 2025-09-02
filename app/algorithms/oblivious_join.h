@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <vector>
-#include "../data_structures/data_types.h"
+#include "../data_structures/data_structures.h"
 #include "../join/join_tree_node.h"
 #include "Enclave_u.h"
 #include "sgx_urts.h"

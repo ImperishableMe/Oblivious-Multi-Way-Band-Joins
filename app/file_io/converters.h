@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <cstring>
-#include "../data_structures/data_types.h"
+#include "../data_structures/data_structures.h"
 #include "../../common/enclave_types.h"
 
 // Forward declarations

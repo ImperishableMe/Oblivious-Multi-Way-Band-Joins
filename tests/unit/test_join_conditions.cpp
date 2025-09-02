@@ -12,7 +12,7 @@
 #include <iostream>
 #include <cassert>
 #include "../../app/join/join_constraint.h"
-#include "../../app/data_structures/data_types.h"
+#include "../../app/data_structures/data_structures.h"
 
 void test_equality_join() {
     std::cout << "\n=== Testing Equality Join ===" << std::endl;

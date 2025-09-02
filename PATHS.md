@@ -33,7 +33,7 @@ Code that runs outside the SGX enclave on the regular host system. Uses C++ STL.
 - **`data_structures/`** - Core data structures
   - `entry.cpp/h` - Entry structure (row representation)
   - `table.cpp/h` - Table structure (collection of entries)
-  - `data_types.h` - Type definitions used by host application
+  - `data_structures.h` - Type definitions used by host application
 
 - **`crypto/`** - Encryption utilities
   - `crypto_utils.cpp/h` - AES encryption/decryption for data at rest

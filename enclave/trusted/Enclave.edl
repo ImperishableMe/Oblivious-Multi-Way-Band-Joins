@@ -1,0 +1,41 @@
+enclave {
+    include "../../common/enclave_types.h"
+    include "../../common/entry_crypto.h"
+    
+    from "sgx_tstdc.edl" import *;
+    from "TestEnclave.edl" import *;
+    
+    trusted {
+        /* Essential ecalls only - all other operations go through batch dispatcher */
+        
+        /* AES-CTR Encryption/Decryption functions */
+        /* The encryption key is stored securely inside the enclave and never exposed */
+        /* Uses AES-128 in CTR mode with unique nonce for each encryption */
+        
+        // Encrypt/decrypt single entry using secure enclave-only key
+        // Used for file I/O and debug operations
+        public crypto_status_t ecall_encrypt_entry([in,out] entry_t* entry);
+        public crypto_status_t ecall_decrypt_entry([in,out] entry_t* entry);
+        
+        // Get output size from last entry
+        public void ecall_obtain_output_size([out] int32_t* retval, [in] const entry_t* entry);
+        
+        // ============================================================================
+        // Batch Operations - Primary interface for all transform/window/comparator ops
+        // ============================================================================
+        
+        // Batch dispatcher for executing multiple operations in a single ecall
+        // This is the main interface for 36+ different operations that were previously
+        // individual ecalls. Dramatically reduces SGX transition overhead.
+        // ops_array is passed as byte buffer with size in bytes
+        public void ecall_batch_dispatcher([in, out, count=data_count] entry_t* data_array, size_t data_count,
+                                          [in, size=ops_size] void* ops_array, size_t ops_count, size_t ops_size,
+                                          int32_t op_type);
+    };
+    
+    untrusted {
+        /* Debug output ocall for enclave debugging */
+        void ocall_debug_print(uint32_t level, [in, string] const char* file, 
+                              int line, [in, string] const char* message);
+    };
+};

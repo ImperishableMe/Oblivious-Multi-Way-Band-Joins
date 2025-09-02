@@ -3,6 +3,8 @@
 *.so
 *.a
 .config_*
+build/
+obj/
 
 # SGX generated files
 *_u.c
@@ -10,44 +12,72 @@
 *_t.c
 *_t.h
 *.signed.so
+enclave.so
+enclave.signed.so
 
-# Test results
-test/bin/
-test/results/
+# Executables
+sgx_app
+encrypt_tables
+test_join
+sqlite_baseline
+overhead_*
+*_test
+
+# Test outputs
 *.log
+*.trace
+*.json
+output/
+debug/
+traces/
 
-# Editor files
+# Editor and IDE files
 .vscode/
+.idea/
 *.swp
+*.swo
 *~
 .DS_Store
+*.bak
 
 # Encryption keys (except enclave signing key)
 *.pem
 !Enclave_private.pem
 
-# Executables
-sgx_app
-unit_tests
-integration_tests
-
-# Core dumps (but not the enclave/core directory)
-/core
+# Core dumps
+core
 *.core
+coredump*
 
 # Temporary files
 *.tmp
 .tmp/
+tmp/
 
-# Data files
-*.csv
-*.tbl
-*.dat
+# Personal configuration
+*.local.*
+.claude/
+CLAUDE.local.md
 
-# Raw data directories
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Documentation builds
+docs/_build/
+
+# Large data files (keep small examples)
+plaintext/data_0_1/
+plaintext/data_1/
+encrypted/data_0_1/
+encrypted/data_1/
 raw_data/
-plaintext/data*/
-encrypted/data*/
 
-# But keep query files
-!queries/*.sql
+# Keep important files
+!Makefile
+!*.cpp
+!*.c
+!*.h
+!*.md
+!*.sql

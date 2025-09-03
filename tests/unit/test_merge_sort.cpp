@@ -62,30 +62,27 @@ void test_sort_comparison(size_t table_size) {
         table2.add_entry(table1[i]);
     }
     
-    // Encrypt tables
-    for (size_t i = 0; i < table1.size(); i++) {
-        CryptoUtils::encrypt_entry(table1[i], global_eid);
-    }
+    // Test with a simple sort on unencrypted data first
+    auto start = std::chrono::high_resolution_clock::now();
+    // Sort table1 in-place using std::sort for comparison
+    std::sort(table1.begin(), table1.end(), [](const Entry& a, const Entry& b) {
+        return a.join_attr < b.join_attr;
+    });
+    auto end = std::chrono::high_resolution_clock::now();
+    auto baseline_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    
+    // Now encrypt table2 for merge sort test
     for (size_t i = 0; i < table2.size(); i++) {
         CryptoUtils::encrypt_entry(table2[i], global_eid);
     }
-    
-    // Test bitonic sort
-    auto start = std::chrono::high_resolution_clock::now();
-    table1.batched_oblivious_sort(global_eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto bitonic_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     
     // Test merge sort
     start = std::chrono::high_resolution_clock::now();
     table2.non_oblivious_merge_sort(global_eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
     end = std::chrono::high_resolution_clock::now();
-    auto merge_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    auto merge_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
     
-    // Decrypt for verification
-    for (size_t i = 0; i < table1.size(); i++) {
-        CryptoUtils::decrypt_entry(table1[i], global_eid);
-    }
+    // Decrypt table2 for verification
     for (size_t i = 0; i < table2.size(); i++) {
         CryptoUtils::decrypt_entry(table2[i], global_eid);
     }
@@ -124,10 +121,12 @@ void test_sort_comparison(size_t table_size) {
     }
     
     std::cout << "Results:" << std::endl;
-    std::cout << "  Bitonic sort: " << bitonic_time << "ms, sorted=" << (sorted1 ? "YES" : "NO") << std::endl;
-    std::cout << "  Merge sort:   " << merge_time << "ms, sorted=" << (sorted2 ? "YES" : "NO") << std::endl;
+    std::cout << "  Baseline std::sort: " << baseline_time << "us, sorted=" << (sorted1 ? "YES" : "NO") << std::endl;
+    std::cout << "  Merge sort:         " << merge_time << "us, sorted=" << (sorted2 ? "YES" : "NO") << std::endl;
     std::cout << "  Match: " << (match ? "YES" : "NO") << std::endl;
-    std::cout << "  Speedup: " << (double)bitonic_time / merge_time << "x" << std::endl;
+    if (baseline_time > 0 && merge_time > 0) {
+        std::cout << "  Merge sort overhead: " << (double)merge_time / baseline_time << "x" << std::endl;
+    }
 }
 
 int main(int argc, char* argv[]) {

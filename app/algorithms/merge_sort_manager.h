@@ -30,6 +30,7 @@ private:
     // Current runs being merged
     std::vector<std::vector<Entry>> runs;
     std::vector<size_t> run_positions;  // Current position in each run
+    std::vector<size_t> current_merge_indices;  // Maps enclave buffer idx to actual run idx
     
     // Static instance for ocall handlers
     static MergeSortManager* current_instance;

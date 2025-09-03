@@ -351,18 +351,6 @@ void Table::add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encr
     DEBUG_TRACE("Table::add_batched_padding: Complete - added %zu entries", count);
 }
 
-void Table::non_oblivious_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
-    if (entries.size() <= 1) return;
-    
-    DEBUG_INFO("Table::non_oblivious_merge_sort: Starting with %zu entries, op_type=%d", 
-               entries.size(), op_type);
-    
-    // Use MergeSortManager to perform the sort
-    MergeSortManager manager(eid, op_type);
-    manager.sort(*this);
-    
-    DEBUG_INFO("Table::non_oblivious_merge_sort: Complete");
-}
 
 void Table::shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
     if (entries.size() <= 1) return;
@@ -376,8 +364,9 @@ void Table::shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
     shuffle_mgr.shuffle(*this);
     DEBUG_INFO("Table::shuffle_merge_sort: Shuffle phase complete");
     
-    // Phase 2: Non-oblivious merge sort
-    non_oblivious_merge_sort(eid, op_type);
+    // Phase 2: Merge sort using MergeSortManager (direct instantiation)
+    MergeSortManager merge_mgr(eid, op_type);
+    merge_mgr.sort(*this);
     DEBUG_INFO("Table::shuffle_merge_sort: Merge sort phase complete");
     
     // Phase 3: Truncate to original size

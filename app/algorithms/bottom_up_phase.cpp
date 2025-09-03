@@ -203,7 +203,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 3: Sort by join attribute and precedence
     DEBUG_INFO("Sorting combined table by join attribute - BATCHED");
-    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
+    combined.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
     DEBUG_INFO("Sort completed");
     
     // Debug: Dump after sorting by join attribute

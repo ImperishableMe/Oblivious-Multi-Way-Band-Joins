@@ -4,21 +4,31 @@
 #include <stdint.h>
 
 /**
- * Non-oblivious comparator functions for merge sort
+ * Oblivious boolean comparator functions for merge sort
  * 
  * These comparators return 1 if e1 < e2, 0 otherwise.
- * They are used for non-oblivious sorting where data is encrypted
- * and we don't need to hide access patterns.
+ * They use branchless arithmetic operations to maintain oblivious execution.
+ * No data-dependent branches are used to prevent information leakage.
  * 
- * Each comparator implements the same logic as the oblivious versions
- * but returns a comparison result instead of performing swaps.
+ * Each comparator extracts logic from the oblivious compare-and-swap versions
+ * but returns the comparison result instead of performing swaps.
  */
 
 /**
+ * Helper: Oblivious sign function
+ * Returns -1, 0, or 1 based on value comparison
+ * Uses arithmetic operations only, no branches
+ */
+static inline int32_t oblivious_sign(int32_t val) {
+    return (val > 0) - (val < 0);
+}
+
+/**
  * Helper: Get precedence for entry type combination
- * Same logic as in comparators.c
+ * Same logic as in comparators.c, already oblivious
  */
 static inline int32_t get_precedence(entry_type_t field_type, equality_type_t equality_type) {
+    // Precedence ordering for correct join semantics:
     // (END, NEQ) -> 1    // Open end: exclude boundary, comes first
     // (START, EQ) -> 1   // Closed start: include boundary, comes first
     // (SOURCE, _) -> 2   // Source entries in middle
@@ -37,27 +47,54 @@ static inline int32_t get_precedence(entry_type_t field_type, equality_type_t eq
 }
 
 /**
+ * Helper: Adjust comparison result for SORT_PADDING entries
+ * SORT_PADDING entries always sort to the end (are "larger")
+ * Returns the final comparison result accounting for padding
+ */
+static inline int32_t adjust_for_padding(entry_t* e1, entry_t* e2, int32_t normal_result) {
+    // Check if entries are SORT_PADDING
+    int32_t is_padding1 = (e1->field_type == SORT_PADDING);
+    int32_t is_padding2 = (e2->field_type == SORT_PADDING);
+    
+    // Calculate adjustments
+    // If e1 is padding and e2 is not: e1 > e2 (return 1)
+    // If e2 is padding and e1 is not: e1 < e2 (return -1)
+    // Otherwise: use normal_result
+    int32_t adjustment = is_padding1 - is_padding2;
+    
+    // If both or neither are padding (adjustment == 0), use normal_result
+    // Otherwise use adjustment
+    int32_t use_normal = (adjustment == 0);
+    return use_normal * normal_result + (1 - use_normal) * adjustment;
+}
+
+/**
  * Compare by join attribute
  * Returns 1 if e1 < e2, 0 otherwise
  */
 int compare_join_attr(entry_t* e1, entry_t* e2) {
-    // Handle SORT_PADDING - always goes to end
-    if (e1->field_type == SORT_PADDING && e2->field_type != SORT_PADDING) {
-        return 0;  // e1 (padding) >= e2 (not padding)
-    }
-    if (e1->field_type != SORT_PADDING && e2->field_type == SORT_PADDING) {
-        return 1;  // e1 (not padding) < e2 (padding)
-    }
+    // Compare join attributes obliviously
+    int32_t diff = e1->join_attr - e2->join_attr;
+    int32_t cmp = oblivious_sign(diff);
     
-    // Compare join attributes
-    if (e1->join_attr != e2->join_attr) {
-        return (e1->join_attr < e2->join_attr) ? 1 : 0;
-    }
+    // Check if equal (without branching)
+    int32_t is_equal = (cmp == 0);
     
-    // If equal, use precedence
+    // Get precedence values
     int32_t p1 = get_precedence(e1->field_type, e1->equality_type);
     int32_t p2 = get_precedence(e2->field_type, e2->equality_type);
-    return (p1 < p2) ? 1 : 0;
+    int32_t prec_cmp = oblivious_sign(p1 - p2);
+    
+    // Combine: use join_attr comparison if not equal, else use precedence
+    int32_t normal_result = (1 - is_equal) * cmp + is_equal * prec_cmp;
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
+    
+    // Return 1 if e1 < e2, 0 otherwise
+    // Note: result > 0 means e1 > e2 (should swap) in the compare-and-swap logic
+    // So we return 1 when result < 0 (e1 < e2)
+    return (result < 0);
 }
 
 /**
@@ -65,37 +102,38 @@ int compare_join_attr(entry_t* e1, entry_t* e2) {
  * Priority: 1) TARGET before SOURCE, 2) by original_index, 3) START before END
  */
 int compare_pairwise(entry_t* e1, entry_t* e2) {
-    // Handle SORT_PADDING
-    if (e1->field_type == SORT_PADDING && e2->field_type != SORT_PADDING) {
-        return 0;
-    }
-    if (e1->field_type != SORT_PADDING && e2->field_type == SORT_PADDING) {
-        return 1;
-    }
-    
-    // Check if entries are TARGET type (START or END)
+    // Check if entries are TARGET type (START or END) - oblivious
     int32_t is_target1 = ((e1->field_type == START) | (e1->field_type == END));
     int32_t is_target2 = ((e2->field_type == START) | (e2->field_type == END));
     
     // Priority 1: TARGET entries before SOURCE
-    if (is_target1 != is_target2) {
-        return is_target1 ? 1 : 0;  // TARGET comes first
-    }
+    int32_t type_cmp = is_target2 - is_target1;  // Negative if e1 is TARGET
     
     // Priority 2: Compare by original index
-    if (e1->original_index != e2->original_index) {
-        return (e1->original_index < e2->original_index) ? 1 : 0;
-    }
+    int32_t idx_cmp = oblivious_sign(e1->original_index - e2->original_index);
     
     // Priority 3: START before END for same index
-    if (e1->field_type == START && e2->field_type == END) {
-        return 1;  // START comes first
-    }
-    if (e1->field_type == END && e2->field_type == START) {
-        return 0;  // END comes after
-    }
+    int32_t is_start1 = (e1->field_type == START);
+    int32_t is_start2 = (e2->field_type == START);
+    int32_t start_cmp = is_start2 - is_start1;  // Negative if e1 is START
     
-    return 0;  // Equal
+    // Check if type priority is equal
+    int32_t same_type = (type_cmp == 0);
+    
+    // Check if index is equal
+    int32_t same_idx = (idx_cmp == 0);
+    
+    // Combine priorities obliviously
+    int32_t priority2_result = same_idx * start_cmp + (1 - same_idx) * idx_cmp;
+    int32_t normal_result = same_type * priority2_result + (1 - same_type) * type_cmp;
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
+    
+    // Return 1 if e1 < e2, 0 otherwise
+    // Note: result > 0 means e1 > e2 (should swap) in the compare-and-swap logic
+    // So we return 1 when result < 0 (e1 < e2)
+    return (result < 0);
 }
 
 /**
@@ -103,25 +141,29 @@ int compare_pairwise(entry_t* e1, entry_t* e2) {
  * Priority: 1) END before others, 2) by original_index
  */
 int compare_end_first(entry_t* e1, entry_t* e2) {
-    // Handle SORT_PADDING
-    if (e1->field_type == SORT_PADDING && e2->field_type != SORT_PADDING) {
-        return 0;
-    }
-    if (e1->field_type != SORT_PADDING && e2->field_type == SORT_PADDING) {
-        return 1;
-    }
-    
-    // Check if entries are END type
+    // Check if entries are END type - oblivious
     int32_t is_end1 = (e1->field_type == END);
     int32_t is_end2 = (e2->field_type == END);
     
     // Priority 1: END entries before all others
-    if (is_end1 != is_end2) {
-        return is_end1 ? 1 : 0;  // END comes first
-    }
+    int32_t type_cmp = is_end2 - is_end1;  // Negative if e1 is END
     
     // Priority 2: Compare by original index
-    return (e1->original_index < e2->original_index) ? 1 : 0;
+    int32_t idx_cmp = oblivious_sign(e1->original_index - e2->original_index);
+    
+    // Check if type priority is equal
+    int32_t same_type = (type_cmp == 0);
+    
+    // Combine priorities
+    int32_t normal_result = same_type * idx_cmp + (1 - same_type) * type_cmp;
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
+    
+    // Return 1 if e1 < e2, 0 otherwise
+    // Note: result > 0 means e1 > e2 (should swap) in the compare-and-swap logic
+    // So we return 1 when result < 0 (e1 < e2)
+    return (result < 0);
 }
 
 /**
@@ -129,57 +171,65 @@ int compare_end_first(entry_t* e1, entry_t* e2) {
  * Used for final output sorting in align phase
  */
 int compare_join_then_other(entry_t* e1, entry_t* e2) {
-    // Handle SORT_PADDING
-    if (e1->field_type == SORT_PADDING && e2->field_type != SORT_PADDING) {
-        return 0;
-    }
-    if (e1->field_type != SORT_PADDING && e2->field_type == SORT_PADDING) {
-        return 1;
-    }
-    
-    // Primary: join_attr
-    if (e1->join_attr != e2->join_attr) {
-        return (e1->join_attr < e2->join_attr) ? 1 : 0;
-    }
+    // Primary: join_attr comparison
+    int32_t join_cmp = oblivious_sign(e1->join_attr - e2->join_attr);
     
     // Secondary: Compare attributes lexicographically
+    // We need to compare all attributes obliviously
+    int32_t attr_cmp = 0;
+    int32_t found_diff = 0;
+    
     for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-        if (e1->attributes[i] != e2->attributes[i]) {
-            return (e1->attributes[i] < e2->attributes[i]) ? 1 : 0;
-        }
+        int32_t this_cmp = oblivious_sign(e1->attributes[i] - e2->attributes[i]);
+        // Only use this comparison if we haven't found a difference yet
+        attr_cmp = found_diff * attr_cmp + (1 - found_diff) * this_cmp;
+        // Mark if we found a difference (obliviously)
+        found_diff = found_diff | (this_cmp != 0);
     }
     
-    return 0;  // Equal
+    // Use join_attr if different, else use attributes
+    int32_t join_equal = (join_cmp == 0);
+    int32_t normal_result = (1 - join_equal) * join_cmp + join_equal * attr_cmp;
+    
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
+    
+    // Return 1 if e1 < e2, 0 otherwise
+    // Note: result > 0 means e1 > e2 (should swap) in the compare-and-swap logic
+    // So we return 1 when result < 0 (e1 < e2)
+    return (result < 0);
 }
 
 /**
  * Compare by original index
  */
 int compare_original_index(entry_t* e1, entry_t* e2) {
-    // Handle SORT_PADDING
-    if (e1->field_type == SORT_PADDING && e2->field_type != SORT_PADDING) {
-        return 0;
-    }
-    if (e1->field_type != SORT_PADDING && e2->field_type == SORT_PADDING) {
-        return 1;
-    }
+    // Simple comparison by original index
+    int32_t idx_cmp = oblivious_sign(e1->original_index - e2->original_index);
     
-    return (e1->original_index < e2->original_index) ? 1 : 0;
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, idx_cmp);
+    
+    // Return 1 if e1 < e2, 0 otherwise
+    // Note: result > 0 means e1 > e2 (should swap) in the compare-and-swap logic
+    // So we return 1 when result < 0 (e1 < e2)
+    return (result < 0);
 }
 
 /**
  * Compare by alignment key
  */
 int compare_alignment_key(entry_t* e1, entry_t* e2) {
-    // Handle SORT_PADDING
-    if (e1->field_type == SORT_PADDING && e2->field_type != SORT_PADDING) {
-        return 0;
-    }
-    if (e1->field_type != SORT_PADDING && e2->field_type == SORT_PADDING) {
-        return 1;
-    }
+    // Simple comparison by alignment key
+    int32_t key_cmp = oblivious_sign(e1->alignment_key - e2->alignment_key);
     
-    return (e1->alignment_key < e2->alignment_key) ? 1 : 0;
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, key_cmp);
+    
+    // Return 1 if e1 < e2, 0 otherwise
+    // Note: result > 0 means e1 > e2 (should swap) in the compare-and-swap logic
+    // So we return 1 when result < 0 (e1 < e2)
+    return (result < 0);
 }
 
 /**
@@ -187,20 +237,29 @@ int compare_alignment_key(entry_t* e1, entry_t* e2) {
  * SORT_PADDING and DIST_PADDING go to end
  */
 int compare_padding_last(entry_t* e1, entry_t* e2) {
-    // Check for padding types
-    int32_t is_padding1 = (e1->field_type == SORT_PADDING) | (e1->field_type == DIST_PADDING);
-    int32_t is_padding2 = (e2->field_type == SORT_PADDING) | (e2->field_type == DIST_PADDING);
+    // Check for padding types obliviously
+    int32_t is_dist_padding1 = (e1->field_type == DIST_PADDING);
+    int32_t is_dist_padding2 = (e2->field_type == DIST_PADDING);
     
-    // Padding goes to end
-    if (is_padding1 && !is_padding2) {
-        return 0;  // e1 (padding) >= e2 (not padding)
-    }
-    if (!is_padding1 && is_padding2) {
-        return 1;  // e1 (not padding) < e2 (padding)
-    }
+    // Priority 1: Non-padding before padding
+    int32_t type_priority = is_dist_padding1 - is_dist_padding2;  // Positive if e1 is padding
     
-    // Both padding or both not padding - compare by original_index
-    return (e1->original_index < e2->original_index) ? 1 : 0;
+    // Priority 2: By original index  
+    int32_t idx_cmp = oblivious_sign(e1->original_index - e2->original_index);
+    
+    // Check if type priority is equal
+    int32_t same_type = (type_priority == 0);
+    
+    // Combine priorities
+    int32_t normal_result = (1 - same_type) * type_priority + same_type * idx_cmp;
+    
+    // Adjust for SORT_PADDING entries (different from DIST_PADDING)
+    int32_t result = adjust_for_padding(e1, e2, normal_result);
+    
+    // Return 1 if e1 < e2, 0 otherwise
+    // Note: result > 0 means e1 > e2 (should swap) in the compare-and-swap logic
+    // So we return 1 when result < 0 (e1 < e2)
+    return (result < 0);
 }
 
 /**
@@ -208,19 +267,21 @@ int compare_padding_last(entry_t* e1, entry_t* e2) {
  * Sort by dst_idx
  */
 int compare_distribute(entry_t* e1, entry_t* e2) {
-    // Handle SORT_PADDING
-    if (e1->field_type == SORT_PADDING && e2->field_type != SORT_PADDING) {
-        return 0;
-    }
-    if (e1->field_type != SORT_PADDING && e2->field_type == SORT_PADDING) {
-        return 1;
-    }
+    // Simple comparison by dst_idx
+    int32_t dst_cmp = oblivious_sign(e1->dst_idx - e2->dst_idx);
     
-    return (e1->dst_idx < e2->dst_idx) ? 1 : 0;
+    // Adjust for SORT_PADDING entries
+    int32_t result = adjust_for_padding(e1, e2, dst_cmp);
+    
+    // Return 1 if e1 < e2, 0 otherwise
+    // Note: result > 0 means e1 > e2 (should swap) in the compare-and-swap logic
+    // So we return 1 when result < 0 (e1 < e2)
+    return (result < 0);
 }
 
 /**
  * Get comparator function by type
+ * These comparators follow standard convention: return 1 if e1 < e2, 0 otherwise
  */
 comparator_func_t get_merge_comparator(OpEcall type) {
     switch(type) {

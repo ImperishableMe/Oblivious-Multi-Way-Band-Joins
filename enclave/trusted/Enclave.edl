@@ -31,11 +31,36 @@ enclave {
         public void ecall_batch_dispatcher([in, out, count=data_count] entry_t* data_array, size_t data_count,
                                           [in, size=ops_size] void* ops_array, size_t ops_count, size_t ops_size,
                                           int32_t op_type);
+        
+        // ============================================================================
+        // Merge Sort Operations
+        // ============================================================================
+        
+        // Heap sort an array in-place
+        public sgx_status_t ecall_heap_sort([in,out,count=size] entry_t* array, size_t size, int comparator_type);
+        
+        // Initialize k-way merge state
+        public sgx_status_t ecall_k_way_merge_init(size_t k, int comparator_type);
+        
+        // Process k-way merge (stateful)
+        public sgx_status_t ecall_k_way_merge_process([out,count=output_capacity] entry_t* output, 
+                                                      size_t output_capacity,
+                                                      [out] size_t* output_produced,
+                                                      [out] int* merge_complete);
+        
+        // Clean up k-way merge state
+        public sgx_status_t ecall_k_way_merge_cleanup(void);
     };
     
     untrusted {
         /* Debug output ocall for enclave debugging */
         void ocall_debug_print(uint32_t level, [in, string] const char* file, 
                               int line, [in, string] const char* message);
+        
+        /* Merge sort buffer management */
+        void ocall_refill_buffer(int buffer_idx, 
+                                [out,count=buffer_size] entry_t* buffer,
+                                size_t buffer_size,
+                                [out] size_t* actual_filled);
     };
 };

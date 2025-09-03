@@ -169,6 +169,23 @@ public:
     void batched_oblivious_sort(sgx_enclave_id_t eid, OpEcall op_type);
     
     /**
+     * NonObliviousMergeSort: Sort using non-oblivious k-way merge sort
+     * More efficient than bitonic sort for encrypted data
+     * @param eid SGX enclave ID
+     * @param op_type Comparator operation type
+     */
+    void non_oblivious_merge_sort(sgx_enclave_id_t eid, OpEcall op_type);
+    
+    /**
+     * ShuffleMergeSort: Two-phase sort with shuffle then merge
+     * Phase 1: Shuffle (placeholder for Waksman network)
+     * Phase 2: Non-oblivious merge sort
+     * @param eid SGX enclave ID
+     * @param op_type Comparator operation type
+     */
+    void shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type);
+    
+    /**
      * BatchedDistributePass: Batched version of distribute_pass
      * @param eid SGX enclave ID
      * @param distance Distance between pairs to process

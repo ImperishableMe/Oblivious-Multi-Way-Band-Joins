@@ -103,7 +103,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table, sgx_enclave_id_t e
     
     // Step 5: Sort to move DIST_PADDING entries to the end
     DEBUG_INFO("Step 5 - Sorting (size=%zu)", working.size());
-    working.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_PADDING_LAST);
+    working.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_PADDING_LAST);
     DEBUG_INFO("Step 5 complete, table size after sort=%zu", working.size());
     
     // Step 5b: Truncate table to remove excess DIST_PADDING entries

@@ -23,6 +23,10 @@ extern "C" {
 #define OCALL_DEBUG_PRINT_DEFINED__
 void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_debug_print, (uint32_t level, const char* file, int line, const char* message));
 #endif
+#ifndef OCALL_REFILL_BUFFER_DEFINED__
+#define OCALL_REFILL_BUFFER_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_refill_buffer, (int buffer_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled));
+#endif
 #ifndef SGX_OC_CPUIDEX_DEFINED__
 #define SGX_OC_CPUIDEX_DEFINED__
 void SGX_UBRIDGE(SGX_CDECL, sgx_oc_cpuidex, (int cpuinfo[4], int leaf, int subleaf));
@@ -48,6 +52,10 @@ sgx_status_t ecall_encrypt_entry(sgx_enclave_id_t eid, crypto_status_t* retval, 
 sgx_status_t ecall_decrypt_entry(sgx_enclave_id_t eid, crypto_status_t* retval, entry_t* entry);
 sgx_status_t ecall_obtain_output_size(sgx_enclave_id_t eid, int32_t* retval, const entry_t* entry);
 sgx_status_t ecall_batch_dispatcher(sgx_enclave_id_t eid, entry_t* data_array, size_t data_count, void* ops_array, size_t ops_count, size_t ops_size, int32_t op_type);
+sgx_status_t ecall_heap_sort(sgx_enclave_id_t eid, sgx_status_t* retval, entry_t* array, size_t size, int comparator_type);
+sgx_status_t ecall_k_way_merge_init(sgx_enclave_id_t eid, sgx_status_t* retval, size_t k, int comparator_type);
+sgx_status_t ecall_k_way_merge_process(sgx_enclave_id_t eid, sgx_status_t* retval, entry_t* output, size_t output_capacity, size_t* output_produced, int* merge_complete);
+sgx_status_t ecall_k_way_merge_cleanup(sgx_enclave_id_t eid, sgx_status_t* retval);
 sgx_status_t ecall_test_noop(sgx_enclave_id_t eid);
 sgx_status_t ecall_test_noop_small(sgx_enclave_id_t eid, void* data, size_t size);
 sgx_status_t ecall_test_noop_inout(sgx_enclave_id_t eid, void* data, size_t size);

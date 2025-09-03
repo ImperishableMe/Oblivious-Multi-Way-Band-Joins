@@ -4,6 +4,7 @@
 #include "debug_util.h"
 #include "Enclave_u.h"
 #include "../batch/ecall_batch_collector.h"
+#include "../algorithms/merge_sort_manager.h"
 
 // Constructor with required schema
 Table::Table(const std::string& name, const std::vector<std::string>& schema) 
@@ -640,5 +641,33 @@ void Table::add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encr
     collector.flush();
     
     DEBUG_TRACE("Table::add_batched_padding: Complete - added %zu entries", count);
+}
+
+void Table::non_oblivious_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
+    if (entries.size() <= 1) return;
+    
+    DEBUG_INFO("Table::non_oblivious_merge_sort: Starting with %zu entries, op_type=%d", 
+               entries.size(), op_type);
+    
+    // Use MergeSortManager to perform the sort
+    MergeSortManager manager(eid, op_type);
+    manager.sort(*this);
+    
+    DEBUG_INFO("Table::non_oblivious_merge_sort: Complete");
+}
+
+void Table::shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
+    if (entries.size() <= 1) return;
+    
+    DEBUG_INFO("Table::shuffle_merge_sort: Starting with %zu entries, op_type=%d", 
+               entries.size(), op_type);
+    
+    // Phase 1: Shuffle (placeholder for now - will add Waksman network later)
+    // TODO: Implement Waksman shuffle network
+    
+    // Phase 2: Non-oblivious merge sort
+    non_oblivious_merge_sort(eid, op_type);
+    
+    DEBUG_INFO("Table::shuffle_merge_sort: Complete");
 }
 

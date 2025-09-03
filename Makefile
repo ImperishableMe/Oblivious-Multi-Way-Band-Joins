@@ -79,6 +79,7 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/algorithms/distribute_expand.cpp \
                  app/algorithms/align_concat.cpp \
                  app/algorithms/oblivious_join.cpp \
+                 app/algorithms/merge_sort_manager.cpp \
                  app/batch/ecall_batch_collector.cpp \
                  app/batch/ecall_wrapper.cpp \
                  app/debug/debug_util.cpp \
@@ -141,8 +142,12 @@ Enclave_C_Files := enclave/trusted/crypto/aes_crypto.c \
                    enclave/trusted/crypto/crypto_helpers.c \
                    enclave/trusted/operations/window_functions.c \
                    enclave/trusted/operations/comparators.c \
+                   enclave/trusted/operations/merge_comparators.c \
                    enclave/trusted/operations/transform_functions.c \
                    enclave/trusted/operations/distribute_functions.c \
+                   enclave/trusted/algorithms/min_heap.c \
+                   enclave/trusted/algorithms/heap_sort.c \
+                   enclave/trusted/algorithms/k_way_merge.c \
                    enclave/trusted/batch/batch_dispatcher.c \
                    enclave/trusted/debug_wrapper.c \
                    enclave/trusted/test/test_ecalls.c \
@@ -288,6 +293,7 @@ Test_Compile_CXXFlags := $(Test_Compile_CFlags) -std=c++17
 # Test programs
 Test_Join_Objects := tests/integration/test_join.o
 Sqlite_Baseline_Objects := tests/baseline/sqlite_baseline.o
+Test_Merge_Sort_Objects := tests/unit/test_merge_sort.o
 
 # Common objects needed by test programs (reuse from main app)
 Test_Common_Objects := app/crypto/crypto_utils.o \
@@ -297,6 +303,7 @@ Test_Common_Objects := app/crypto/crypto_utils.o \
                       app/data_structures/table.o \
                       app/join/join_condition.o \
                       app/join/join_attribute_setter.o \
+                      app/algorithms/merge_sort_manager.o \
                       app/batch/ecall_batch_collector.o \
                       app/batch/ecall_wrapper.o \
                       app/debug/debug_util.o \
@@ -312,6 +319,10 @@ sqlite_baseline: $(Sqlite_Baseline_Objects) $(Test_Common_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags) -lsqlite3
 	@echo "LINK =>  $@"
 
+test_merge_sort: $(Test_Merge_Sort_Objects) $(Test_Common_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
 # Compile test source files
 tests/integration/%.o: tests/integration/%.cpp
 	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
@@ -321,8 +332,12 @@ tests/baseline/%.o: tests/baseline/%.cpp
 	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
+tests/unit/%.o: tests/unit/%.cpp
+	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
 # Build all tests
-tests: test_join sqlite_baseline
+tests: test_join sqlite_baseline test_merge_sort
 	@echo "All tests built successfully"
 
 ######## Clean ########

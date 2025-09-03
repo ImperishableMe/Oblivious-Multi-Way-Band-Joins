@@ -316,7 +316,7 @@ void Table::batched_parallel_pass(Table& other, sgx_enclave_id_t eid, OpEcall op
 }
 
 
-void Table::add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encryption_status) {
+void Table::add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encryption_status, OpEcall padding_op) {
     if (count == 0) {
         return;
     }
@@ -327,7 +327,7 @@ void Table::add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encr
     entries.reserve(entries.size() + count);
     
     // Create batch collector for padding creation
-    EcallBatchCollector collector(eid, OP_ECALL_TRANSFORM_SET_SORT_PADDING);
+    EcallBatchCollector collector(eid, padding_op);
     
     // Create padding entries in batches
     for (size_t i = 0; i < count; i++) {
@@ -367,8 +367,8 @@ void Table::pad_to_shuffle_size(sgx_enclave_id_t eid) {
             encryption_status = 1;
         }
         
-        // Add padding entries
-        add_batched_padding(padding_count, eid, encryption_status);
+        // Add padding entries for shuffle sort
+        add_batched_padding(padding_count, eid, encryption_status, OP_ECALL_TRANSFORM_SET_SORT_PADDING);
     }
 }
 

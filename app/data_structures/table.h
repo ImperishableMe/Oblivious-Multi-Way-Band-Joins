@@ -135,7 +135,7 @@ public:
      * @param eid SGX enclave ID
      * @param encryption_status Encryption status to match table
      */
-    void add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encryption_status);
+    void add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encryption_status, OpEcall padding_op = OP_ECALL_TRANSFORM_CREATE_DIST_PADDING);
     
     /**
      * PadToShuffleSize: Pad table to 2^a * k^b format for shuffle operations

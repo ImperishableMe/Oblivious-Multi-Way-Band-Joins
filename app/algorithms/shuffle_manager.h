@@ -53,24 +53,6 @@ private:
     // For large vectors (> MAX_BATCH_SIZE)
     void shuffle_large(std::vector<Entry>& entries);
     
-    // Helper to pad to required size
-    void pad_entries(std::vector<Entry>& entries, size_t target_size);
-    
-    // Helper to calculate next power of 2
-    static size_t next_power_of_two(size_t n) {
-        size_t power = 1;
-        while (power < n) power *= 2;
-        return power;
-    }
-    
-    // Helper to calculate next multiple of k
-    static size_t next_multiple_of_k(size_t n, size_t k) {
-        return ((n + k - 1) / k) * k;
-    }
-    
-    // Calculate padding target: smallest m > n where m = 2^a * k^b
-    static size_t calculate_shuffle_padding(size_t n);
-    
     // Set/clear current instance for ocall handling
     void set_as_current();
     void clear_current();

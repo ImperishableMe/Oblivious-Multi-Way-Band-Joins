@@ -36,6 +36,13 @@ void ShuffleManager::shuffle(Table& table) {
     
     DEBUG_INFO("ShuffleManager::shuffle starting with %zu entries", table.size());
     
+    // Verify input is valid size (2^a * k^b)
+    if (!Table::is_valid_shuffle_size(table.size())) {
+        DEBUG_ERROR("Invalid shuffle size: %zu (not 2^a * k^b format)", table.size());
+        // Could throw exception or assert in production
+        return;
+    }
+    
     // Convert table to vector of entries
     std::vector<Entry> entries;
     entries.reserve(table.size());
@@ -43,18 +50,10 @@ void ShuffleManager::shuffle(Table& table) {
         entries.push_back(table[i]);
     }
     
-    // Calculate and apply one-time padding
-    size_t original_size = entries.size();
-    size_t padded_size = calculate_shuffle_padding(original_size);
-    if (padded_size > original_size) {
-        DEBUG_INFO("Padding from %zu to %zu for shuffle", original_size, padded_size);
-        pad_entries(entries, padded_size);
-    }
-    
-    // Perform recursive shuffle (no more padding inside)
+    // Perform recursive shuffle (input already padded)
     recursive_shuffle(entries);
     
-    // Copy back to table (keep padded size - truncation happens after merge sort)
+    // Copy back to table
     table.clear();
     for (const auto& entry : entries) {
         table.add_entry(entry);
@@ -186,50 +185,6 @@ void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
     DEBUG_INFO("Large shuffle complete: %zu entries", n);
 }
 
-void ShuffleManager::pad_entries(std::vector<Entry>& entries, size_t target_size) {
-    size_t current_size = entries.size();
-    if (current_size >= target_size) {
-        return;  // No padding needed
-    }
-    
-    // Get encryption status from existing entries
-    uint8_t encryption_status = 0;
-    if (!entries.empty()) {
-        encryption_status = entries[0].is_encrypted;
-    }
-    
-    size_t padding_needed = target_size - current_size;
-    DEBUG_TRACE("Adding %zu padding entries", padding_needed);
-    
-    // Reserve space for efficiency
-    entries.reserve(target_size);
-    
-    // Add padding entries with SORT_PADDING field_type
-    for (size_t i = 0; i < padding_needed; i++) {
-        Entry padding;
-        padding.field_type = SORT_PADDING;  // Mark as padding
-        // Initialize attributes to sentinel values
-        for (int j = 0; j < MAX_ATTRIBUTES; j++) {
-            padding.attributes[j] = JOIN_ATTR_POS_INF;  // Use positive infinity as sentinel
-        }
-        padding.join_attr = JOIN_ATTR_POS_INF;
-        
-        // Encrypt if other entries are encrypted
-        if (encryption_status) {
-            padding.is_encrypted = 0;  // Start unencrypted
-            crypto_status_t enc_status;
-            entry_t entry_c = padding.to_entry_t();
-            sgx_status_t ecall_ret = ecall_encrypt_entry(eid, &enc_status, &entry_c);
-            if (ecall_ret == SGX_SUCCESS && enc_status == CRYPTO_SUCCESS) {
-                padding.from_entry_t(entry_c);
-            }
-        } else {
-            padding.is_encrypted = 0;
-        }
-        
-        entries.push_back(padding);
-    }
-}
 
 // Ocall handlers for buffered I/O
 void ShuffleManager::handle_flush_to_group(int group_idx, entry_t* buffer, size_t buffer_size) {
@@ -302,44 +257,3 @@ void ShuffleManager::clear_current() {
     }
 }
 
-// Calculate padding target: smallest m >= n where m = 2^a * k^b
-size_t ShuffleManager::calculate_shuffle_padding(size_t n) {
-    if (n <= MAX_BATCH_SIZE) {
-        // Small vector: just pad to power of 2
-        return next_power_of_two(n);
-    }
-    
-    // Large vector: need m = 2^a * k^b
-    const size_t k = MERGE_SORT_K;
-    
-    // First determine b: number of k-way decomposition levels needed
-    // After b levels, we want size <= MAX_BATCH_SIZE
-    size_t temp = n;
-    size_t b = 0;
-    size_t k_power = 1;
-    
-    while (temp > MAX_BATCH_SIZE) {
-        temp = (temp + k - 1) / k;  // Ceiling division
-        b++;
-        k_power *= k;
-    }
-    
-    // Now temp <= MAX_BATCH_SIZE after b levels of division by k
-    // We need temp to be a power of 2 for the final Waksman shuffle
-    size_t a_part = next_power_of_two(temp);
-    
-    // Calculate m = a_part * k^b
-    size_t m = a_part * k_power;
-    
-    // Ensure m >= n (it should be by construction, but let's be safe)
-    if (m < n) {
-        // This shouldn't happen, but if it does, we need to increase a_part
-        a_part *= 2;
-        m = a_part * k_power;
-    }
-    
-    DEBUG_TRACE("Shuffle padding: n=%zu, b=%zu, a_part=%zu, k^b=%zu, m=%zu",
-                n, b, a_part, k_power, m);
-    
-    return m;
-}

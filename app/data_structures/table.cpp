@@ -352,6 +352,76 @@ void Table::add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encr
 }
 
 
+void Table::pad_to_shuffle_size(sgx_enclave_id_t eid) {
+    size_t current_size = entries.size();
+    size_t target_size = calculate_shuffle_padding(current_size);
+    
+    if (target_size > current_size) {
+        size_t padding_count = target_size - current_size;
+        DEBUG_INFO("Table::pad_to_shuffle_size: Padding from %zu to %zu (adding %zu entries)", 
+                   current_size, target_size, padding_count);
+        
+        // Determine encryption status from existing entries
+        uint8_t encryption_status = 0;
+        if (!entries.empty() && entries[0].is_encrypted) {
+            encryption_status = 1;
+        }
+        
+        // Add padding entries
+        add_batched_padding(padding_count, eid, encryption_status);
+    }
+}
+
+size_t Table::calculate_shuffle_padding(size_t n) {
+    if (n <= MAX_BATCH_SIZE) {
+        // Small vector: just pad to power of 2
+        return next_power_of_two(n);
+    }
+    
+    // Large vector: need m = 2^a * k^b
+    const size_t k = MERGE_SORT_K;
+    
+    // First determine b: number of k-way decomposition levels needed
+    // After b levels, we want size <= MAX_BATCH_SIZE
+    size_t temp = n;
+    size_t b = 0;
+    size_t k_power = 1;
+    
+    while (temp > MAX_BATCH_SIZE) {
+        temp = (temp + k - 1) / k;  // Ceiling division
+        b++;
+        k_power *= k;
+    }
+    
+    // Now temp <= MAX_BATCH_SIZE after b levels of division by k
+    // We need temp to be a power of 2 for the final Waksman shuffle
+    size_t a_part = next_power_of_two(temp);
+    
+    // Calculate m = a_part * k^b
+    size_t m = a_part * k_power;
+    
+    // Ensure m >= n (it should be by construction, but let's be safe)
+    if (m < n) {
+        // This shouldn't happen, but if it does, we need to increase a_part
+        a_part *= 2;
+        m = a_part * k_power;
+    }
+    
+    DEBUG_TRACE("Shuffle padding: n=%zu, b=%zu, a_part=%zu, k^b=%zu, m=%zu",
+                n, b, a_part, k_power, m);
+    
+    return m;
+}
+
+bool Table::is_valid_shuffle_size(size_t n) {
+    // Check if n = 2^a * k^b
+    while (n > MAX_BATCH_SIZE && n % MERGE_SORT_K == 0) {
+        n /= MERGE_SORT_K;
+    }
+    // Should be power of 2 and <= MAX_BATCH_SIZE
+    return n <= MAX_BATCH_SIZE && (n & (n - 1)) == 0;
+}
+
 void Table::shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
     if (entries.size() <= 1) return;
     
@@ -359,17 +429,21 @@ void Table::shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
     DEBUG_INFO("Table::shuffle_merge_sort: Starting with %zu entries, op_type=%d", 
                original_size, op_type);
     
-    // Phase 1: Shuffle using ShuffleManager (handles both small and large vectors)
+    // Phase 1: Pad to 2^a * k^b format
+    pad_to_shuffle_size(eid);
+    DEBUG_INFO("Table::shuffle_merge_sort: Padded to %zu entries", entries.size());
+    
+    // Phase 2: Shuffle using ShuffleManager (expects padded input)
     ShuffleManager shuffle_mgr(eid);
     shuffle_mgr.shuffle(*this);
     DEBUG_INFO("Table::shuffle_merge_sort: Shuffle phase complete");
     
-    // Phase 2: Merge sort using MergeSortManager (direct instantiation)
+    // Phase 3: Merge sort using MergeSortManager (works with padded data)
     MergeSortManager merge_mgr(eid, op_type);
     merge_mgr.sort(*this);
     DEBUG_INFO("Table::shuffle_merge_sort: Merge sort phase complete");
     
-    // Phase 3: Truncate to original size
+    // Phase 4: Truncate to original size
     // After sorting, padding entries (with JOIN_ATTR_POS_INF) are at the end
     if (entries.size() > original_size) {
         entries.resize(original_size);

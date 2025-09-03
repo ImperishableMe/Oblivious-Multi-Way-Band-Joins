@@ -137,9 +137,36 @@ public:
      */
     void add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encryption_status);
     
+    /**
+     * PadToShuffleSize: Pad table to 2^a * k^b format for shuffle operations
+     * @param eid SGX enclave ID
+     */
+    void pad_to_shuffle_size(sgx_enclave_id_t eid);
+    
+    /**
+     * CalculateShufflePadding: Calculate target size for shuffle (2^a * k^b)
+     * @param n Current size
+     * @return Target padded size
+     */
+    static size_t calculate_shuffle_padding(size_t n);
+    
+    /**
+     * IsValidShuffleSize: Check if size is valid 2^a * k^b format
+     * @param n Size to check
+     * @return true if valid shuffle size
+     */
+    static bool is_valid_shuffle_size(size_t n);
+    
 private:
     // Helper methods
     static void check_sgx_status(sgx_status_t status, const std::string& operation);
+    
+    // Helper to calculate next power of 2
+    static size_t next_power_of_two(size_t n) {
+        size_t power = 1;
+        while (power < n) power *= 2;
+        return power;
+    }
 };
 
 #endif // APP_TABLE_H

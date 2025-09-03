@@ -98,6 +98,9 @@ void test_small_shuffle() {
         Table table = create_test_table(n, "test_small", global_eid);
         size_t original_size = table.size();
         
+        // Pad table to shuffle size before shuffling
+        table.pad_to_shuffle_size(global_eid);
+        
         // Apply shuffle using ShuffleManager directly
         ShuffleManager shuffle_mgr(global_eid);
         
@@ -203,6 +206,8 @@ void test_large_shuffle() {
         Table table = create_test_table(n, "test_large", global_eid);
         size_t original_size = table.size();
         
+        // Pad table to shuffle size before shuffling
+        table.pad_to_shuffle_size(global_eid);
         
         // Apply shuffle using ShuffleManager
         ShuffleManager shuffle_mgr(global_eid);
@@ -324,6 +329,9 @@ void test_shuffle_randomness() {
     for (int trial = 0; trial < num_trials; trial++) {
         // Create identical starting table
         Table table = create_test_table(n, "test_random", global_eid);
+        
+        // Pad table to shuffle size before shuffling
+        table.pad_to_shuffle_size(global_eid);
         
         // Apply shuffle
         ShuffleManager shuffle_mgr(global_eid);

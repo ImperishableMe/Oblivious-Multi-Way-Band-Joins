@@ -11,13 +11,13 @@
 static uint64_t g_nonce_counter = 1;
 
 // AES key derived from secure key (16 bytes for AES-128)
-static uint8_t aes_key[16] = {0};
-static int aes_key_initialized = 0;
+uint8_t aes_key[16] = {0};
+int aes_key_initialized = 0;
 
 /**
  * Initialize AES key from secure key
  */
-static void init_aes_key(void) {
+void init_aes_key(void) {
     if (!aes_key_initialized) {
         // Derive AES key from secure key (simple approach for now)
         uint32_t key = SECURE_ENCRYPTION_KEY;

@@ -53,6 +53,15 @@ uint64_t get_next_nonce(void);
  */
 void reset_nonce_counter(void);
 
+/**
+ * Initialize AES key (for internal use)
+ */
+void init_aes_key(void);
+
+// Exposed for Waksman shuffle RNG
+extern uint8_t aes_key[16];
+extern int aes_key_initialized;
+
 #ifdef __cplusplus
 }
 #endif

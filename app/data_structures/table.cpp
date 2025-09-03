@@ -5,6 +5,7 @@
 #include "Enclave_u.h"
 #include "../batch/ecall_batch_collector.h"
 #include "../algorithms/merge_sort_manager.h"
+#include "../algorithms/shuffle_manager.h"
 
 // Constructor with required schema
 Table::Table(const std::string& name, const std::vector<std::string>& schema) 
@@ -366,15 +367,22 @@ void Table::non_oblivious_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
 void Table::shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
     if (entries.size() <= 1) return;
     
+    size_t original_size = entries.size();
     DEBUG_INFO("Table::shuffle_merge_sort: Starting with %zu entries, op_type=%d", 
-               entries.size(), op_type);
+               original_size, op_type);
     
-    // Phase 1: Shuffle (placeholder for now - will add Waksman network later)
-    // TODO: Implement Waksman shuffle network
+    // Phase 1: Shuffle using ShuffleManager (handles both small and large vectors)
+    ShuffleManager shuffle_mgr(eid);
+    shuffle_mgr.shuffle(*this);
+    DEBUG_INFO("Table::shuffle_merge_sort: Shuffle phase complete");
     
     // Phase 2: Non-oblivious merge sort
     non_oblivious_merge_sort(eid, op_type);
+    DEBUG_INFO("Table::shuffle_merge_sort: Merge sort phase complete");
     
-    DEBUG_INFO("Table::shuffle_merge_sort: Complete");
+    // Note: ShuffleManager already handles padding and truncation internally
+    // so we don't need to manually truncate here
+    
+    DEBUG_INFO("Table::shuffle_merge_sort: Complete with %zu entries", entries.size());
 }
 

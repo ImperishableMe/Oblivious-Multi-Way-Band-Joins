@@ -50,6 +50,19 @@ enclave {
         
         // Clean up k-way merge state
         public sgx_status_t ecall_k_way_merge_cleanup(void);
+        
+        // ============================================================================
+        // Oblivious Shuffle Operations
+        // ============================================================================
+        
+        // Oblivious 2-way Waksman shuffle (in-memory)
+        public sgx_status_t ecall_oblivious_2way_waksman([in,out,count=n] entry_t* data, size_t n);
+        
+        // K-way shuffle decomposition for large vectors
+        public sgx_status_t ecall_k_way_shuffle_decompose([in,count=n] entry_t* input, size_t n);
+        
+        // K-way shuffle reconstruction for large vectors  
+        public sgx_status_t ecall_k_way_shuffle_reconstruct(size_t n);
     };
     
     untrusted {
@@ -62,5 +75,10 @@ enclave {
                                 [out,count=buffer_size] entry_t* buffer,
                                 size_t buffer_size,
                                 [out] size_t* actual_filled);
+        
+        /* K-way shuffle data transfer */
+        void ocall_append_to_group(int group_idx, [in] entry_t* entry);
+        void ocall_get_from_group(int group_idx, [out] entry_t* entry, size_t position);
+        void ocall_output_element([in] entry_t* entry, size_t position);
     };
 };

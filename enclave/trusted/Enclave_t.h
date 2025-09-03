@@ -26,6 +26,9 @@ sgx_status_t ecall_heap_sort(entry_t* array, size_t size, int comparator_type);
 sgx_status_t ecall_k_way_merge_init(size_t k, int comparator_type);
 sgx_status_t ecall_k_way_merge_process(entry_t* output, size_t output_capacity, size_t* output_produced, int* merge_complete);
 sgx_status_t ecall_k_way_merge_cleanup(void);
+sgx_status_t ecall_oblivious_2way_waksman(entry_t* data, size_t n);
+sgx_status_t ecall_k_way_shuffle_decompose(entry_t* input, size_t n);
+sgx_status_t ecall_k_way_shuffle_reconstruct(size_t n);
 void ecall_test_noop(void);
 void ecall_test_noop_small(void* data, size_t size);
 void ecall_test_noop_inout(void* data, size_t size);
@@ -42,6 +45,9 @@ void ecall_test_mixed_encryption(entry_t* entries, size_t count, int32_t encrypt
 
 sgx_status_t SGX_CDECL ocall_debug_print(uint32_t level, const char* file, int line, const char* message);
 sgx_status_t SGX_CDECL ocall_refill_buffer(int buffer_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled);
+sgx_status_t SGX_CDECL ocall_append_to_group(int group_idx, entry_t* entry);
+sgx_status_t SGX_CDECL ocall_get_from_group(int group_idx, entry_t* entry, size_t position);
+sgx_status_t SGX_CDECL ocall_output_element(entry_t* entry, size_t position);
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf);
 sgx_status_t SGX_CDECL sgx_thread_wait_untrusted_event_ocall(int* retval, const void* self);
 sgx_status_t SGX_CDECL sgx_thread_set_untrusted_event_ocall(int* retval, const void* waiter);

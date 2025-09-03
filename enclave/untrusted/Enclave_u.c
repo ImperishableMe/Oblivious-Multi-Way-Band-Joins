@@ -50,6 +50,23 @@ typedef struct ms_ecall_k_way_merge_cleanup_t {
 	sgx_status_t ms_retval;
 } ms_ecall_k_way_merge_cleanup_t;
 
+typedef struct ms_ecall_oblivious_2way_waksman_t {
+	sgx_status_t ms_retval;
+	entry_t* ms_data;
+	size_t ms_n;
+} ms_ecall_oblivious_2way_waksman_t;
+
+typedef struct ms_ecall_k_way_shuffle_decompose_t {
+	sgx_status_t ms_retval;
+	entry_t* ms_input;
+	size_t ms_n;
+} ms_ecall_k_way_shuffle_decompose_t;
+
+typedef struct ms_ecall_k_way_shuffle_reconstruct_t {
+	sgx_status_t ms_retval;
+	size_t ms_n;
+} ms_ecall_k_way_shuffle_reconstruct_t;
+
 typedef struct ms_ecall_test_noop_small_t {
 	void* ms_data;
 	size_t ms_size;
@@ -126,6 +143,22 @@ typedef struct ms_ocall_refill_buffer_t {
 	size_t* ms_actual_filled;
 } ms_ocall_refill_buffer_t;
 
+typedef struct ms_ocall_append_to_group_t {
+	int ms_group_idx;
+	entry_t* ms_entry;
+} ms_ocall_append_to_group_t;
+
+typedef struct ms_ocall_get_from_group_t {
+	int ms_group_idx;
+	entry_t* ms_entry;
+	size_t ms_position;
+} ms_ocall_get_from_group_t;
+
+typedef struct ms_ocall_output_element_t {
+	entry_t* ms_entry;
+	size_t ms_position;
+} ms_ocall_output_element_t;
+
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
 	int ms_leaf;
@@ -166,6 +199,30 @@ static sgx_status_t SGX_CDECL Enclave_ocall_refill_buffer(void* pms)
 {
 	ms_ocall_refill_buffer_t* ms = SGX_CAST(ms_ocall_refill_buffer_t*, pms);
 	ocall_refill_buffer(ms->ms_buffer_idx, ms->ms_buffer, ms->ms_buffer_size, ms->ms_actual_filled);
+
+	return SGX_SUCCESS;
+}
+
+static sgx_status_t SGX_CDECL Enclave_ocall_append_to_group(void* pms)
+{
+	ms_ocall_append_to_group_t* ms = SGX_CAST(ms_ocall_append_to_group_t*, pms);
+	ocall_append_to_group(ms->ms_group_idx, ms->ms_entry);
+
+	return SGX_SUCCESS;
+}
+
+static sgx_status_t SGX_CDECL Enclave_ocall_get_from_group(void* pms)
+{
+	ms_ocall_get_from_group_t* ms = SGX_CAST(ms_ocall_get_from_group_t*, pms);
+	ocall_get_from_group(ms->ms_group_idx, ms->ms_entry, ms->ms_position);
+
+	return SGX_SUCCESS;
+}
+
+static sgx_status_t SGX_CDECL Enclave_ocall_output_element(void* pms)
+{
+	ms_ocall_output_element_t* ms = SGX_CAST(ms_ocall_output_element_t*, pms);
+	ocall_output_element(ms->ms_entry, ms->ms_position);
 
 	return SGX_SUCCESS;
 }
@@ -212,12 +269,15 @@ static sgx_status_t SGX_CDECL Enclave_sgx_thread_set_multiple_untrusted_events_o
 
 static const struct {
 	size_t nr_ocall;
-	void * table[7];
+	void * table[10];
 } ocall_table_Enclave = {
-	7,
+	10,
 	{
 		(void*)Enclave_ocall_debug_print,
 		(void*)Enclave_ocall_refill_buffer,
+		(void*)Enclave_ocall_append_to_group,
+		(void*)Enclave_ocall_get_from_group,
+		(void*)Enclave_ocall_output_element,
 		(void*)Enclave_sgx_oc_cpuidex,
 		(void*)Enclave_sgx_thread_wait_untrusted_event_ocall,
 		(void*)Enclave_sgx_thread_set_untrusted_event_ocall,
@@ -314,10 +374,42 @@ sgx_status_t ecall_k_way_merge_cleanup(sgx_enclave_id_t eid, sgx_status_t* retva
 	return status;
 }
 
+sgx_status_t ecall_oblivious_2way_waksman(sgx_enclave_id_t eid, sgx_status_t* retval, entry_t* data, size_t n)
+{
+	sgx_status_t status;
+	ms_ecall_oblivious_2way_waksman_t ms;
+	ms.ms_data = data;
+	ms.ms_n = n;
+	status = sgx_ecall(eid, 8, &ocall_table_Enclave, &ms);
+	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
+	return status;
+}
+
+sgx_status_t ecall_k_way_shuffle_decompose(sgx_enclave_id_t eid, sgx_status_t* retval, entry_t* input, size_t n)
+{
+	sgx_status_t status;
+	ms_ecall_k_way_shuffle_decompose_t ms;
+	ms.ms_input = input;
+	ms.ms_n = n;
+	status = sgx_ecall(eid, 9, &ocall_table_Enclave, &ms);
+	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
+	return status;
+}
+
+sgx_status_t ecall_k_way_shuffle_reconstruct(sgx_enclave_id_t eid, sgx_status_t* retval, size_t n)
+{
+	sgx_status_t status;
+	ms_ecall_k_way_shuffle_reconstruct_t ms;
+	ms.ms_n = n;
+	status = sgx_ecall(eid, 10, &ocall_table_Enclave, &ms);
+	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
+	return status;
+}
+
 sgx_status_t ecall_test_noop(sgx_enclave_id_t eid)
 {
 	sgx_status_t status;
-	status = sgx_ecall(eid, 8, &ocall_table_Enclave, NULL);
+	status = sgx_ecall(eid, 11, &ocall_table_Enclave, NULL);
 	return status;
 }
 
@@ -327,7 +419,7 @@ sgx_status_t ecall_test_noop_small(sgx_enclave_id_t eid, void* data, size_t size
 	ms_ecall_test_noop_small_t ms;
 	ms.ms_data = data;
 	ms.ms_size = size;
-	status = sgx_ecall(eid, 9, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 12, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -337,7 +429,7 @@ sgx_status_t ecall_test_noop_inout(sgx_enclave_id_t eid, void* data, size_t size
 	ms_ecall_test_noop_inout_t ms;
 	ms.ms_data = data;
 	ms.ms_size = size;
-	status = sgx_ecall(eid, 10, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 13, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -347,7 +439,7 @@ sgx_status_t ecall_test_noop_entries(sgx_enclave_id_t eid, entry_t* entries, siz
 	ms_ecall_test_noop_entries_t ms;
 	ms.ms_entries = entries;
 	ms.ms_count = count;
-	status = sgx_ecall(eid, 11, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 14, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -357,7 +449,7 @@ sgx_status_t ecall_test_sum_array(sgx_enclave_id_t eid, int32_t* retval, int32_t
 	ms_ecall_test_sum_array_t ms;
 	ms.ms_data = data;
 	ms.ms_size = size;
-	status = sgx_ecall(eid, 12, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 15, &ocall_table_Enclave, &ms);
 	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
 	return status;
 }
@@ -368,7 +460,7 @@ sgx_status_t ecall_test_touch_entries(sgx_enclave_id_t eid, entry_t* entries, si
 	ms_ecall_test_touch_entries_t ms;
 	ms.ms_entries = entries;
 	ms.ms_count = count;
-	status = sgx_ecall(eid, 13, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 16, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -378,7 +470,7 @@ sgx_status_t ecall_test_increment_entries(sgx_enclave_id_t eid, entry_t* entries
 	ms_ecall_test_increment_entries_t ms;
 	ms.ms_entries = entries;
 	ms.ms_count = count;
-	status = sgx_ecall(eid, 14, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 17, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -388,7 +480,7 @@ sgx_status_t ecall_test_decrypt_only(sgx_enclave_id_t eid, entry_t* entries, siz
 	ms_ecall_test_decrypt_only_t ms;
 	ms.ms_entries = entries;
 	ms.ms_count = count;
-	status = sgx_ecall(eid, 15, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 18, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -398,7 +490,7 @@ sgx_status_t ecall_test_encrypt_only(sgx_enclave_id_t eid, entry_t* entries, siz
 	ms_ecall_test_encrypt_only_t ms;
 	ms.ms_entries = entries;
 	ms.ms_count = count;
-	status = sgx_ecall(eid, 16, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 19, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -408,7 +500,7 @@ sgx_status_t ecall_test_decrypt_and_compare(sgx_enclave_id_t eid, entry_t* entri
 	ms_ecall_test_decrypt_and_compare_t ms;
 	ms.ms_entries = entries;
 	ms.ms_count = count;
-	status = sgx_ecall(eid, 17, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 20, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -418,7 +510,7 @@ sgx_status_t ecall_test_compare_only(sgx_enclave_id_t eid, entry_t* entries, siz
 	ms_ecall_test_compare_only_t ms;
 	ms.ms_entries = entries;
 	ms.ms_count = count;
-	status = sgx_ecall(eid, 18, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 21, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -428,7 +520,7 @@ sgx_status_t ecall_test_full_cycle(sgx_enclave_id_t eid, entry_t* entries, size_
 	ms_ecall_test_full_cycle_t ms;
 	ms.ms_entries = entries;
 	ms.ms_count = count;
-	status = sgx_ecall(eid, 19, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 22, &ocall_table_Enclave, &ms);
 	return status;
 }
 
@@ -439,7 +531,7 @@ sgx_status_t ecall_test_mixed_encryption(sgx_enclave_id_t eid, entry_t* entries,
 	ms.ms_entries = entries;
 	ms.ms_count = count;
 	ms.ms_encrypt_percent = encrypt_percent;
-	status = sgx_ecall(eid, 20, &ocall_table_Enclave, &ms);
+	status = sgx_ecall(eid, 23, &ocall_table_Enclave, &ms);
 	return status;
 }
 

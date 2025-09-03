@@ -80,6 +80,7 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/algorithms/align_concat.cpp \
                  app/algorithms/oblivious_join.cpp \
                  app/algorithms/merge_sort_manager.cpp \
+                 app/algorithms/shuffle_manager.cpp \
                  app/batch/ecall_batch_collector.cpp \
                  app/batch/ecall_wrapper.cpp \
                  app/debug/debug_util.cpp \
@@ -147,7 +148,9 @@ Enclave_C_Files := enclave/trusted/crypto/aes_crypto.c \
                    enclave/trusted/operations/distribute_functions.c \
                    enclave/trusted/algorithms/min_heap.c \
                    enclave/trusted/algorithms/heap_sort.c \
+                   enclave/trusted/algorithms/oblivious_waksman.c \
                    enclave/trusted/algorithms/k_way_merge.c \
+                   enclave/trusted/algorithms/k_way_shuffle.c \
                    enclave/trusted/batch/batch_dispatcher.c \
                    enclave/trusted/debug_wrapper.c \
                    enclave/trusted/test/test_ecalls.c \
@@ -264,6 +267,10 @@ enclave/trusted/operations/%.o: enclave/trusted/operations/%.c
 	@$(CC) $(SGX_COMMON_CFLAGS) $(Enclave_Compile_CFlags) -c $< -o $@
 	@echo "CC   <=  $<"
 
+enclave/trusted/algorithms/%.o: enclave/trusted/algorithms/%.c
+	@$(CC) $(SGX_COMMON_CFLAGS) $(Enclave_Compile_CFlags) -c $< -o $@
+	@echo "CC   <=  $<"
+
 enclave/trusted/batch/%.o: enclave/trusted/batch/%.c
 	@$(CC) $(SGX_COMMON_CFLAGS) $(Enclave_Compile_CFlags) -c $< -o $@
 	@echo "CC   <=  $<"
@@ -294,6 +301,8 @@ Test_Compile_CXXFlags := $(Test_Compile_CFlags) -std=c++17
 Test_Join_Objects := tests/integration/test_join.o
 Sqlite_Baseline_Objects := tests/baseline/sqlite_baseline.o
 Test_Merge_Sort_Objects := tests/unit/test_merge_sort.o
+Test_Waksman_Objects := tests/unit/test_waksman_shuffle.o
+Test_Waksman_Dist_Objects := tests/unit/test_waksman_distribution.o
 
 # Common objects needed by test programs (reuse from main app)
 Test_Common_Objects := app/crypto/crypto_utils.o \
@@ -304,6 +313,7 @@ Test_Common_Objects := app/crypto/crypto_utils.o \
                       app/join/join_condition.o \
                       app/join/join_attribute_setter.o \
                       app/algorithms/merge_sort_manager.o \
+                      app/algorithms/shuffle_manager.o \
                       app/batch/ecall_batch_collector.o \
                       app/batch/ecall_wrapper.o \
                       app/debug/debug_util.o \
@@ -323,6 +333,14 @@ test_merge_sort: $(Test_Merge_Sort_Objects) $(Test_Common_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
+test_waksman_shuffle: $(Test_Waksman_Objects) $(Test_Common_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
+test_waksman_distribution: $(Test_Waksman_Dist_Objects) $(Test_Common_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
 # Compile test source files
 tests/integration/%.o: tests/integration/%.cpp
 	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
@@ -337,7 +355,7 @@ tests/unit/%.o: tests/unit/%.cpp
 	@echo "CXX  <=  $<"
 
 # Build all tests
-tests: test_join sqlite_baseline test_merge_sort
+tests: test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksman_distribution
 	@echo "All tests built successfully"
 
 ######## Clean ########

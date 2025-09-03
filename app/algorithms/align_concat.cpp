@@ -89,7 +89,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     auto sort_start = Clock::now();
     size_t before_sort = get_ecall_count();
     
-    sorted_accumulator.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_THEN_OTHER);
+    sorted_accumulator.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_JOIN_THEN_OTHER);
     
     double acc_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
     size_t acc_sort_ecalls = get_ecall_count() - before_sort;
@@ -110,7 +110,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     sort_start = Clock::now();
     before_sort = get_ecall_count();
     
-    aligned_child.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_ALIGNMENT_KEY);
+    aligned_child.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_ALIGNMENT_KEY);
     
     double child_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
     size_t child_sort_ecalls = get_ecall_count() - before_sort;

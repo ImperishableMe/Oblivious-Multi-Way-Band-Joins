@@ -169,21 +169,23 @@ typedef struct ms_ocall_refill_buffer_t {
 	size_t* ms_actual_filled;
 } ms_ocall_refill_buffer_t;
 
-typedef struct ms_ocall_append_to_group_t {
+typedef struct ms_ocall_flush_to_group_t {
 	int ms_group_idx;
-	entry_t* ms_entry;
-} ms_ocall_append_to_group_t;
+	entry_t* ms_buffer;
+	size_t ms_buffer_size;
+} ms_ocall_flush_to_group_t;
 
-typedef struct ms_ocall_get_from_group_t {
+typedef struct ms_ocall_refill_from_group_t {
 	int ms_group_idx;
-	entry_t* ms_entry;
-	size_t ms_position;
-} ms_ocall_get_from_group_t;
+	entry_t* ms_buffer;
+	size_t ms_buffer_size;
+	size_t* ms_actual_filled;
+} ms_ocall_refill_from_group_t;
 
-typedef struct ms_ocall_output_element_t {
-	entry_t* ms_entry;
-	size_t ms_position;
-} ms_ocall_output_element_t;
+typedef struct ms_ocall_flush_output_t {
+	entry_t* ms_buffer;
+	size_t ms_buffer_size;
+} ms_ocall_flush_output_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -1715,19 +1717,19 @@ sgx_status_t SGX_CDECL ocall_refill_buffer(int buffer_idx, entry_t* buffer, size
 	return status;
 }
 
-sgx_status_t SGX_CDECL ocall_append_to_group(int group_idx, entry_t* entry)
+sgx_status_t SGX_CDECL ocall_flush_to_group(int group_idx, entry_t* buffer, size_t buffer_size)
 {
 	sgx_status_t status = SGX_SUCCESS;
-	size_t _len_entry = sizeof(entry_t);
+	size_t _len_buffer = buffer_size * sizeof(entry_t);
 
-	ms_ocall_append_to_group_t* ms = NULL;
-	size_t ocalloc_size = sizeof(ms_ocall_append_to_group_t);
+	ms_ocall_flush_to_group_t* ms = NULL;
+	size_t ocalloc_size = sizeof(ms_ocall_flush_to_group_t);
 	void *__tmp = NULL;
 
 
-	CHECK_ENCLAVE_POINTER(entry, _len_entry);
+	CHECK_ENCLAVE_POINTER(buffer, _len_buffer);
 
-	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (entry != NULL) ? _len_entry : 0))
+	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (buffer != NULL) ? _len_buffer : 0))
 		return SGX_ERROR_INVALID_PARAMETER;
 
 	__tmp = sgx_ocalloc(ocalloc_size);
@@ -1735,28 +1737,33 @@ sgx_status_t SGX_CDECL ocall_append_to_group(int group_idx, entry_t* entry)
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
-	ms = (ms_ocall_append_to_group_t*)__tmp;
-	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_append_to_group_t));
-	ocalloc_size -= sizeof(ms_ocall_append_to_group_t);
+	ms = (ms_ocall_flush_to_group_t*)__tmp;
+	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_flush_to_group_t));
+	ocalloc_size -= sizeof(ms_ocall_flush_to_group_t);
 
 	if (memcpy_verw_s(&ms->ms_group_idx, sizeof(ms->ms_group_idx), &group_idx, sizeof(group_idx))) {
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	if (entry != NULL) {
-		if (memcpy_verw_s(&ms->ms_entry, sizeof(entry_t*), &__tmp, sizeof(entry_t*))) {
+	if (buffer != NULL) {
+		if (memcpy_verw_s(&ms->ms_buffer, sizeof(entry_t*), &__tmp, sizeof(entry_t*))) {
 			sgx_ocfree();
 			return SGX_ERROR_UNEXPECTED;
 		}
-		if (memcpy_verw_s(__tmp, ocalloc_size, entry, _len_entry)) {
+		if (memcpy_verw_s(__tmp, ocalloc_size, buffer, _len_buffer)) {
 			sgx_ocfree();
 			return SGX_ERROR_UNEXPECTED;
 		}
-		__tmp = (void *)((size_t)__tmp + _len_entry);
-		ocalloc_size -= _len_entry;
+		__tmp = (void *)((size_t)__tmp + _len_buffer);
+		ocalloc_size -= _len_buffer;
 	} else {
-		ms->ms_entry = NULL;
+		ms->ms_buffer = NULL;
+	}
+
+	if (memcpy_verw_s(&ms->ms_buffer_size, sizeof(ms->ms_buffer_size), &buffer_size, sizeof(buffer_size))) {
+		sgx_ocfree();
+		return SGX_ERROR_UNEXPECTED;
 	}
 
 	status = sgx_ocall(2, ms);
@@ -1767,20 +1774,25 @@ sgx_status_t SGX_CDECL ocall_append_to_group(int group_idx, entry_t* entry)
 	return status;
 }
 
-sgx_status_t SGX_CDECL ocall_get_from_group(int group_idx, entry_t* entry, size_t position)
+sgx_status_t SGX_CDECL ocall_refill_from_group(int group_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled)
 {
 	sgx_status_t status = SGX_SUCCESS;
-	size_t _len_entry = sizeof(entry_t);
+	size_t _len_buffer = buffer_size * sizeof(entry_t);
+	size_t _len_actual_filled = sizeof(size_t);
 
-	ms_ocall_get_from_group_t* ms = NULL;
-	size_t ocalloc_size = sizeof(ms_ocall_get_from_group_t);
+	ms_ocall_refill_from_group_t* ms = NULL;
+	size_t ocalloc_size = sizeof(ms_ocall_refill_from_group_t);
 	void *__tmp = NULL;
 
-	void *__tmp_entry = NULL;
+	void *__tmp_buffer = NULL;
+	void *__tmp_actual_filled = NULL;
 
-	CHECK_ENCLAVE_POINTER(entry, _len_entry);
+	CHECK_ENCLAVE_POINTER(buffer, _len_buffer);
+	CHECK_ENCLAVE_POINTER(actual_filled, _len_actual_filled);
 
-	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (entry != NULL) ? _len_entry : 0))
+	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (buffer != NULL) ? _len_buffer : 0))
+		return SGX_ERROR_INVALID_PARAMETER;
+	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (actual_filled != NULL) ? _len_actual_filled : 0))
 		return SGX_ERROR_INVALID_PARAMETER;
 
 	__tmp = sgx_ocalloc(ocalloc_size);
@@ -1788,38 +1800,61 @@ sgx_status_t SGX_CDECL ocall_get_from_group(int group_idx, entry_t* entry, size_
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
-	ms = (ms_ocall_get_from_group_t*)__tmp;
-	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_get_from_group_t));
-	ocalloc_size -= sizeof(ms_ocall_get_from_group_t);
+	ms = (ms_ocall_refill_from_group_t*)__tmp;
+	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_refill_from_group_t));
+	ocalloc_size -= sizeof(ms_ocall_refill_from_group_t);
 
 	if (memcpy_verw_s(&ms->ms_group_idx, sizeof(ms->ms_group_idx), &group_idx, sizeof(group_idx))) {
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	if (entry != NULL) {
-		if (memcpy_verw_s(&ms->ms_entry, sizeof(entry_t*), &__tmp, sizeof(entry_t*))) {
+	if (buffer != NULL) {
+		if (memcpy_verw_s(&ms->ms_buffer, sizeof(entry_t*), &__tmp, sizeof(entry_t*))) {
 			sgx_ocfree();
 			return SGX_ERROR_UNEXPECTED;
 		}
-		__tmp_entry = __tmp;
-		memset_verw(__tmp_entry, 0, _len_entry);
-		__tmp = (void *)((size_t)__tmp + _len_entry);
-		ocalloc_size -= _len_entry;
+		__tmp_buffer = __tmp;
+		memset_verw(__tmp_buffer, 0, _len_buffer);
+		__tmp = (void *)((size_t)__tmp + _len_buffer);
+		ocalloc_size -= _len_buffer;
 	} else {
-		ms->ms_entry = NULL;
+		ms->ms_buffer = NULL;
 	}
 
-	if (memcpy_verw_s(&ms->ms_position, sizeof(ms->ms_position), &position, sizeof(position))) {
+	if (memcpy_verw_s(&ms->ms_buffer_size, sizeof(ms->ms_buffer_size), &buffer_size, sizeof(buffer_size))) {
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
+	}
+
+	if (actual_filled != NULL) {
+		if (memcpy_verw_s(&ms->ms_actual_filled, sizeof(size_t*), &__tmp, sizeof(size_t*))) {
+			sgx_ocfree();
+			return SGX_ERROR_UNEXPECTED;
+		}
+		__tmp_actual_filled = __tmp;
+		if (_len_actual_filled % sizeof(*actual_filled) != 0) {
+			sgx_ocfree();
+			return SGX_ERROR_INVALID_PARAMETER;
+		}
+		memset_verw(__tmp_actual_filled, 0, _len_actual_filled);
+		__tmp = (void *)((size_t)__tmp + _len_actual_filled);
+		ocalloc_size -= _len_actual_filled;
+	} else {
+		ms->ms_actual_filled = NULL;
 	}
 
 	status = sgx_ocall(3, ms);
 
 	if (status == SGX_SUCCESS) {
-		if (entry) {
-			if (memcpy_s((void*)entry, _len_entry, __tmp_entry, _len_entry)) {
+		if (buffer) {
+			if (memcpy_s((void*)buffer, _len_buffer, __tmp_buffer, _len_buffer)) {
+				sgx_ocfree();
+				return SGX_ERROR_UNEXPECTED;
+			}
+		}
+		if (actual_filled) {
+			if (memcpy_s((void*)actual_filled, _len_actual_filled, __tmp_actual_filled, _len_actual_filled)) {
 				sgx_ocfree();
 				return SGX_ERROR_UNEXPECTED;
 			}
@@ -1829,19 +1864,19 @@ sgx_status_t SGX_CDECL ocall_get_from_group(int group_idx, entry_t* entry, size_
 	return status;
 }
 
-sgx_status_t SGX_CDECL ocall_output_element(entry_t* entry, size_t position)
+sgx_status_t SGX_CDECL ocall_flush_output(entry_t* buffer, size_t buffer_size)
 {
 	sgx_status_t status = SGX_SUCCESS;
-	size_t _len_entry = sizeof(entry_t);
+	size_t _len_buffer = buffer_size * sizeof(entry_t);
 
-	ms_ocall_output_element_t* ms = NULL;
-	size_t ocalloc_size = sizeof(ms_ocall_output_element_t);
+	ms_ocall_flush_output_t* ms = NULL;
+	size_t ocalloc_size = sizeof(ms_ocall_flush_output_t);
 	void *__tmp = NULL;
 
 
-	CHECK_ENCLAVE_POINTER(entry, _len_entry);
+	CHECK_ENCLAVE_POINTER(buffer, _len_buffer);
 
-	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (entry != NULL) ? _len_entry : 0))
+	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (buffer != NULL) ? _len_buffer : 0))
 		return SGX_ERROR_INVALID_PARAMETER;
 
 	__tmp = sgx_ocalloc(ocalloc_size);
@@ -1849,26 +1884,26 @@ sgx_status_t SGX_CDECL ocall_output_element(entry_t* entry, size_t position)
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
-	ms = (ms_ocall_output_element_t*)__tmp;
-	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_output_element_t));
-	ocalloc_size -= sizeof(ms_ocall_output_element_t);
+	ms = (ms_ocall_flush_output_t*)__tmp;
+	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_flush_output_t));
+	ocalloc_size -= sizeof(ms_ocall_flush_output_t);
 
-	if (entry != NULL) {
-		if (memcpy_verw_s(&ms->ms_entry, sizeof(entry_t*), &__tmp, sizeof(entry_t*))) {
+	if (buffer != NULL) {
+		if (memcpy_verw_s(&ms->ms_buffer, sizeof(entry_t*), &__tmp, sizeof(entry_t*))) {
 			sgx_ocfree();
 			return SGX_ERROR_UNEXPECTED;
 		}
-		if (memcpy_verw_s(__tmp, ocalloc_size, entry, _len_entry)) {
+		if (memcpy_verw_s(__tmp, ocalloc_size, buffer, _len_buffer)) {
 			sgx_ocfree();
 			return SGX_ERROR_UNEXPECTED;
 		}
-		__tmp = (void *)((size_t)__tmp + _len_entry);
-		ocalloc_size -= _len_entry;
+		__tmp = (void *)((size_t)__tmp + _len_buffer);
+		ocalloc_size -= _len_buffer;
 	} else {
-		ms->ms_entry = NULL;
+		ms->ms_buffer = NULL;
 	}
 
-	if (memcpy_verw_s(&ms->ms_position, sizeof(ms->ms_position), &position, sizeof(position))) {
+	if (memcpy_verw_s(&ms->ms_buffer_size, sizeof(ms->ms_buffer_size), &buffer_size, sizeof(buffer_size))) {
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}

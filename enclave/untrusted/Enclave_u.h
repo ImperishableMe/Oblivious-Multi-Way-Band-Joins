@@ -27,17 +27,17 @@ void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_debug_print, (uint32_t level, const cha
 #define OCALL_REFILL_BUFFER_DEFINED__
 void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_refill_buffer, (int buffer_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled));
 #endif
-#ifndef OCALL_APPEND_TO_GROUP_DEFINED__
-#define OCALL_APPEND_TO_GROUP_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_append_to_group, (int group_idx, entry_t* entry));
+#ifndef OCALL_FLUSH_TO_GROUP_DEFINED__
+#define OCALL_FLUSH_TO_GROUP_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_flush_to_group, (int group_idx, entry_t* buffer, size_t buffer_size));
 #endif
-#ifndef OCALL_GET_FROM_GROUP_DEFINED__
-#define OCALL_GET_FROM_GROUP_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_from_group, (int group_idx, entry_t* entry, size_t position));
+#ifndef OCALL_REFILL_FROM_GROUP_DEFINED__
+#define OCALL_REFILL_FROM_GROUP_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_refill_from_group, (int group_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled));
 #endif
-#ifndef OCALL_OUTPUT_ELEMENT_DEFINED__
-#define OCALL_OUTPUT_ELEMENT_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_output_element, (entry_t* entry, size_t position));
+#ifndef OCALL_FLUSH_OUTPUT_DEFINED__
+#define OCALL_FLUSH_OUTPUT_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_flush_output, (entry_t* buffer, size_t buffer_size));
 #endif
 #ifndef SGX_OC_CPUIDEX_DEFINED__
 #define SGX_OC_CPUIDEX_DEFINED__

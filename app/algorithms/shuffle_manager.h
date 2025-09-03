@@ -37,10 +37,11 @@ public:
     // Main shuffle function
     void shuffle(Table& table);
     
-    // Ocall handlers (called from enclave via global C functions)
-    static void handle_append_to_group(int group_idx, entry_t* entry);
-    static void handle_get_from_group(int group_idx, entry_t* entry, size_t position);
-    static void handle_output_element(entry_t* entry, size_t position);
+    // Ocall handlers for buffered I/O (called from enclave via global C functions)
+    static void handle_flush_to_group(int group_idx, entry_t* buffer, size_t buffer_size);
+    static void handle_refill_from_group(int group_idx, entry_t* buffer, 
+                                         size_t buffer_size, size_t* actual_filled);
+    static void handle_flush_output(entry_t* buffer, size_t buffer_size);
     
 private:
     // Recursive shuffle implementation
@@ -66,6 +67,9 @@ private:
     static size_t next_multiple_of_k(size_t n, size_t k) {
         return ((n + k - 1) / k) * k;
     }
+    
+    // Calculate padding target: smallest m > n where m = 2^a * k^b
+    static size_t calculate_shuffle_padding(size_t n);
     
     // Set/clear current instance for ocall handling
     void set_as_current();

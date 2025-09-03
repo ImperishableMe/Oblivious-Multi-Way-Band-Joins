@@ -45,9 +45,9 @@ void ecall_test_mixed_encryption(entry_t* entries, size_t count, int32_t encrypt
 
 sgx_status_t SGX_CDECL ocall_debug_print(uint32_t level, const char* file, int line, const char* message);
 sgx_status_t SGX_CDECL ocall_refill_buffer(int buffer_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled);
-sgx_status_t SGX_CDECL ocall_append_to_group(int group_idx, entry_t* entry);
-sgx_status_t SGX_CDECL ocall_get_from_group(int group_idx, entry_t* entry, size_t position);
-sgx_status_t SGX_CDECL ocall_output_element(entry_t* entry, size_t position);
+sgx_status_t SGX_CDECL ocall_flush_to_group(int group_idx, entry_t* buffer, size_t buffer_size);
+sgx_status_t SGX_CDECL ocall_refill_from_group(int group_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled);
+sgx_status_t SGX_CDECL ocall_flush_output(entry_t* buffer, size_t buffer_size);
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf);
 sgx_status_t SGX_CDECL sgx_thread_wait_untrusted_event_ocall(int* retval, const void* self);
 sgx_status_t SGX_CDECL sgx_thread_set_untrusted_event_ocall(int* retval, const void* waiter);

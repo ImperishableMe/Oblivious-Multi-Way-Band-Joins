@@ -143,21 +143,23 @@ typedef struct ms_ocall_refill_buffer_t {
 	size_t* ms_actual_filled;
 } ms_ocall_refill_buffer_t;
 
-typedef struct ms_ocall_append_to_group_t {
+typedef struct ms_ocall_flush_to_group_t {
 	int ms_group_idx;
-	entry_t* ms_entry;
-} ms_ocall_append_to_group_t;
+	entry_t* ms_buffer;
+	size_t ms_buffer_size;
+} ms_ocall_flush_to_group_t;
 
-typedef struct ms_ocall_get_from_group_t {
+typedef struct ms_ocall_refill_from_group_t {
 	int ms_group_idx;
-	entry_t* ms_entry;
-	size_t ms_position;
-} ms_ocall_get_from_group_t;
+	entry_t* ms_buffer;
+	size_t ms_buffer_size;
+	size_t* ms_actual_filled;
+} ms_ocall_refill_from_group_t;
 
-typedef struct ms_ocall_output_element_t {
-	entry_t* ms_entry;
-	size_t ms_position;
-} ms_ocall_output_element_t;
+typedef struct ms_ocall_flush_output_t {
+	entry_t* ms_buffer;
+	size_t ms_buffer_size;
+} ms_ocall_flush_output_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -203,26 +205,26 @@ static sgx_status_t SGX_CDECL Enclave_ocall_refill_buffer(void* pms)
 	return SGX_SUCCESS;
 }
 
-static sgx_status_t SGX_CDECL Enclave_ocall_append_to_group(void* pms)
+static sgx_status_t SGX_CDECL Enclave_ocall_flush_to_group(void* pms)
 {
-	ms_ocall_append_to_group_t* ms = SGX_CAST(ms_ocall_append_to_group_t*, pms);
-	ocall_append_to_group(ms->ms_group_idx, ms->ms_entry);
+	ms_ocall_flush_to_group_t* ms = SGX_CAST(ms_ocall_flush_to_group_t*, pms);
+	ocall_flush_to_group(ms->ms_group_idx, ms->ms_buffer, ms->ms_buffer_size);
 
 	return SGX_SUCCESS;
 }
 
-static sgx_status_t SGX_CDECL Enclave_ocall_get_from_group(void* pms)
+static sgx_status_t SGX_CDECL Enclave_ocall_refill_from_group(void* pms)
 {
-	ms_ocall_get_from_group_t* ms = SGX_CAST(ms_ocall_get_from_group_t*, pms);
-	ocall_get_from_group(ms->ms_group_idx, ms->ms_entry, ms->ms_position);
+	ms_ocall_refill_from_group_t* ms = SGX_CAST(ms_ocall_refill_from_group_t*, pms);
+	ocall_refill_from_group(ms->ms_group_idx, ms->ms_buffer, ms->ms_buffer_size, ms->ms_actual_filled);
 
 	return SGX_SUCCESS;
 }
 
-static sgx_status_t SGX_CDECL Enclave_ocall_output_element(void* pms)
+static sgx_status_t SGX_CDECL Enclave_ocall_flush_output(void* pms)
 {
-	ms_ocall_output_element_t* ms = SGX_CAST(ms_ocall_output_element_t*, pms);
-	ocall_output_element(ms->ms_entry, ms->ms_position);
+	ms_ocall_flush_output_t* ms = SGX_CAST(ms_ocall_flush_output_t*, pms);
+	ocall_flush_output(ms->ms_buffer, ms->ms_buffer_size);
 
 	return SGX_SUCCESS;
 }
@@ -275,9 +277,9 @@ static const struct {
 	{
 		(void*)Enclave_ocall_debug_print,
 		(void*)Enclave_ocall_refill_buffer,
-		(void*)Enclave_ocall_append_to_group,
-		(void*)Enclave_ocall_get_from_group,
-		(void*)Enclave_ocall_output_element,
+		(void*)Enclave_ocall_flush_to_group,
+		(void*)Enclave_ocall_refill_from_group,
+		(void*)Enclave_ocall_flush_output,
 		(void*)Enclave_sgx_oc_cpuidex,
 		(void*)Enclave_sgx_thread_wait_untrusted_event_ocall,
 		(void*)Enclave_sgx_thread_set_untrusted_event_ocall,

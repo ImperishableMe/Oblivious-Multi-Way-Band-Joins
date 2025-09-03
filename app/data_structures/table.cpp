@@ -380,8 +380,13 @@ void Table::shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
     non_oblivious_merge_sort(eid, op_type);
     DEBUG_INFO("Table::shuffle_merge_sort: Merge sort phase complete");
     
-    // Note: ShuffleManager already handles padding and truncation internally
-    // so we don't need to manually truncate here
+    // Phase 3: Truncate to original size
+    // After sorting, padding entries (with JOIN_ATTR_POS_INF) are at the end
+    if (entries.size() > original_size) {
+        entries.resize(original_size);
+        DEBUG_INFO("Table::shuffle_merge_sort: Truncated from %zu to %zu entries", 
+                   entries.size() + (entries.size() - original_size), original_size);
+    }
     
     DEBUG_INFO("Table::shuffle_merge_sort: Complete with %zu entries", entries.size());
 }

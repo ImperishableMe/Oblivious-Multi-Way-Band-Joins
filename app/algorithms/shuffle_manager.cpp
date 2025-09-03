@@ -1,7 +1,7 @@
 #include "shuffle_manager.h"
 #include "Enclave_u.h"
 #include "debug_util.h"
-#include "../batch/ecall_batch_collector.h"
+#include "../crypto/crypto_utils.h"
 #include <algorithm>
 
 // Static member initialization
@@ -9,16 +9,16 @@ ShuffleManager* ShuffleManager::current_instance = nullptr;
 
 // Global ocall handlers (extern "C" for EDL)
 extern "C" {
-    void ocall_append_to_group(int group_idx, entry_t* entry) {
-        ShuffleManager::handle_append_to_group(group_idx, entry);
+    void ocall_flush_to_group(int group_idx, entry_t* buffer, size_t buffer_size) {
+        ShuffleManager::handle_flush_to_group(group_idx, buffer, buffer_size);
     }
     
-    void ocall_get_from_group(int group_idx, entry_t* entry, size_t position) {
-        ShuffleManager::handle_get_from_group(group_idx, entry, position);
+    void ocall_refill_from_group(int group_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled) {
+        ShuffleManager::handle_refill_from_group(group_idx, buffer, buffer_size, actual_filled);
     }
     
-    void ocall_output_element(entry_t* entry, size_t position) {
-        ShuffleManager::handle_output_element(entry, position);
+    void ocall_flush_output(entry_t* buffer, size_t buffer_size) {
+        ShuffleManager::handle_flush_output(buffer, buffer_size);
     }
 }
 
@@ -43,10 +43,18 @@ void ShuffleManager::shuffle(Table& table) {
         entries.push_back(table[i]);
     }
     
-    // Perform recursive shuffle
+    // Calculate and apply one-time padding
+    size_t original_size = entries.size();
+    size_t padded_size = calculate_shuffle_padding(original_size);
+    if (padded_size > original_size) {
+        DEBUG_INFO("Padding from %zu to %zu for shuffle", original_size, padded_size);
+        pad_entries(entries, padded_size);
+    }
+    
+    // Perform recursive shuffle (no more padding inside)
     recursive_shuffle(entries);
     
-    // Copy back to table
+    // Copy back to table (keep padded size - truncation happens after merge sort)
     table.clear();
     for (const auto& entry : entries) {
         table.add_entry(entry);
@@ -69,21 +77,15 @@ void ShuffleManager::recursive_shuffle(std::vector<Entry>& entries) {
 }
 
 void ShuffleManager::shuffle_small(std::vector<Entry>& entries) {
-    size_t original_size = entries.size();
+    size_t n = entries.size();
     
-    DEBUG_INFO("Small shuffle: n=%zu", original_size);
+    DEBUG_INFO("Small shuffle: n=%zu", n);
     
-    // Pad to power of 2
-    size_t padded_size = next_power_of_two(original_size);
-    
-    if (padded_size > original_size) {
-        DEBUG_TRACE("Padding from %zu to %zu (power of 2)", original_size, padded_size);
-        pad_entries(entries, padded_size);
-    }
+    // No padding here - already done in shuffle()
     
     // Convert to entry_t array
     std::vector<entry_t> c_entries;
-    c_entries.reserve(padded_size);
+    c_entries.reserve(n);
     for (const auto& e : entries) {
         c_entries.push_back(e.to_entry_t());
     }
@@ -91,7 +93,7 @@ void ShuffleManager::shuffle_small(std::vector<Entry>& entries) {
     // Call 2-way Waksman shuffle
     sgx_status_t status = SGX_SUCCESS;
     sgx_status_t ecall_status = ecall_oblivious_2way_waksman(
-        eid, &status, c_entries.data(), padded_size);
+        eid, &status, c_entries.data(), n);
     
     if (ecall_status != SGX_SUCCESS || status != SGX_SUCCESS) {
         DEBUG_ERROR("Waksman shuffle failed: ecall_status=%d, status=%d", 
@@ -99,31 +101,25 @@ void ShuffleManager::shuffle_small(std::vector<Entry>& entries) {
         return;
     }
     
-    // Convert back and truncate to original size
+    // Convert back all entries (including padding)
     entries.clear();
-    for (size_t i = 0; i < original_size; i++) {
+    for (size_t i = 0; i < n; i++) {
         Entry e;
         e.from_entry_t(c_entries[i]);
         entries.push_back(e);
     }
     
-    DEBUG_INFO("Small shuffle complete: %zu entries", original_size);
+    DEBUG_INFO("Small shuffle complete: %zu entries", n);
 }
 
 void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
-    size_t original_size = entries.size();
+    size_t n = entries.size();
     const size_t k = MERGE_SORT_K;  // Use same K as merge sort (8)
     
-    // Pad to multiple of k
-    size_t padded_size = next_multiple_of_k(original_size, k);
-    if (padded_size > original_size) {
-        DEBUG_TRACE("Padding from %zu to %zu (multiple of %zu)", 
-                    original_size, padded_size, k);
-        pad_entries(entries, padded_size);
-    }
+    // No padding here - already done in shuffle()
+    // n should already be a valid size (2^a * k^b)
     
-    DEBUG_INFO("Large shuffle: n=%zu, padded=%zu, k=%zu", 
-               original_size, padded_size, k);
+    DEBUG_INFO("Large shuffle: n=%zu, k=%zu", n, k);
     
     // Phase 1: K-way decomposition
     set_as_current();
@@ -132,19 +128,19 @@ void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
     groups.clear();
     groups.resize(k);
     for (auto& group : groups) {
-        group.reserve(padded_size / k);
+        group.reserve(n / k);
     }
     
     // Convert to entry_t and call decompose
     std::vector<entry_t> c_entries;
-    c_entries.reserve(padded_size);
+    c_entries.reserve(n);
     for (const auto& e : entries) {
         c_entries.push_back(e.to_entry_t());
     }
     
     sgx_status_t status = SGX_SUCCESS;
     sgx_status_t ecall_status = ecall_k_way_shuffle_decompose(
-        eid, &status, c_entries.data(), padded_size);
+        eid, &status, c_entries.data(), n);
     
     if (ecall_status != SGX_SUCCESS || status != SGX_SUCCESS) {
         DEBUG_ERROR("K-way decompose failed: ecall_status=%d, status=%d", 
@@ -166,14 +162,14 @@ void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
     
     // Phase 3: K-way reconstruction
     output_entries.clear();
-    output_entries.reserve(padded_size);
+    output_entries.reserve(n);
     
     // Reset positions for reading
     group_positions.clear();
     group_positions.resize(k, 0);
     
     ecall_status = ecall_k_way_shuffle_reconstruct(
-        eid, &status, padded_size);
+        eid, &status, n);
     
     if (ecall_status != SGX_SUCCESS || status != SGX_SUCCESS) {
         DEBUG_ERROR("K-way reconstruct failed: ecall_status=%d, status=%d", 
@@ -182,17 +178,12 @@ void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
         return;
     }
     
-    // Move output to entries vector
+    // Move output to entries vector (keep all entries including padding)
     entries = std::move(output_entries);
     
     clear_current();
     
-    // Truncate to original size
-    if (entries.size() > original_size) {
-        entries.resize(original_size);
-    }
-    
-    DEBUG_INFO("Large shuffle complete: %zu entries", original_size);
+    DEBUG_INFO("Large shuffle complete: %zu entries", n);
 }
 
 void ShuffleManager::pad_entries(std::vector<Entry>& entries, size_t target_size) {
@@ -213,61 +204,92 @@ void ShuffleManager::pad_entries(std::vector<Entry>& entries, size_t target_size
     // Reserve space for efficiency
     entries.reserve(target_size);
     
-    // Create batch collector for SORT_PADDING transformation
-    EcallBatchCollector collector(eid, OP_ECALL_TRANSFORM_SET_SORT_PADDING);
-    
-    // Add padding entries
+    // Add padding entries with SORT_PADDING field_type
     for (size_t i = 0; i < padding_needed; i++) {
         Entry padding;
-        padding.is_encrypted = encryption_status;
-        entries.push_back(padding);
+        padding.field_type = SORT_PADDING;  // Mark as padding
+        // Initialize attributes to sentinel values
+        for (int j = 0; j < MAX_ATTRIBUTES; j++) {
+            padding.attributes[j] = JOIN_ATTR_POS_INF;  // Use positive infinity as sentinel
+        }
+        padding.join_attr = JOIN_ATTR_POS_INF;
         
-        // Add to batch for transformation to SORT_PADDING
-        collector.add_operation(entries.back());
+        // Encrypt if other entries are encrypted
+        if (encryption_status) {
+            padding.is_encrypted = 0;  // Start unencrypted
+            crypto_status_t enc_status;
+            entry_t entry_c = padding.to_entry_t();
+            sgx_status_t ecall_ret = ecall_encrypt_entry(eid, &enc_status, &entry_c);
+            if (ecall_ret == SGX_SUCCESS && enc_status == CRYPTO_SUCCESS) {
+                padding.from_entry_t(entry_c);
+            }
+        } else {
+            padding.is_encrypted = 0;
+        }
+        
+        entries.push_back(padding);
     }
-    
-    // Flush batch to set field_type = SORT_PADDING and other fields
-    collector.flush();
 }
 
-// Ocall handlers
-void ShuffleManager::handle_append_to_group(int group_idx, entry_t* entry) {
+// Ocall handlers for buffered I/O
+void ShuffleManager::handle_flush_to_group(int group_idx, entry_t* buffer, size_t buffer_size) {
     if (!current_instance || group_idx < 0 || group_idx >= MERGE_SORT_K) {
-        DEBUG_ERROR("Invalid append_to_group: group_idx=%d, current=%p", 
+        DEBUG_ERROR("Invalid flush_to_group: group_idx=%d, current=%p", 
                     group_idx, current_instance);
         return;
     }
     
-    Entry e;
-    e.from_entry_t(*entry);
-    current_instance->groups[group_idx].push_back(e);
+    // Append buffer contents to the specified group
+    for (size_t i = 0; i < buffer_size; i++) {
+        Entry e;
+        e.from_entry_t(buffer[i]);
+        current_instance->groups[group_idx].push_back(e);
+    }
+    
+    DEBUG_TRACE("Flushed %zu entries to group %d (total=%zu)", 
+                buffer_size, group_idx, current_instance->groups[group_idx].size());
 }
 
-void ShuffleManager::handle_get_from_group(int group_idx, entry_t* entry, size_t position) {
+void ShuffleManager::handle_refill_from_group(int group_idx, entry_t* buffer, 
+                                               size_t buffer_size, size_t* actual_filled) {
     if (!current_instance || group_idx < 0 || group_idx >= MERGE_SORT_K) {
-        DEBUG_ERROR("Invalid get_from_group: group_idx=%d, position=%zu", 
-                    group_idx, position);
+        DEBUG_ERROR("Invalid refill_from_group: group_idx=%d", group_idx);
+        *actual_filled = 0;
         return;
     }
     
-    if (position < current_instance->groups[group_idx].size()) {
-        *entry = current_instance->groups[group_idx][position].to_entry_t();
-    } else {
-        DEBUG_ERROR("Position %zu out of bounds for group %d (size=%zu)", 
-                    position, group_idx, current_instance->groups[group_idx].size());
+    size_t& pos = current_instance->group_positions[group_idx];
+    const auto& group = current_instance->groups[group_idx];
+    size_t available = group.size() - pos;
+    size_t to_fill = std::min(buffer_size, available);
+    
+    // Fill buffer from current position in group
+    for (size_t i = 0; i < to_fill; i++) {
+        buffer[i] = group[pos + i].to_entry_t();
     }
+    
+    pos += to_fill;
+    *actual_filled = to_fill;
+    
+    DEBUG_TRACE("Refilled %zu entries from group %d (pos=%zu/%zu)", 
+                to_fill, group_idx, pos, group.size());
 }
 
-void ShuffleManager::handle_output_element(entry_t* entry, size_t position) {
+void ShuffleManager::handle_flush_output(entry_t* buffer, size_t buffer_size) {
     if (!current_instance) {
-        DEBUG_ERROR("No current instance for output_element");
+        DEBUG_ERROR("No current instance for flush_output");
         return;
     }
     
-    (void)position;  // Position not needed for sequential output
-    Entry e;
-    e.from_entry_t(*entry);
-    current_instance->output_entries.push_back(e);
+    // Append buffer contents to output
+    for (size_t i = 0; i < buffer_size; i++) {
+        Entry e;
+        e.from_entry_t(buffer[i]);
+        current_instance->output_entries.push_back(e);
+    }
+    
+    DEBUG_TRACE("Flushed %zu entries to output (total=%zu)", 
+                buffer_size, current_instance->output_entries.size());
 }
 
 void ShuffleManager::set_as_current() {
@@ -278,4 +300,46 @@ void ShuffleManager::clear_current() {
     if (current_instance == this) {
         current_instance = nullptr;
     }
+}
+
+// Calculate padding target: smallest m >= n where m = 2^a * k^b
+size_t ShuffleManager::calculate_shuffle_padding(size_t n) {
+    if (n <= MAX_BATCH_SIZE) {
+        // Small vector: just pad to power of 2
+        return next_power_of_two(n);
+    }
+    
+    // Large vector: need m = 2^a * k^b
+    const size_t k = MERGE_SORT_K;
+    
+    // First determine b: number of k-way decomposition levels needed
+    // After b levels, we want size <= MAX_BATCH_SIZE
+    size_t temp = n;
+    size_t b = 0;
+    size_t k_power = 1;
+    
+    while (temp > MAX_BATCH_SIZE) {
+        temp = (temp + k - 1) / k;  // Ceiling division
+        b++;
+        k_power *= k;
+    }
+    
+    // Now temp <= MAX_BATCH_SIZE after b levels of division by k
+    // We need temp to be a power of 2 for the final Waksman shuffle
+    size_t a_part = next_power_of_two(temp);
+    
+    // Calculate m = a_part * k^b
+    size_t m = a_part * k_power;
+    
+    // Ensure m >= n (it should be by construction, but let's be safe)
+    if (m < n) {
+        // This shouldn't happen, but if it does, we need to increase a_part
+        a_part *= 2;
+        m = a_part * k_power;
+    }
+    
+    DEBUG_TRACE("Shuffle padding: n=%zu, b=%zu, a_part=%zu, k^b=%zu, m=%zu",
+                n, b, a_part, k_power, m);
+    
+    return m;
 }

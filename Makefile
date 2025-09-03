@@ -303,6 +303,7 @@ Sqlite_Baseline_Objects := tests/baseline/sqlite_baseline.o
 Test_Merge_Sort_Objects := tests/unit/test_merge_sort.o
 Test_Waksman_Objects := tests/unit/test_waksman_shuffle.o
 Test_Waksman_Dist_Objects := tests/unit/test_waksman_distribution.o
+Test_Shuffle_Manager_Objects := tests/unit/test_shuffle_manager.o
 
 # Common objects needed by test programs (reuse from main app)
 Test_Common_Objects := app/crypto/crypto_utils.o \
@@ -341,6 +342,10 @@ test_waksman_distribution: $(Test_Waksman_Dist_Objects) $(Test_Common_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
+test_shuffle_manager: $(Test_Shuffle_Manager_Objects) $(Test_Common_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
 # Compile test source files
 tests/integration/%.o: tests/integration/%.cpp
 	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
@@ -355,7 +360,7 @@ tests/unit/%.o: tests/unit/%.cpp
 	@echo "CXX  <=  $<"
 
 # Build all tests
-tests: test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksman_distribution
+tests: test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksman_distribution test_shuffle_manager
 	@echo "All tests built successfully"
 
 ######## Clean ########

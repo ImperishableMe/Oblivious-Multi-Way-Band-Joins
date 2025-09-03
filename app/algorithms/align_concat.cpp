@@ -97,20 +97,26 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     
     // Step 2: Compute copy indices for child table
     DEBUG_INFO("Step 2: Computing copy indices");
+    DEBUG_INFO("Child size before ComputeCopyIndices: %zu rows", child.size());
     Table indexed_child = ComputeCopyIndices(child, eid);
+    DEBUG_INFO("Child size after ComputeCopyIndices: %zu rows", indexed_child.size());
     
     // Step 3: Compute alignment keys
     DEBUG_INFO("Step 3: Computing alignment keys");
     Table aligned_child = ComputeAlignmentKeys(indexed_child, eid);
+    DEBUG_INFO("Child size after ComputeAlignmentKeys: %zu rows", aligned_child.size());
     
     // Step 4: Sort child by alignment key
     DEBUG_INFO("Step 4: Sorting child by alignment key");
+    DEBUG_INFO("Child size before sort: %zu rows", aligned_child.size());
     
     // Track child sort timing and ecalls
     sort_start = Clock::now();
     before_sort = get_ecall_count();
     
     aligned_child.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_ALIGNMENT_KEY);
+    
+    DEBUG_INFO("Child size after sort: %zu rows", aligned_child.size());
     
     double child_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
     size_t child_sort_ecalls = get_ecall_count() - before_sort;
@@ -146,6 +152,13 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     DEBUG_INFO("Table sizes - Accumulator: %zu rows, Child: %zu rows", result.size(), aligned_child.size());
+    
+    // Add immediate check for size mismatch
+    if (result.size() != aligned_child.size()) {
+        DEBUG_ERROR("Size mismatch before parallel_pass - Accumulator: %zu rows, Child: %zu rows", 
+                    result.size(), aligned_child.size());
+    }
+    
     DEBUG_INFO("These two tables will now be concatenated horizontally (parallel_pass)");
     
     // Debug: Print first few entries before concatenation

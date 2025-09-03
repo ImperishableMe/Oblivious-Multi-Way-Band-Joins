@@ -327,7 +327,7 @@ void Table::add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encr
     entries.reserve(entries.size() + count);
     
     // Create batch collector for padding creation
-    EcallBatchCollector collector(eid, OP_ECALL_TRANSFORM_CREATE_DIST_PADDING);
+    EcallBatchCollector collector(eid, OP_ECALL_TRANSFORM_SET_SORT_PADDING);
     
     // Create padding entries in batches
     for (size_t i = 0; i < count; i++) {
@@ -446,9 +446,10 @@ void Table::shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
     // Phase 4: Truncate to original size
     // After sorting, padding entries (with JOIN_ATTR_POS_INF) are at the end
     if (entries.size() > original_size) {
+        size_t padded_size = entries.size();
         entries.resize(original_size);
         DEBUG_INFO("Table::shuffle_merge_sort: Truncated from %zu to %zu entries", 
-                   entries.size() + (entries.size() - original_size), original_size);
+                   padded_size, original_size);
     }
     
     DEBUG_INFO("Table::shuffle_merge_sort: Complete with %zu entries", entries.size());

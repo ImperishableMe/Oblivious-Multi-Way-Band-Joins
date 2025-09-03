@@ -164,7 +164,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 3: Sort by join attribute
     DEBUG_INFO("Sorting by join attribute");
-    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
+    combined.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
     
     // Debug: Dump after sorting by join attribute
     debug_dump_with_mask(combined, "sorted_by_join", "topdown_step3_sorted", static_cast<uint32_t>(eid), foreign_init_mask);
@@ -182,7 +182,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 5: Sort for pairwise processing
     DEBUG_INFO("Sorting for pairwise processing");
-    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_PAIRWISE);
+    combined.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_PAIRWISE);
     
     // Debug: Dump after pairwise sort
     debug_dump_with_mask(combined, "sorted_pairwise", "topdown_step5_pairwise", static_cast<uint32_t>(eid), foreign_sum_mask);
@@ -201,7 +201,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 7: Sort END entries first to extract computed intervals
     DEBUG_INFO("Sorting END entries first");
-    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_END_FIRST);
+    combined.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_END_FIRST);
     
     // Debug: Dump after END-first sort
     debug_dump_with_mask(combined, "sorted_end_first", "topdown_step7_end_first", static_cast<uint32_t>(eid), foreign_interval_mask);

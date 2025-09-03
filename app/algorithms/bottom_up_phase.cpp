@@ -218,7 +218,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 5: Sort for pairwise processing (group START/END pairs)
     DEBUG_INFO("Sorting for pairwise processing");
-    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_PAIRWISE);
+    combined.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_PAIRWISE);
     
     // Debug: Dump after sorting for pairwise
     debug_dump_with_mask(combined, "sorted_pairwise", "bottomup_step6_pairwise", static_cast<uint32_t>(eid), init_mask);
@@ -232,7 +232,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 7: Sort END entries first for final update
     DEBUG_INFO("Sorting END entries first");
-    combined.batched_oblivious_sort(eid, OP_ECALL_COMPARATOR_END_FIRST);
+    combined.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_END_FIRST);
     
     // Debug: Dump after sorting END first
     debug_dump_with_mask(combined, "sorted_end_first", "bottomup_step8_end_first", static_cast<uint32_t>(eid), init_mask);

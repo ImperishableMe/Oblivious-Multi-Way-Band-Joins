@@ -53,6 +53,23 @@ inline sgx_status_t counted_ecall_batch_dispatcher(sgx_enclave_id_t eid, entry_t
     return status;
 }
 
+// Counted wrappers for k-way shuffle ecalls (used by ShuffleManager)
+inline sgx_status_t counted_ecall_k_way_shuffle_decompose(sgx_enclave_id_t eid, sgx_status_t* retval, entry_t* input, size_t n) {
+    sgx_status_t status = ecall_k_way_shuffle_decompose(eid, retval, input, n);
+    if (status == SGX_SUCCESS) {
+        g_ecall_count.fetch_add(1, std::memory_order_relaxed);
+    }
+    return status;
+}
+
+inline sgx_status_t counted_ecall_k_way_shuffle_reconstruct(sgx_enclave_id_t eid, sgx_status_t* retval, size_t n) {
+    sgx_status_t status = ecall_k_way_shuffle_reconstruct(eid, retval, n);
+    if (status == SGX_SUCCESS) {
+        g_ecall_count.fetch_add(1, std::memory_order_relaxed);
+    }
+    return status;
+}
+
 // For convenience, provide a macro that can be used for any ecall
 #define COUNTED_ECALL(func_name, ...) \
     ({ \

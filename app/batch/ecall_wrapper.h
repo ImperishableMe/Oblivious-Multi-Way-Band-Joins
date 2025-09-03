@@ -8,9 +8,15 @@
 // Global ecall counter
 extern std::atomic<size_t> g_ecall_count;
 
+// Global ocall counter
+extern std::atomic<size_t> g_ocall_count;
+
 // Counter management functions
 void reset_ecall_count();
 size_t get_ecall_count();
+
+void reset_ocall_count();
+size_t get_ocall_count();
 
 // Wrapper macro for ecalls that automatically increments counter
 #define COUNTED_ECALL(func_name, ...) \

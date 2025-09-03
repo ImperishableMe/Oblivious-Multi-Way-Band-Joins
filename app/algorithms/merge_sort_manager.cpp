@@ -1,6 +1,7 @@
 #include "merge_sort_manager.h"
 #include "debug_util.h"
 #include "../utils/counted_ecalls.h"
+#include "../batch/ecall_wrapper.h"  // For ocall counter
 #include <algorithm>
 #include <cmath>
 
@@ -10,6 +11,7 @@ MergeSortManager* MergeSortManager::current_instance = nullptr;
 // Global ocall handler function (must be extern "C" for EDL)
 extern "C" void ocall_refill_buffer(int buffer_idx, entry_t* buffer, 
                                     size_t buffer_size, size_t* actual_filled) {
+    g_ocall_count.fetch_add(1, std::memory_order_relaxed);  // Count the ocall
     MergeSortManager::handle_refill_buffer(buffer_idx, buffer, buffer_size, actual_filled);
 }
 

@@ -13,6 +13,7 @@
 #include "query/query_parser.h"
 #include "debug_util.h"
 #include "file_io/table_io.h"
+#include "batch/ecall_wrapper.h"
 
 /* Global enclave ID */
 sgx_enclave_id_t global_eid = 0;
@@ -129,12 +130,20 @@ int main(int argc, char* argv[]) {
         // Parse SQL query and build join tree
         JoinTreeNodePtr join_tree = parse_sql_query(query_file, tables);
         
+        // Reset counters before execution
+        reset_ecall_count();
+        reset_ocall_count();
+        
         // Execute oblivious join with debug output
         Table result = ObliviousJoin::ExecuteWithDebug(join_tree, global_eid, "oblivious_join");
         
         // Save result (encrypted with nonce)
         TableIO::save_encrypted_csv(result, output_file, global_eid);
         printf("Result: %zu rows\n", result.size());
+        
+        // Output ecall and ocall counts in parseable format
+        printf("ECALL_COUNT: %zu\n", get_ecall_count());
+        printf("OCALL_COUNT: %zu\n", get_ocall_count());
         
         // Cleanup
         destroy_enclave();

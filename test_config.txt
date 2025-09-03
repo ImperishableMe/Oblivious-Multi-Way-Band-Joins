@@ -1,0 +1,16 @@
+# Test configuration file for batch test runner
+# Format: query_file,data_dir
+
+# TPC-H benchmarks - Scale 0.001
+input/queries/tpch_tb1.sql,input/encrypted/data_0_001
+input/queries/tpch_tb2.sql,input/encrypted/data_0_001
+input/queries/tpch_tm1.sql,input/encrypted/data_0_001
+input/queries/tpch_tm2.sql,input/encrypted/data_0_001
+input/queries/tpch_tm3.sql,input/encrypted/data_0_001
+
+# TPC-H benchmarks - Scale 0.01
+input/queries/tpch_tb1.sql,input/encrypted/data_0_01
+input/queries/tpch_tb2.sql,input/encrypted/data_0_01
+input/queries/tpch_tm1.sql,input/encrypted/data_0_01
+input/queries/tpch_tm2.sql,input/encrypted/data_0_01
+input/queries/tpch_tm3.sql,input/encrypted/data_0_01

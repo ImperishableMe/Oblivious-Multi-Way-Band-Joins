@@ -1,0 +1,6 @@
+# Small test configuration for quick testing
+# Format: query_file,data_dir
+
+# TPC-H benchmarks - Scale 0.001 only
+input/queries/tpch_tb1.sql,input/encrypted/data_0_001
+input/queries/tpch_tm1.sql,input/encrypted/data_0_001

@@ -125,6 +125,7 @@ Gen_Untrusted_Object := enclave/untrusted/Enclave_u.o
 App_Objects := $(App_Cpp_Files:.cpp=.o) $(Gen_Untrusted_Object)
 
 App_Name := sgx_app
+Encrypt_Tool := encrypt_tables
 
 ######## Enclave Settings ########
 
@@ -228,12 +229,38 @@ main/%.o: main/%.cpp
 	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
+main/tools/%.o: main/tools/%.cpp
+	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
 app/%.o: app/%.cpp
 	@$(CXX) $(SGX_COMMON_CXXFLAGS) $(App_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
 # Link app
 $(App_Name): $(App_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
+# Build encrypt_tables utility
+Encrypt_Tool_Objects := main/tools/encrypt_tables.o \
+                       app/file_io/table_io.o \
+                       app/file_io/converters.o \
+                       app/crypto/crypto_utils.o \
+                       app/data_structures/entry.o \
+                       app/data_structures/table.o \
+                       app/join/join_condition.o \
+                       app/join/join_constraint.o \
+                       app/join/join_attribute_setter.o \
+                       app/algorithms/merge_sort_manager.o \
+                       app/algorithms/shuffle_manager.o \
+                       app/batch/ecall_batch_collector.o \
+                       app/batch/ecall_wrapper.o \
+                       app/debug/debug_util.o \
+                       app/debug/debug_manager.o \
+                       $(Gen_Untrusted_Object)
+
+$(Encrypt_Tool): $(Encrypt_Tool_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
@@ -299,6 +326,7 @@ Test_Compile_CXXFlags := $(Test_Compile_CFlags) -std=c++17
 
 # Test programs
 Test_Join_Objects := tests/integration/test_join.o
+Test_Join_Batch_Objects := tests/integration/test_join_batch.o
 Sqlite_Baseline_Objects := tests/baseline/sqlite_baseline.o
 Test_Merge_Sort_Objects := tests/unit/test_merge_sort.o
 Test_Waksman_Objects := tests/unit/test_waksman_shuffle.o
@@ -346,6 +374,10 @@ test_shuffle_manager: $(Test_Shuffle_Manager_Objects) $(Test_Common_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
+test_join_batch: $(Test_Join_Batch_Objects) $(Test_Common_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags) -lsqlite3
+	@echo "LINK =>  $@"
+
 # Compile test source files
 tests/integration/%.o: tests/integration/%.cpp
 	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
@@ -366,8 +398,8 @@ tests: test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksm
 ######## Clean ########
 
 clean:
-	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name)
-	@rm -f $(App_Objects) $(Enclave_Objects) 
+	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(Encrypt_Tool)
+	@rm -f $(App_Objects) $(Enclave_Objects) main/tools/*.o
 	@rm -f enclave/trusted/Enclave_t.* $(Gen_Untrusted_Source) $(Gen_Untrusted_Object)
 	@rm -f test_join sqlite_baseline $(Test_Join_Objects) $(Sqlite_Baseline_Objects)
 	@rm -f .config_*

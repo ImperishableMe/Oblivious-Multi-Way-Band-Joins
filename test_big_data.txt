@@ -1,0 +1,10 @@
+# Test configuration for big data (scale 0.1)
+# Tests ordered by expected runtime/complexity: tb1, tm1, tm2, tm3, tb2
+# Format: query_file,data_dir
+
+# TPC-H benchmarks - Scale 0.1
+input/queries/tpch_tb1.sql,input/encrypted/data_0_1
+input/queries/tpch_tm1.sql,input/encrypted/data_0_1
+input/queries/tpch_tm2.sql,input/encrypted/data_0_1
+input/queries/tpch_tm3.sql,input/encrypted/data_0_1
+input/queries/tpch_tb2.sql,input/encrypted/data_0_1

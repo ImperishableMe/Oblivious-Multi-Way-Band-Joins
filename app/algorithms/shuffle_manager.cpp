@@ -1,5 +1,6 @@
 #include "shuffle_manager.h"
-#include "Enclave_u.h"
+#include "../utils/counted_ecalls.h"  // For counted ecall wrappers
+#include "../batch/ecall_wrapper.h"  // For ocall counter
 #include "debug_util.h"
 #include "../crypto/crypto_utils.h"
 #include <algorithm>
@@ -10,14 +11,17 @@ ShuffleManager* ShuffleManager::current_instance = nullptr;
 // Global ocall handlers (extern "C" for EDL)
 extern "C" {
     void ocall_flush_to_group(int group_idx, entry_t* buffer, size_t buffer_size) {
+        g_ocall_count.fetch_add(1, std::memory_order_relaxed);  // Count the ocall
         ShuffleManager::handle_flush_to_group(group_idx, buffer, buffer_size);
     }
     
     void ocall_refill_from_group(int group_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled) {
+        g_ocall_count.fetch_add(1, std::memory_order_relaxed);  // Count the ocall
         ShuffleManager::handle_refill_from_group(group_idx, buffer, buffer_size, actual_filled);
     }
     
     void ocall_flush_output(entry_t* buffer, size_t buffer_size) {
+        g_ocall_count.fetch_add(1, std::memory_order_relaxed);  // Count the ocall
         ShuffleManager::handle_flush_output(buffer, buffer_size);
     }
 }
@@ -138,7 +142,7 @@ void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
     }
     
     sgx_status_t status = SGX_SUCCESS;
-    sgx_status_t ecall_status = ecall_k_way_shuffle_decompose(
+    sgx_status_t ecall_status = counted_ecall_k_way_shuffle_decompose(
         eid, &status, c_entries.data(), n);
     
     if (ecall_status != SGX_SUCCESS || status != SGX_SUCCESS) {
@@ -167,7 +171,7 @@ void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
     group_positions.clear();
     group_positions.resize(k, 0);
     
-    ecall_status = ecall_k_way_shuffle_reconstruct(
+    ecall_status = counted_ecall_k_way_shuffle_reconstruct(
         eid, &status, n);
     
     if (ecall_status != SGX_SUCCESS || status != SGX_SUCCESS) {

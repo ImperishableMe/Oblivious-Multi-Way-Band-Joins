@@ -31,7 +31,7 @@ public:
      * @param column_name The column to use as join_attr
      * @param eid Enclave ID for encrypted data operations
      */
-    static void SetJoinAttributesForTable(Table& table, const std::string& column_name, sgx_enclave_id_t eid);
+    static void SetJoinAttributesForTable(Table& table, const std::string& column_name);
 
 private:
     /**

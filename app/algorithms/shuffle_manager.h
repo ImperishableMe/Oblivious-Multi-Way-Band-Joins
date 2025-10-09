@@ -18,20 +18,18 @@
  */
 class ShuffleManager {
 private:
-    sgx_enclave_id_t eid;
-    
     // For k-way decomposition (large vectors)
     std::vector<std::vector<Entry>> groups;  // K groups after decomposition
     std::vector<size_t> group_positions;     // Current position in each group for reading
-    
+
     // For collecting output during reconstruction
     std::vector<Entry> output_entries;
-    
+
     // Static instance for ocall handling (like MergeSortManager)
     static ShuffleManager* current_instance;
-    
+
 public:
-    ShuffleManager(sgx_enclave_id_t enclave_id);
+    ShuffleManager();
     ~ShuffleManager();
     
     // Main shuffle function

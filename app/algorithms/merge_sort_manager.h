@@ -24,21 +24,20 @@
  */
 class MergeSortManager {
 private:
-    sgx_enclave_id_t eid;
     OpEcall comparator_type;
-    
+
     // Current runs being merged
     std::vector<std::vector<Entry>> runs;
     std::vector<size_t> run_positions;  // Current position in each run
     std::vector<size_t> current_merge_indices;  // Maps enclave buffer idx to actual run idx
-    
+
     // Static instance for ocall handlers
     static MergeSortManager* current_instance;
-    
+
     // No friend needed - ocall_refill_buffer will access via static function
-    
+
 public:
-    MergeSortManager(sgx_enclave_id_t eid, OpEcall type);
+    MergeSortManager(OpEcall type);
     ~MergeSortManager();
     
     // Main sort function

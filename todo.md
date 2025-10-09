@@ -46,16 +46,17 @@
 - [x] **4.2** Add include for `core_logic/batch/batch_dispatcher.h`
 - [x] **4.3** Remove `eid` parameter from EcallBatchCollector constructor
 - [x] **4.4** Remove `eid` from Table::batched_map, batched_linear_pass, batched_parallel_pass
-- [ ] **4.5** Update all algorithm files to remove eid parameters from function signatures
-- [ ] **4.6** Update `app/algorithms/merge_sort_manager.cpp` - replace `ecall_heap_sort()` with `heap_sort()`
-- [ ] **4.7** Update k_way_merge calls: `ecall_k_way_merge_init/process/cleanup()` → direct calls
-- [ ] **4.8** Update `app/algorithms/shuffle_manager.cpp` - replace all shuffle ecalls with direct calls
-- [ ] **4.9** Replace `ecall_oblivious_2way_waksman()` with `oblivious_2way_waksman()`
-- [ ] **4.10** Replace `ecall_k_way_shuffle_decompose/reconstruct()` with direct calls
-- [ ] **4.11** Remove all SGX status checking (sgx_status_t, SGX_SUCCESS, etc.)
-- [ ] **4.12** Update `app/batch/ecall_wrapper.h` - keep counters, remove ecall macros
-- [ ] **4.13** Delete `app/utils/counted_ecalls.h` (no longer needed)
-- [ ] **4.14** Commit: "Phase 4: Replace ecalls with direct function calls"
+- [x] **4.5** Update all algorithm files to remove eid parameters from function signatures
+- [x] **4.6** Update `app/algorithms/merge_sort_manager.cpp` - replace `ecall_heap_sort()` with `heap_sort()`
+- [x] **4.7** Update k_way_merge calls: `ecall_k_way_merge_init/process/cleanup()` → direct MinHeap calls
+- [x] **4.8** Update `app/algorithms/shuffle_manager.cpp` - replace all shuffle ecalls with direct calls
+- [x] **4.9** Replace `ecall_oblivious_2way_waksman()` with `oblivious_2way_waksman()`
+- [x] **4.10** Replace `ecall_k_way_shuffle_decompose/reconstruct()` with direct 2way shuffle
+- [x] **4.11** Remove all SGX status checking (sgx_status_t, SGX_SUCCESS, etc.)
+- [x] **4.12** Remove ocall handlers from merge_sort and shuffle managers
+- [x] **4.13** Update `app/batch/ecall_wrapper.h` - keep counters, remove ecall macros
+- [x] **4.14** Delete `app/utils/counted_ecalls.h` (no longer needed)
+- [x] **4.15** Commit: "Phase 4: Replace ecalls with direct function calls"
 
 ---
 

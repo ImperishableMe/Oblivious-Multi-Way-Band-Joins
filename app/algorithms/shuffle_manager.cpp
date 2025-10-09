@@ -26,8 +26,8 @@ extern "C" {
     }
 }
 
-ShuffleManager::ShuffleManager(sgx_enclave_id_t enclave_id) 
-    : eid(enclave_id) {
+ShuffleManager::ShuffleManager() 
+     {
     DEBUG_INFO("ShuffleManager created");
 }
 

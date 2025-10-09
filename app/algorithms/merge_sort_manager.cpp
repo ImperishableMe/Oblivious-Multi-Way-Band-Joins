@@ -1,22 +1,16 @@
 #include "merge_sort_manager.h"
 #include "debug_util.h"
-#include "../utils/counted_ecalls.h"
-#include "../batch/ecall_wrapper.h"  // For ocall counter
+#include "../core_logic/algorithms/min_heap.h"
 #include <algorithm>
 #include <cmath>
 
 // Static member initialization
 MergeSortManager* MergeSortManager::current_instance = nullptr;
 
-// Global ocall handler function (must be extern "C" for EDL)
-extern "C" void ocall_refill_buffer(int buffer_idx, entry_t* buffer, 
-                                    size_t buffer_size, size_t* actual_filled) {
-    g_ocall_count.fetch_add(1, std::memory_order_relaxed);  // Count the ocall
-    MergeSortManager::handle_refill_buffer(buffer_idx, buffer, buffer_size, actual_filled);
-}
+// Note: ocall handlers removed - no longer needed without enclave
 
-MergeSortManager::MergeSortManager(sgx_enclave_id_t enclave_id, OpEcall type)
-    : eid(enclave_id), comparator_type(type) {
+MergeSortManager::MergeSortManager(OpEcall type)
+    : comparator_type(type) {
     DEBUG_INFO("MergeSortManager created with comparator type %d", type);
 }
 
@@ -168,14 +162,8 @@ void MergeSortManager::sort_run_in_enclave(std::vector<Entry>& entries) {
     }
     
     // Call enclave to sort
-    sgx_status_t retval;
-    sgx_status_t status = COUNTED_ECALL(ecall_heap_sort, eid, &retval, entry_array.data(), size, 
-                                          (int)comparator_type);
-    
-    if (status != SGX_SUCCESS) {
-        DEBUG_ERROR("ecall_heap_sort failed with status %d", status);
-        return;
-    }
+    // Call heap sort directly - comparator type passed as parameter
+    heap_sort(entry_array.data(), size, (comparator_func_t)comparator_type);
     
     // Convert back to Entry objects
     for (size_t i = 0; i < size; i++) {
@@ -273,44 +261,43 @@ std::vector<Entry> MergeSortManager::k_way_merge(const std::vector<size_t>& run_
     run_positions.clear();
     run_positions.resize(runs.size(), 0);
     
-    // Initialize merge in enclave
-    sgx_status_t retval;
-    sgx_status_t status = COUNTED_ECALL(ecall_k_way_merge_init, eid, &retval, k, (int)comparator_type);
-    if (status != SGX_SUCCESS || retval != SGX_SUCCESS) {
-        DEBUG_ERROR("ecall_k_way_merge_init failed with status %d, retval %d", status, retval);
-        clear_current();
-        return {};
-    }
-    
-    // Collect merged output
+    // Perform k-way merge directly using MinHeap
     std::vector<Entry> result;
-    std::vector<entry_t> output_buffer(MERGE_BUFFER_SIZE);
-    
-    int merge_complete = 0;
-    while (!merge_complete) {
-        size_t output_produced = 0;
-        
-        status = COUNTED_ECALL(ecall_k_way_merge_process, eid, &retval, output_buffer.data(), 
-                                          MERGE_BUFFER_SIZE,
-                                          &output_produced, &merge_complete);
-        
-        if (status != SGX_SUCCESS) {
-            DEBUG_ERROR("ecall_k_way_merge_process failed with status %d", status);
-            break;
+    result.reserve(expected_total);
+
+    // Initialize heap with comparator
+    MinHeap heap;
+    minheap_init(&heap, k, (comparator_func_t)comparator_type);
+
+    // Add first element from each run to heap
+    for (size_t i = 0; i < run_indices.size(); i++) {
+        if (run_positions[run_indices[i]] < runs[run_indices[i]].size()) {
+            entry_t e = runs[run_indices[i]][run_positions[run_indices[i]]].to_entry_t();
+            heap_push(&heap, &e, i);
         }
-        
-        // Add produced entries to result
-        for (size_t i = 0; i < output_produced; i++) {
-            Entry e;
-            e.from_entry_t(output_buffer[i]);
-            result.push_back(e);
-        }
-        
-        DEBUG_TRACE("Merge produced %zu entries, complete=%d", output_produced, merge_complete);
     }
-    
-    // Clean up merge state
-    COUNTED_ECALL(ecall_k_way_merge_cleanup, eid, &retval);
+
+    // Extract min and refill until all runs exhausted
+    while (!heap_is_empty(&heap)) {
+        entry_t min_entry;
+        size_t run_idx;
+        heap_pop(&heap, &min_entry, &run_idx);
+
+        Entry e;
+        e.from_entry_t(min_entry);
+        result.push_back(e);
+
+        // Refill from same run
+        size_t actual_run_idx = run_indices[run_idx];
+        run_positions[actual_run_idx]++;
+        if (run_positions[actual_run_idx] < runs[actual_run_idx].size()) {
+            entry_t next = runs[actual_run_idx][run_positions[actual_run_idx]].to_entry_t();
+            heap_push(&heap, &next, run_idx);
+        }
+    }
+
+    // Clean up heap
+    heap_destroy(&heap);
     clear_current();
     
     DEBUG_TRACE("K-way merge complete, produced %zu entries (expected %zu)", 

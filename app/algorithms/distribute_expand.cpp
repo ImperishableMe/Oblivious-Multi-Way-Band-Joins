@@ -121,14 +121,11 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     // Step 6: Add padding entries to reach output_size
     size_t current_size = working.size();
     DEBUG_INFO("Step 6 - Adding padding entries: current_size=%zu, output_size=%zu", current_size, output_size);
-    
-    // Get the table's encryption status (asserts consistency)
-    uint8_t table_encryption_status = AssertConsistentEncryption(working);
-    
+
     // Use batched padding creation for efficiency
     size_t padding_needed = output_size - current_size;
     if (padding_needed > 0) {
-        working.add_batched_padding(padding_needed, eid, table_encryption_status);
+        working.add_batched_padding(padding_needed);
     }
     DEBUG_INFO("Step 6 complete, table size after padding=%zu", working.size());
     

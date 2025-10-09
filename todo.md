@@ -31,12 +31,12 @@
 - [x] **3.6** Copy batch: batch_dispatcher.c/h
 - [x] **3.7** Copy core.h to app/core_logic/
 - [x] **3.8** Update batch_dispatcher - remove crypto includes and encryption logic
-- [ ] **3.9** Update include paths in all copied files (../../common → ../../../common)
-- [ ] **3.10** Remove `#include "../crypto/..."` lines from all copied files
-- [ ] **3.11** Remove `#include "Enclave_t.h"` from all copied files
-- [ ] **3.12** Remove `#ifdef ENCLAVE_BUILD` conditionals (keep the code)
-- [ ] **3.13** Update `oblivious_waksman.c` - replace SGX RNG with standard RNG (/dev/urandom)
-- [ ] **3.14** Commit: "Phase 3: Merge enclave code into app/core_logic"
+- [x] **3.9** Update include paths in all copied files (../../common → ../../../common)
+- [x] **3.10** Remove `#include "../crypto/..."` lines from all copied files
+- [x] **3.11** Remove `#include "Enclave_t.h"` from all copied files
+- [x] **3.12** Remove `#ifdef ENCLAVE_BUILD` conditionals (keep the code)
+- [x] **3.13** Update `oblivious_waksman.c` - replace SGX RNG with standard RNG (hash-based)
+- [x] **3.14** Commit: "Phase 3: Merge enclave code into app/core_logic"
 
 ---
 

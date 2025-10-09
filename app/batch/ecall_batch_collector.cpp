@@ -1,45 +1,37 @@
 #include "ecall_batch_collector.h"
-#include "../utils/counted_ecalls.h"  // Use counted ecalls instead of direct Enclave_u.h
+#include "../core_logic/batch/batch_dispatcher.h"
 #include "debug_util.h"
 #include <stdexcept>
 #include <sstream>
 
-EcallBatchCollector::EcallBatchCollector(sgx_enclave_id_t enclave_id, OpEcall op, size_t max_size)
-    : eid(enclave_id), op_type(op), max_batch_size(max_size), stats{0, 0, 0, 0} {
-    
+EcallBatchCollector::EcallBatchCollector(OpEcall op, size_t max_size)
+    : op_type(op), max_batch_size(max_size), stats{0, 0, 0, 0} {
+
     if (max_size > MAX_BATCH_SIZE) {
-        throw std::invalid_argument("Batch size exceeds maximum allowed: " + 
+        throw std::invalid_argument("Batch size exceeds maximum allowed: " +
                                    std::to_string(MAX_BATCH_SIZE));
     }
-    
+
     // Reserve space to avoid frequent reallocations
     batch_data.reserve(max_batch_size);
     operations.reserve(max_batch_size);
     entry_pointers.reserve(max_batch_size);  // Pre-reserve to avoid reallocations
     entry_map.reserve(max_batch_size);       // Pre-reserve hash table buckets
-    
-    DEBUG_INFO("BatchCollector: Created for operation %d with max batch size %zu", 
+
+    DEBUG_INFO("BatchCollector: Created for operation %d with max batch size %zu",
                op_type, max_batch_size);
 }
 
 EcallBatchCollector::~EcallBatchCollector() {
     // Ensure any pending operations are flushed
     if (!operations.empty()) {
-        DEBUG_INFO("BatchCollector: Flushing %zu pending operations in destructor", 
+        DEBUG_INFO("BatchCollector: Flushing %zu pending operations in destructor",
                    operations.size());
         flush();
     }
-    
-    DEBUG_INFO("BatchCollector: Destroyed. Stats: %zu operations, %zu flushes, %zu entries", 
-               stats.total_operations, stats.total_flushes, stats.total_entries_processed);
-}
 
-void EcallBatchCollector::check_sgx_status(sgx_status_t status, const std::string& operation) {
-    if (status != SGX_SUCCESS) {
-        std::stringstream ss;
-        ss << "SGX error in " << operation << ": " << status;
-        throw std::runtime_error(ss.str());
-    }
+    DEBUG_INFO("BatchCollector: Destroyed. Stats: %zu operations, %zu flushes, %zu entries",
+               stats.total_operations, stats.total_flushes, stats.total_entries_processed);
 }
 
 void EcallBatchCollector::add_operation(Entry& e1, Entry& e2, int32_t* params) {
@@ -155,18 +147,17 @@ void EcallBatchCollector::flush() {
         DEBUG_TRACE("BatchCollector: Flush called but no operations pending");
         return;
     }
-    
-    DEBUG_DEBUG("BatchCollector: Flushing %zu operations with %zu unique entries", 
+
+    DEBUG_DEBUG("BatchCollector: Flushing %zu operations with %zu unique entries",
                 operations.size(), batch_data.size());
-    
+
     // Update max batch size statistic
     if (operations.size() > stats.max_batch_size_reached) {
         stats.max_batch_size_reached = operations.size();
     }
-    
-    // Call the batch dispatcher ecall (counted version)
-    sgx_status_t status = counted_ecall_batch_dispatcher(
-        eid,
+
+    // Call the batch dispatcher directly (no ecall)
+    batch_dispatcher(
         batch_data.data(),
         batch_data.size(),
         operations.data(),
@@ -174,20 +165,18 @@ void EcallBatchCollector::flush() {
         operations.size() * sizeof(BatchOperation),  // ops_size in bytes
         op_type
     );
-    
-    check_sgx_status(status, "BatchDispatcher ecall");
-    
+
     DEBUG_DEBUG("BatchCollector: Batch dispatcher returned successfully");
-    
+
     // Write back results to original Entry objects
     write_back_results();
-    
+
     // Update statistics
     stats.total_flushes++;
     stats.total_entries_processed += batch_data.size();
-    
+
     DEBUG_DEBUG("BatchCollector: Flush complete. Clearing batch for next operations");
-    
+
     // Clear for next batch
     entry_map.clear();
     entry_pointers.clear();

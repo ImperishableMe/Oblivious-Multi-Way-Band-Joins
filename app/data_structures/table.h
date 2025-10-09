@@ -85,30 +85,27 @@ public:
     // ========================================================================
     
     /**
-     * BatchedMap: Apply transformation to each entry with batched ecalls
-     * @param eid SGX enclave ID
+     * BatchedMap: Apply transformation to each entry
      * @param op_type Operation type for batch dispatcher
      * @param params Optional parameters for operations (can be nullptr)
      * @return New table with transformed entries
      */
-    Table batched_map(sgx_enclave_id_t eid, OpEcall op_type, int32_t* params = nullptr) const;
-    
+    Table batched_map(OpEcall op_type, int32_t* params = nullptr) const;
+
     /**
-     * BatchedLinearPass: Apply window function with batched ecalls
-     * @param eid SGX enclave ID
+     * BatchedLinearPass: Apply window function
      * @param op_type Operation type for batch dispatcher
      * @param params Optional parameters for operations (can be nullptr)
      */
-    void batched_linear_pass(sgx_enclave_id_t eid, OpEcall op_type, int32_t* params = nullptr);
-    
+    void batched_linear_pass(OpEcall op_type, int32_t* params = nullptr);
+
     /**
-     * BatchedParallelPass: Apply function to aligned pairs with batched ecalls
+     * BatchedParallelPass: Apply function to aligned pairs
      * @param other Second table (must have same size)
-     * @param eid SGX enclave ID
      * @param op_type Operation type for batch dispatcher
      * @param params Optional parameters for operations (can be nullptr)
      */
-    void batched_parallel_pass(Table& other, sgx_enclave_id_t eid, OpEcall op_type, int32_t* params = nullptr);
+    void batched_parallel_pass(Table& other, OpEcall op_type, int32_t* params = nullptr);
     
     
     /**

@@ -80,33 +80,33 @@ public:
     // which are more efficient for SGX by reducing ecall overhead
     
     // ========================================================================
-    // Batched Operations - Reduce SGX overhead by batching ecalls
+    // Direct Operations (TDX - no batching needed)
     // ========================================================================
-    
+
     /**
-     * BatchedMap: Apply transformation to each entry
-     * @param op_type Operation type for batch dispatcher
+     * Map: Apply transformation to each entry
+     * @param op_type Operation type for core function
      * @param params Optional parameters for operations (can be nullptr)
      * @return New table with transformed entries
      */
-    Table batched_map(OpEcall op_type, int32_t* params = nullptr) const;
+    Table map(OpEcall op_type, int32_t* params = nullptr) const;
 
     /**
-     * BatchedLinearPass: Apply window function
-     * @param op_type Operation type for batch dispatcher
+     * LinearPass: Apply window function to adjacent pairs
+     * @param op_type Operation type for core function
      * @param params Optional parameters for operations (can be nullptr)
      */
-    void batched_linear_pass(OpEcall op_type, int32_t* params = nullptr);
+    void linear_pass(OpEcall op_type, int32_t* params = nullptr);
 
     /**
-     * BatchedParallelPass: Apply function to aligned pairs
+     * ParallelPass: Apply function to aligned pairs from two tables
      * @param other Second table (must have same size)
-     * @param op_type Operation type for batch dispatcher
+     * @param op_type Operation type for core function
      * @param params Optional parameters for operations (can be nullptr)
      */
-    void batched_parallel_pass(Table& other, OpEcall op_type, int32_t* params = nullptr);
-    
-    
+    void parallel_pass(Table& other, OpEcall op_type, int32_t* params = nullptr);
+
+
     /**
      * ShuffleMergeSort: Two-phase oblivious sort
      * Phase 1: Oblivious shuffle using ShuffleManager (Waksman network)
@@ -116,19 +116,19 @@ public:
     void shuffle_merge_sort(OpEcall op_type);
 
     /**
-     * BatchedDistributePass: Batched version of distribute_pass
+     * DistributePass: Process pairs at given distance
      * @param distance Distance between pairs to process
-     * @param op_type Operation type for batch dispatcher
+     * @param op_type Operation type for core function
      * @param params Optional parameters for operations (can be nullptr)
      */
-    void batched_distribute_pass(size_t distance, OpEcall op_type, int32_t* params = nullptr);
-    
+    void distribute_pass(size_t distance, OpEcall op_type, int32_t* params = nullptr);
+
     /**
-     * AddBatchedPadding: Add multiple padding entries using batched operations
+     * AddPadding: Add multiple padding entries
      * @param count Number of padding entries to add
      * @param padding_op Operation type for padding creation
      */
-    void add_batched_padding(size_t count, OpEcall padding_op = OP_ECALL_TRANSFORM_CREATE_DIST_PADDING);
+    void add_padding(size_t count, OpEcall padding_op = OP_ECALL_TRANSFORM_CREATE_DIST_PADDING);
 
     /**
      * PadToShuffleSize: Pad table to 2^a * k^b format for shuffle operations

@@ -67,7 +67,7 @@ void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node) {
 
     // Use batched operation to set join_attr for all entries
     int32_t params[4] = {column_index, 0, 0, 0};
-    Table updated = table.batched_map(OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
+    Table updated = table.map(OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
     
     // Replace the table's entries with the updated ones
     table = updated;
@@ -111,7 +111,7 @@ void JoinAttributeSetter::SetJoinAttributesForTable(Table& table, const std::str
 
     // Use batched operation to set join_attr for all entries
     int32_t params[4] = {column_index, 0, 0, 0};
-    Table updated = table.batched_map(OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
+    Table updated = table.map(OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
     
     // Replace the table's entries with the updated ones
     table = updated;

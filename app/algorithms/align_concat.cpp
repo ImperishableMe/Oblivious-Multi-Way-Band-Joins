@@ -183,7 +183,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     int32_t concat_params[MAX_EXTRA_PARAMS] = {left_attr_count, right_attr_count, 0, 0};
     
     // Use parallel_pass to concatenate attributes from aligned_child
-    result.batched_parallel_pass(aligned_child, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);
+    result.parallel_pass(aligned_child, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);
     
     // Update the result table's schema to include columns from both tables
     std::vector<std::string> combined_schema = result.get_schema();
@@ -216,12 +216,12 @@ Table AlignConcat::ComputeCopyIndices(const Table& table) {
     DEBUG_DEBUG("Computing copy indices for %zu entries", table.size());
     
     // Initialize copy_index to 0 for all entries
-    Table result = table.batched_map( OP_ECALL_TRANSFORM_INIT_COPY_INDEX);
-    
+    Table result = table.map(OP_ECALL_TRANSFORM_INIT_COPY_INDEX);
+
     // Linear pass to compute copy indices
     // Same original_index -> increment
     // Different original_index -> reset to 0
-    result.batched_linear_pass( OP_ECALL_WINDOW_UPDATE_COPY_INDEX);
+    result.linear_pass(OP_ECALL_WINDOW_UPDATE_COPY_INDEX);
     
     DEBUG_DEBUG("Copy indices computed");
     
@@ -232,7 +232,7 @@ Table AlignConcat::ComputeAlignmentKeys(const Table& table) {
     DEBUG_DEBUG("Computing alignment keys for %zu entries", table.size());
     
     // Apply transformation to compute alignment_key = foreign_sum + (copy_index / local_mult)
-    Table result = table.batched_map( OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY);
+    Table result = table.map(OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY);
     
     DEBUG_DEBUG("Alignment keys computed");
     

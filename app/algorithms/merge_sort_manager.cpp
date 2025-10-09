@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <cmath>
 
+// External function to get comparator from OpEcall type
+extern "C" comparator_func_t get_merge_comparator(OpEcall type);
+
 // Static member initialization
 MergeSortManager* MergeSortManager::current_instance = nullptr;
 
@@ -162,8 +165,9 @@ void MergeSortManager::sort_run_in_enclave(std::vector<Entry>& entries) {
     }
     
     // Call enclave to sort
-    // Call heap sort directly - comparator type passed as parameter
-    heap_sort(entry_array.data(), size, (comparator_func_t)comparator_type);
+    // Call heap sort directly
+    comparator_func_t compare = get_merge_comparator(comparator_type);
+    heap_sort(entry_array.data(), size, compare);
     
     // Convert back to Entry objects
     for (size_t i = 0; i < size; i++) {
@@ -267,7 +271,8 @@ std::vector<Entry> MergeSortManager::k_way_merge(const std::vector<size_t>& run_
 
     // Initialize heap with comparator
     MinHeap heap;
-    minheap_init(&heap, k, (comparator_func_t)comparator_type);
+    comparator_func_t compare = get_merge_comparator(comparator_type);
+    minheap_init(&heap, k, compare);
 
     // Add first element from each run to heap
     for (size_t i = 0; i < run_indices.size(); i++) {

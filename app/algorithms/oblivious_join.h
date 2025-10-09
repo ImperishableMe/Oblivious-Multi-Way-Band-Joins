@@ -40,14 +40,12 @@ public:
     /**
      * Execute join with debug session
      * Same as Execute but creates a debug session for intermediate results
-     * 
+     *
      * @param root Root of the join tree with input tables
-     * @param eid SGX enclave ID for secure operations
      * @param session_name Name for debug session
-     * @return Final join result table (encrypted)
+     * @return Final join result table
      */
-    static Table ExecuteWithDebug(JoinTreeNodePtr root, 
-                                   sgx_enclave_id_t eid,
+    static Table ExecuteWithDebug(JoinTreeNodePtr root,
                                    const std::string& session_name);
 
 private:

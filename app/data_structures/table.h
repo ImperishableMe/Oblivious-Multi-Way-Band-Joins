@@ -5,14 +5,13 @@
 #include <string>
 #include <functional>
 #include "entry.h"
-#include "sgx_urts.h"
 #include "../../common/batch_types.h"
 
 /**
  * Table Class - Manages collections of entries for oblivious multi-way band join
- * 
- * Provides batched operations for efficient SGX processing
- * that maintain fixed access patterns for secure computation in SGX enclaves.
+ *
+ * Provides batched operations for efficient TDX processing
+ * that maintain fixed access patterns for secure computation.
  */
 class Table {
 private:
@@ -151,9 +150,6 @@ public:
     static bool is_valid_shuffle_size(size_t n);
     
 private:
-    // Helper methods
-    static void check_sgx_status(sgx_status_t status, const std::string& operation);
-    
     // Helper to calculate next power of 2
     static size_t next_power_of_two(size_t n) {
         size_t power = 1;

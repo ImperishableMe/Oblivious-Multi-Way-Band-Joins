@@ -21,7 +21,8 @@ void transform_set_local_mult_one_op(entry_t* entry) {
  * Set local_mult = 1 for all tables in bottom-up phase initialization
  */
 void transform_set_local_mult_one(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_set_local_mult_one_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_set_local_mult_one_op(entry);
 }
 
 void transform_add_metadata_op(entry_t* entry) {
@@ -47,7 +48,8 @@ void transform_add_metadata_op(entry_t* entry) {
  * Initializes all metadata fields to prepare for algorithm phases
  */
 void transform_add_metadata(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_add_metadata_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_add_metadata_op(entry);
 }
 
 void transform_set_index_op(entry_t* entry, uint32_t index) {
@@ -59,20 +61,8 @@ void transform_set_index_op(entry_t* entry, uint32_t index) {
  * Used during initialization to assign sequential indices
  */
 void transform_set_index(entry_t* entry, uint32_t index) {
-    // Can't use apply_to_decrypted_entry with parameters, so decrypt/encrypt manually
-    crypto_status_t status;
-    uint8_t was_encrypted = entry->is_encrypted;
-    
-    if (was_encrypted) {
-        status = aes_decrypt_entry(entry);
-        if (status != CRYPTO_SUCCESS) return;
-    }
-    
+    // TDX: Direct call, no encryption wrapper needed
     transform_set_index_op(entry, index);
-    
-    if (was_encrypted) {
-        aes_encrypt_entry(entry);
-    }
 }
 
 void transform_init_local_temps_op(entry_t* entry) {
@@ -86,7 +76,8 @@ void transform_init_local_temps_op(entry_t* entry) {
  * Sets local_cumsum = local_mult, local_interval = 0
  */
 void transform_init_local_temps(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_init_local_temps_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_init_local_temps_op(entry);
 }
 
 void transform_to_source_op(entry_t* entry) {
@@ -100,7 +91,8 @@ void transform_to_source_op(entry_t* entry) {
  * Used when creating combined table from source (child) entries
  */
 void transform_to_source(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_to_source_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_to_source_op(entry);
 }
 
 void transform_to_start_op(entry_t* entry, int32_t deviation, equality_type_t equality) {
@@ -132,20 +124,8 @@ void transform_to_start_op(entry_t* entry, int32_t deviation, equality_type_t eq
  * Creates the start of a matching range for band joins
  */
 void transform_to_start(entry_t* entry, int32_t deviation, equality_type_t equality) {
-    // Can't use apply_to_decrypted_entry with parameters, so decrypt/encrypt manually
-    crypto_status_t status;
-    uint8_t was_encrypted = entry->is_encrypted;
-    
-    if (was_encrypted) {
-        status = aes_decrypt_entry(entry);
-        if (status != CRYPTO_SUCCESS) return;
-    }
-    
+    // TDX: Direct call, no encryption wrapper needed
     transform_to_start_op(entry, deviation, equality);
-    
-    if (was_encrypted) {
-        aes_encrypt_entry(entry);
-    }
 }
 
 void transform_to_end_op(entry_t* entry, int32_t deviation, equality_type_t equality) {
@@ -183,20 +163,8 @@ void transform_to_end_op(entry_t* entry, int32_t deviation, equality_type_t equa
  * Creates the end of a matching range for band joins
  */
 void transform_to_end(entry_t* entry, int32_t deviation, equality_type_t equality) {
-    // Can't use apply_to_decrypted_entry with parameters, so decrypt/encrypt manually
-    crypto_status_t status;
-    uint8_t was_encrypted = entry->is_encrypted;
-    
-    if (was_encrypted) {
-        status = aes_decrypt_entry(entry);
-        if (status != CRYPTO_SUCCESS) return;
-    }
-    
+    // TDX: Direct call, no encryption wrapper needed
     transform_to_end_op(entry, deviation, equality);
-    
-    if (was_encrypted) {
-        aes_encrypt_entry(entry);
-    }
 }
 
 /**
@@ -217,7 +185,8 @@ void transform_set_sort_padding_op(entry_t* entry) {
 }
 
 void transform_set_sort_padding(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_set_sort_padding_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_set_sort_padding_op(entry);
 }
 
 /**
@@ -232,7 +201,8 @@ void transform_init_final_mult_op(entry_t* entry) {
 }
 
 void transform_init_final_mult(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_init_final_mult_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_init_final_mult_op(entry);
 }
 
 /**
@@ -248,7 +218,8 @@ void transform_init_foreign_temps_op(entry_t* entry) {
 }
 
 void transform_init_foreign_temps(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_init_foreign_temps_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_init_foreign_temps_op(entry);
 }
 
 // ============================================================================
@@ -263,7 +234,8 @@ void transform_init_dst_idx_op(entry_t* entry) {
 }
 
 void transform_init_dst_idx(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_init_dst_idx_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_init_dst_idx_op(entry);
 }
 
 /**
@@ -274,7 +246,8 @@ void transform_init_index_op(entry_t* entry) {
 }
 
 void transform_init_index(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_init_index_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_init_index_op(entry);
 }
 
 /**
@@ -287,7 +260,8 @@ void transform_mark_zero_mult_padding_op(entry_t* entry) {
 }
 
 void transform_mark_zero_mult_padding(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_mark_zero_mult_padding_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_mark_zero_mult_padding_op(entry);
 }
 
 /**
@@ -305,7 +279,8 @@ void transform_create_dist_padding_op(entry_t* entry) {
 }
 
 void transform_create_dist_padding(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_create_dist_padding_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_create_dist_padding_op(entry);
 }
 
 // ============================================================================
@@ -320,7 +295,8 @@ void transform_init_copy_index_op(entry_t* entry) {
 }
 
 void transform_init_copy_index(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_init_copy_index_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_init_copy_index_op(entry);
 }
 
 /**
@@ -333,7 +309,8 @@ void transform_compute_alignment_key_op(entry_t* entry) {
 }
 
 void transform_compute_alignment_key(entry_t* entry) {
-    apply_to_decrypted_entry(entry, transform_compute_alignment_key_op);
+    // TDX: Direct call, no encryption wrapper needed
+    transform_compute_alignment_key_op(entry);
 }
 
 /**
@@ -360,24 +337,9 @@ void transform_set_join_attr_op(entry_t* entry, int32_t column_index) {
 
 void transform_set_join_attr(entry_t* entry, int32_t column_index) {
     if (!entry) return;
-    
-    uint8_t was_encrypted = entry->is_encrypted;
-    
-    // Decrypt if needed
-    if (was_encrypted) {
-        crypto_status_t status = aes_decrypt_entry(entry);
-        if (status != CRYPTO_SUCCESS) {
-            return;
-        }
-    }
-    
-    // Apply the operation
+
+    // TDX: Direct call, no encryption wrapper needed
     transform_set_join_attr_op(entry, column_index);
-    
-    // Re-encrypt if it was encrypted
-    if (was_encrypted) {
-        aes_encrypt_entry(entry);
-    }
 }
 
 /**
@@ -442,18 +404,6 @@ void transform_init_metadata_null_op(entry_t* entry, uint32_t field_mask) {
 }
 
 void transform_init_metadata_null(entry_t* entry, uint32_t field_mask) {
-    // Can't use apply_to_decrypted_entry with parameters, so decrypt/encrypt manually
-    crypto_status_t status;
-    uint8_t was_encrypted = entry->is_encrypted;
-    
-    if (was_encrypted) {
-        status = aes_decrypt_entry(entry);
-        if (status != CRYPTO_SUCCESS) return;
-    }
-    
+    // TDX: Direct call, no encryption wrapper needed
     transform_init_metadata_null_op(entry, field_mask);
-    
-    if (was_encrypted) {
-        aes_encrypt_entry(entry);
-    }
 }

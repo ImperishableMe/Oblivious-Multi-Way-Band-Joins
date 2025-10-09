@@ -5,8 +5,6 @@
 #include <vector>
 #include "../data_structures/data_structures.h"
 #include "../join/join_tree_node.h"
-#include "Enclave_u.h"
-#include "sgx_urts.h"
 
 /**
  * AlignConcat Class
@@ -29,9 +27,8 @@ public:
     /**
      * Execute align-concat phase on the join tree
      * Constructs the final join result by aligning and concatenating tables
-     * 
+     *
      * @param root Root of the join tree with expanded tables
-     * @param eid SGX enclave ID for secure operations
      * @return Final join result table
      */
     static Table Execute(JoinTreeNodePtr root);
@@ -60,9 +57,8 @@ private:
     /**
      * Recursively construct join result through the tree
      * Processes tree in pre-order, accumulating results
-     * 
+     *
      * @param root Current root of subtree
-     * @param eid SGX enclave ID
      * @return Accumulated join result for this subtree
      */
     static Table ConstructJoinResult(JoinTreeNodePtr root);
@@ -70,22 +66,20 @@ private:
     /**
      * Align child table with accumulator and concatenate
      * Core operation that aligns two tables and merges them horizontally
-     * 
+     *
      * Algorithm steps:
      * 1. Sort accumulator by join attr, then other attrs
      * 2. Compute copy indices for child via linear pass
      * 3. Compute alignment keys for child
      * 4. Sort child by alignment key
      * 5. Horizontal concatenation
-     * 
+     *
      * @param accumulator Current accumulated result (parent)
      * @param child Child table to align and add
-     * @param eid SGX enclave ID
      * @return Concatenated result table
      */
-    static Table AlignAndConcatenate(const Table& accumulator, 
-                                     const Table& child,
-                                     sgx_enclave_id_t eid);
+    static Table AlignAndConcatenate(const Table& accumulator,
+                                     const Table& child);
     
     /**
      * Pre-order traversal of join tree
@@ -99,23 +93,21 @@ private:
     /**
      * Compute copy indices for an expanded table
      * Sets copy_index from 0 to (final_mult-1) for each original tuple
-     * 
+     *
      * Uses linear pass to track:
      * - Same original_index -> increment copy_index
      * - Different original_index -> reset to 0
-     * 
+     *
      * @param table Expanded table to process
-     * @param eid SGX enclave ID
      * @return Table with copy indices set
      */
     static Table ComputeCopyIndices(const Table& table);
-    
+
     /**
      * Compute alignment keys for child table
      * Uses formula: foreign_sum + (copy_index / local_mult)
-     * 
+     *
      * @param table Table with copy indices set
-     * @param eid SGX enclave ID
      * @return Table with alignment keys computed
      */
     static Table ComputeAlignmentKeys(const Table& table);

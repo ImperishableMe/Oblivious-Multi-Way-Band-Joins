@@ -44,8 +44,8 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/algorithms/shuffle_manager.cpp \
                  app/batch/ecall_batch_collector.cpp \
                  app/batch/ecall_wrapper.cpp \
-                 app/debug/debug_util.cpp \
-                 app/debug/debug_manager.cpp
+                 app/debug_stubs.cpp \
+                 app/core_logic_callbacks.cpp
 
 # C source files from core_logic (merged from enclave)
 App_C_Files := app/core_logic/algorithms/min_heap.c \
@@ -143,13 +143,13 @@ Test_Common_Objects := app/file_io/converters.o \
                       app/algorithms/shuffle_manager.o \
                       app/batch/ecall_batch_collector.o \
                       app/batch/ecall_wrapper.o \
-                      app/debug/debug_util.o \
-                      app/debug/debug_manager.o \
+                      app/core_logic_callbacks.o \
+                      app/debug_stubs.o \
                       $(App_C_Files:.c=.o)
 
 # Test executables
 test_join: $(Test_Join_Objects) $(Test_Common_Objects)
-	@$(CXX) $^ -o $@ $(App_Link_Flags) -lsqlite3
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
 sqlite_baseline: $(Sqlite_Baseline_Objects) $(Test_Common_Objects)

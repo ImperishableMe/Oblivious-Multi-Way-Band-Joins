@@ -13,48 +13,12 @@
 #include <sys/stat.h>
 #include "app/data_structures/data_structures.h"
 #include "app/file_io/table_io.h"
-#include "app/crypto/crypto_utils.h"
-#include "sgx_urts.h"
-#include "enclave/untrusted/Enclave_u.h"
 #include "common/debug_util.h"
 
-/* Global enclave ID for decryption */
-sgx_enclave_id_t global_eid = 0;
-
-/* Initialize the enclave */
-int initialize_enclave() {
-    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
-    
-    ret = sgx_create_enclave("enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
-    if (ret != SGX_SUCCESS) {
-        std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
-        return -1;
-    }
-    
-    // Enclave initialized
-    return 0;
-}
-
-/* Destroy the enclave */
-void destroy_enclave() {
-    if (global_eid != 0) {
-        sgx_destroy_enclave(global_eid);
-    }
-}
-
-/* Decrypt a table */
-Table decrypt_table(const Table& encrypted_table) {
-    Table decrypted = encrypted_table;
-    
-    for (size_t i = 0; i < decrypted.size(); i++) {
-        Entry& entry = decrypted[i];
-        if (entry.is_encrypted) {
-            CryptoUtils::decrypt_entry(entry, global_eid);
-        }
-    }
-    
-    return decrypted;
-}
+/**
+ * TDX Migration: No encryption/decryption needed
+ * Data is protected by the TDX VM, not application-level encryption
+ */
 
 /* Convert table to comparable format (sorted rows as strings) */
 std::multiset<std::string> table_to_multiset(const Table& table) {
@@ -315,14 +279,10 @@ int main(int argc, char* argv[]) {
     std::string data_dir = argv[2];
     
     // Starting test comparison
-    
+
     try {
-        // Initialize enclave for decryption
-        if (initialize_enclave() < 0) {
-            std::cerr << "Enclave initialization failed!" << std::endl;
-            return -1;
-        }
-        
+        // TDX: No enclave initialization needed
+
         // Create temporary directory for outputs
         std::string output_dir = "/tmp/join_compare_" + std::to_string(time(nullptr));
         mkdir(output_dir.c_str(), 0755);
@@ -350,16 +310,13 @@ int main(int argc, char* argv[]) {
         double sqlite_time = run_timed_command(sqlite_cmd);
         // SQLite done
         
-        // Load and decrypt results
+        // Load results (TDX: no decryption needed)
         // Comparing results
-        Table sgx_encrypted = TableIO::load_csv(sgx_output);
-        Table sgx_decrypted = decrypt_table(sgx_encrypted);
-        
-        Table sqlite_encrypted = TableIO::load_csv(sqlite_output);
-        Table sqlite_result = decrypt_table(sqlite_encrypted);
-        
+        Table sgx_table = TableIO::load_csv(sgx_output);
+        Table sqlite_table = TableIO::load_csv(sqlite_output);
+
         // Compare results
-        ComparisonResult comparison = compare_tables(sgx_decrypted, sqlite_result);
+        ComparisonResult comparison = compare_tables(sgx_table, sqlite_table);
         
         // Print minimal output
         printf("Output: SGX=%zu rows, SQLite=%zu rows\n", comparison.sgx_rows, comparison.sqlite_rows);
@@ -527,15 +484,13 @@ int main(int argc, char* argv[]) {
         } else {
             std::cerr << "Warning: Could not write summary file: " << summary_filename << std::endl;
         }
-        
-        // Cleanup
-        destroy_enclave();
-        
+
+        // TDX: No cleanup needed
+
         return comparison.are_equivalent ? 0 : 1;
-        
+
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
-        destroy_enclave();
         return 1;
     }
 }

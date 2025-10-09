@@ -7,7 +7,7 @@
 
 /**
  * Min-Heap for K-Way Merge Sort
- * 
+ *
  * Maintains a min-heap of entries along with their run indices.
  * Used for efficiently finding the minimum element among k runs.
  */
@@ -18,6 +18,10 @@ typedef struct {
     size_t capacity;      // Maximum capacity
     comparator_func_t compare;  // Comparison function
 } MinHeap;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Initialize heap with given capacity
 void minheap_init(MinHeap* heap, size_t capacity, comparator_func_t compare);
@@ -41,5 +45,9 @@ void heap_destroy(MinHeap* heap);
 
 // Heap sort an array in-place
 void heap_sort(entry_t* array, size_t size, comparator_func_t compare);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // MIN_HEAP_H

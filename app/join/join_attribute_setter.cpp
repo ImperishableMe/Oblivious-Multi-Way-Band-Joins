@@ -1,18 +1,17 @@
 #include "join_attribute_setter.h"
-#include "Enclave_u.h"
 #include "batch_types.h"
 #include <stdexcept>
 #include <sstream>
 
 void JoinAttributeSetter::SetJoinAttributesForTree(JoinTreeNodePtr root) {
     DEBUG_DEBUG("Setting join attributes for tree rooted at %s", root->get_table_name().c_str());
-    
+
     // Process current node
-    SetJoinAttributesForNode(root, eid);
-    
+    SetJoinAttributesForNode(root);
+
     // Recursively process children
     for (auto& child : root->get_children()) {
-        SetJoinAttributesForTree(child, eid);
+        SetJoinAttributesForTree(child);
     }
 }
 
@@ -65,10 +64,10 @@ void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node) {
     }
     
     DEBUG_INFO("Column %s is at index %d", join_column.c_str(), column_index);
-    
+
     // Use batched operation to set join_attr for all entries
     int32_t params[4] = {column_index, 0, 0, 0};
-    Table updated = table.batched_map(eid, OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
+    Table updated = table.batched_map(OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
     
     // Replace the table's entries with the updated ones
     table = updated;
@@ -109,10 +108,10 @@ void JoinAttributeSetter::SetJoinAttributesForTable(Table& table, const std::str
     
     DEBUG_INFO("Setting join_attr for %zu entries using column %s (index %d)",
                table.size(), column_name.c_str(), column_index);
-    
+
     // Use batched operation to set join_attr for all entries
     int32_t params[4] = {column_index, 0, 0, 0};
-    Table updated = table.batched_map(eid, OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
+    Table updated = table.batched_map(OP_ECALL_TRANSFORM_SET_JOIN_ATTR, params);
     
     // Replace the table's entries with the updated ones
     table = updated;

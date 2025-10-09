@@ -3,7 +3,6 @@
 #include <iostream>
 #include <chrono>
 #include "debug_util.h"
-#include "../utils/counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
 
 // Global variables to track sorting metrics across all concatenations
 static double g_total_sort_time = 0.0;
@@ -66,9 +65,8 @@ Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root) {
     return accumulator;
 }
 
-Table AlignConcat::AlignAndConcatenate(const Table& accumulator, 
-                                       const Table& child,
-                                       sgx_enclave_id_t eid) {
+Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
+                                       const Table& child) {
     static int concat_iteration = 0;
     concat_iteration++;
     
@@ -84,16 +82,15 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     DEBUG_INFO("Step 1: Sorting accumulator by join attr, then others");
     Table sorted_accumulator = accumulator;
     
-    // Track accumulator sort timing and ecalls
+    // Track accumulator sort timing
     using Clock = std::chrono::high_resolution_clock;
     auto sort_start = Clock::now();
-    size_t before_sort = get_ecall_count();
-    
+
     sorted_accumulator.shuffle_merge_sort( OP_ECALL_COMPARATOR_JOIN_THEN_OTHER);
-    
+
     double acc_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
-    size_t acc_sort_ecalls = get_ecall_count() - before_sort;
-    DEBUG_INFO("Accumulator sort: %.6fs, %zu ecalls", acc_sort_time, acc_sort_ecalls);
+    size_t acc_sort_ecalls = 0;  // TDX: No ecalls in TDX, set to 0
+    DEBUG_INFO("Accumulator sort: %.6fs", acc_sort_time);
     
     // Step 2: Compute copy indices for child table
     DEBUG_INFO("Step 2: Computing copy indices");
@@ -110,17 +107,16 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     DEBUG_INFO("Step 4: Sorting child by alignment key");
     DEBUG_INFO("Child size before sort: %zu rows", aligned_child.size());
     
-    // Track child sort timing and ecalls
+    // Track child sort timing
     sort_start = Clock::now();
-    before_sort = get_ecall_count();
-    
+
     aligned_child.shuffle_merge_sort( OP_ECALL_COMPARATOR_ALIGNMENT_KEY);
-    
+
     DEBUG_INFO("Child size after sort: %zu rows", aligned_child.size());
-    
+
     double child_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
-    size_t child_sort_ecalls = get_ecall_count() - before_sort;
-    DEBUG_INFO("Child sort: %.6fs, %zu ecalls", child_sort_time, child_sort_ecalls);
+    size_t child_sort_ecalls = 0;  // TDX: No ecalls in TDX, set to 0
+    DEBUG_INFO("Child sort: %.6fs", child_sort_time);
     
     // Update global sorting metrics
     g_accumulator_sort_time += acc_sort_time;
@@ -142,13 +138,13 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     DEBUG_INFO("=== TABLES IMMEDIATELY BEFORE HORIZONTAL CONCATENATION ===");
     
     // Dump sorted accumulator (left side of concatenation)
-    debug_dump_table(result, ("before_concat_accumulator_" + concat_label).c_str(), 
-                    ("align_step5a_before_concat_" + concat_label).c_str(), static_cast<uint32_t>(),
+    debug_dump_table(result, ("before_concat_accumulator_" + concat_label).c_str(),
+                    ("align_step5a_before_concat_" + concat_label).c_str(), 0,
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     // Dump aligned child (right side of concatenation)  
     debug_dump_table(aligned_child, ("before_concat_child_" + concat_label).c_str(),
-                    ("align_step5b_before_concat_" + concat_label).c_str(), static_cast<uint32_t>(),
+                    ("align_step5b_before_concat_" + concat_label).c_str(), 0,
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     DEBUG_INFO("Table sizes - Accumulator: %zu rows, Child: %zu rows", result.size(), aligned_child.size());
@@ -187,7 +183,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     int32_t concat_params[MAX_EXTRA_PARAMS] = {left_attr_count, right_attr_count, 0, 0};
     
     // Use parallel_pass to concatenate attributes from aligned_child
-    result.batched_parallel_pass(aligned_child, eid, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);
+    result.batched_parallel_pass(aligned_child, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);
     
     // Update the result table's schema to include columns from both tables
     std::vector<std::string> combined_schema = result.get_schema();
@@ -200,8 +196,8 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     DEBUG_INFO("Updated schema after concatenation: %zu columns", combined_schema.size());
     
     // Debug: Dump final result - show concatenated attributes WITH ALL COLUMNS
-    debug_dump_table(result, ("final_result_" + concat_label).c_str(), 
-                    ("align_step5_" + concat_label).c_str(), static_cast<uint32_t>(),
+    debug_dump_table(result, ("final_result_" + concat_label).c_str(),
+                    ("align_step5_" + concat_label).c_str(), 0,
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     DEBUG_INFO("========================================");

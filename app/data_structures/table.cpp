@@ -1,8 +1,8 @@
 #include "table.h"
 #include <stdexcept>
 #include <climits>
+#include <cstring>
 #include "debug_util.h"
-#include "Enclave_u.h"
 #include "../batch/ecall_batch_collector.h"
 #include "../algorithms/merge_sort_manager.h"
 #include "../algorithms/shuffle_manager.h"
@@ -189,30 +189,13 @@ std::vector<Entry>::const_iterator Table::end() const {
 }
 
 Table::EncryptionStatus Table::get_encryption_status() const {
-    if (entries.empty()) {
-        return UNENCRYPTED;  // Empty table is considered unencrypted
-    }
-    
-    bool first_is_encrypted = entries[0].is_encrypted;
-    
-    for (size_t i = 1; i < entries.size(); ++i) {
-        if (entries[i].is_encrypted != first_is_encrypted) {
-            return MIXED;  // Found a mismatch
-        }
-    }
-    
-    return first_is_encrypted ? ENCRYPTED : UNENCRYPTED;
+    // TDX migration: All data is now unencrypted (no app-level encryption)
+    return UNENCRYPTED;
 }
 
 // ============================================================================
 // Oblivious Operations Implementation
 // ============================================================================
-
-void Table::check_sgx_status(sgx_status_t status, const std::string& operation) {
-    if (status != SGX_SUCCESS) {
-        throw std::runtime_error("SGX error in " + operation + ": " + std::to_string(status));
-    }
-}
 
 
 

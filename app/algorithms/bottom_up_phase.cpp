@@ -2,7 +2,6 @@
 #include "../join/join_attribute_setter.h"
 #include <iostream>
 #include "debug_util.h"
-#include "../utils/counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
 #include "enclave_types.h"  // For METADATA_* constants
 #include "../batch/ecall_batch_collector.h"  // For batch operations
 
@@ -51,7 +50,7 @@ void BottomUpPhase::Execute(JoinTreeNodePtr root) {
                        DEBUG_COL_FIELD_TYPE | DEBUG_COL_EQUALITY_TYPE | 
                        DEBUG_COL_JOIN_ATTR;
         std::string step_name = "bottomup_step12_final_" + node->get_table_name();
-        debug_dump_with_mask(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), static_cast<uint32_t>(), mask);
+        debug_dump_with_mask(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), 0, mask);
     }
 }
 
@@ -172,8 +171,8 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     // Debug: Dump parent and child tables before combining  
     uint32_t debug_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
                          DEBUG_COL_JOIN_ATTR | DEBUG_COL_ALL_ATTRIBUTES;
-    debug_dump_with_mask(parent, "parent", "bottomup_step1_inputs", static_cast<uint32_t>(), debug_mask);
-    debug_dump_with_mask(child, "child", "bottomup_step1_inputs", static_cast<uint32_t>(), debug_mask);
+    debug_dump_with_mask(parent, "parent", "bottomup_step1_inputs", 0, debug_mask);
+    debug_dump_with_mask(child, "child", "bottomup_step1_inputs", 0, debug_mask);
     
     // Step 1: Create combined table with dual-entry technique
     DEBUG_INFO("Creating combined table from parent (%zu) and child (%zu)",
@@ -185,7 +184,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     uint32_t combined_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
                             DEBUG_COL_FIELD_TYPE | DEBUG_COL_EQUALITY_TYPE | 
                             DEBUG_COL_JOIN_ATTR | DEBUG_COL_ALL_ATTRIBUTES;
-    debug_dump_with_mask(combined, "combined", "bottomup_step2_combine", static_cast<uint32_t>(), combined_mask);
+    debug_dump_with_mask(combined, "combined", "bottomup_step2_combine", 0, combined_mask);
     
     // Step 2: Initialize temporary fields (local_cumsum = local_mult, local_interval = 0)
     DEBUG_INFO("Initializing temporary fields");
@@ -196,7 +195,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     uint32_t init_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE | 
                         DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | 
                         DEBUG_COL_LOCAL_CUMSUM | DEBUG_COL_LOCAL_INTERVAL;
-    debug_dump_with_mask(combined, "initialized", "bottomup_step3_init_temps", static_cast<uint32_t>(), init_mask);
+    debug_dump_with_mask(combined, "initialized", "bottomup_step3_init_temps", 0, init_mask);
     
     // Step 3: Sort by join attribute and precedence
     DEBUG_INFO("Sorting combined table by join attribute - BATCHED");
@@ -204,35 +203,35 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     DEBUG_INFO("Sort completed");
     
     // Debug: Dump after sorting by join attribute
-    debug_dump_with_mask(combined, "sorted_by_join", "bottomup_step4_sorted", static_cast<uint32_t>(), init_mask);
+    debug_dump_with_mask(combined, "sorted_by_join", "bottomup_step4_sorted", 0, init_mask);
     
     // Step 4: Compute local cumulative sums
     DEBUG_INFO("Computing local cumulative sums");
     combined.batched_linear_pass( OP_ECALL_WINDOW_COMPUTE_LOCAL_SUM);
     
     // Debug: Dump after computing cumulative sums
-    debug_dump_with_mask(combined, "with_cumsum", "bottomup_step5_cumsum", static_cast<uint32_t>(), init_mask);
+    debug_dump_with_mask(combined, "with_cumsum", "bottomup_step5_cumsum", 0, init_mask);
     
     // Step 5: Sort for pairwise processing (group START/END pairs)
     DEBUG_INFO("Sorting for pairwise processing");
     combined.shuffle_merge_sort( OP_ECALL_COMPARATOR_PAIRWISE);
     
     // Debug: Dump after sorting for pairwise
-    debug_dump_with_mask(combined, "sorted_pairwise", "bottomup_step6_pairwise", static_cast<uint32_t>(), init_mask);
+    debug_dump_with_mask(combined, "sorted_pairwise", "bottomup_step6_pairwise", 0, init_mask);
     
     // Step 6: Compute intervals between START/END pairs
     DEBUG_INFO("Computing intervals between START/END pairs");
     combined.batched_linear_pass( OP_ECALL_WINDOW_COMPUTE_LOCAL_INTERVAL);
     
     // Debug: Dump after computing intervals
-    debug_dump_with_mask(combined, "with_intervals", "bottomup_step7_intervals", static_cast<uint32_t>(), init_mask);
+    debug_dump_with_mask(combined, "with_intervals", "bottomup_step7_intervals", 0, init_mask);
     
     // Step 7: Sort END entries first for final update
     DEBUG_INFO("Sorting END entries first");
     combined.shuffle_merge_sort( OP_ECALL_COMPARATOR_END_FIRST);
     
     // Debug: Dump after sorting END first
-    debug_dump_with_mask(combined, "sorted_end_first", "bottomup_step8_end_first", static_cast<uint32_t>(), init_mask);
+    debug_dump_with_mask(combined, "sorted_end_first", "bottomup_step8_end_first", 0, init_mask);
     
     // Step 8: Truncate to parent size - now we have END entries with computed intervals
     // The first parent.size() entries are now the END entries with computed intervals
@@ -246,19 +245,19 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     // Debug: Dump truncated END entries with intervals
     uint32_t key_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
                        DEBUG_COL_LOCAL_INTERVAL | DEBUG_COL_FIELD_TYPE;
-    debug_dump_with_mask(truncated, "truncated_ends", "bottomup_step9_truncated", static_cast<uint32_t>(), key_mask);
+    debug_dump_with_mask(truncated, "truncated_ends", "bottomup_step9_truncated", 0, key_mask);
     
     // Step 9: Update parent multiplicities using parallel pass
     // This multiplies parent's local_mult by the computed interval from END entries
     DEBUG_INFO("Updating parent multiplicities");
     
     // Debug: Parent before update
-    debug_dump_with_mask(parent, "parent_before", "bottomup_step10_parent_before", static_cast<uint32_t>(), key_mask);
+    debug_dump_with_mask(parent, "parent_before", "bottomup_step10_parent_before", 0, key_mask);
     
     truncated.batched_parallel_pass(parent, OP_ECALL_UPDATE_TARGET_MULTIPLICITY);
     
     // Debug: Parent after update
-    debug_dump_with_mask(parent, "parent_after", "bottomup_step11_parent_after", static_cast<uint32_t>(), key_mask);
+    debug_dump_with_mask(parent, "parent_after", "bottomup_step11_parent_after", 0, key_mask);
     DEBUG_INFO("Parent multiplicities updated");
 }
 

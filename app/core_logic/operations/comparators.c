@@ -131,7 +131,8 @@ void comparator_join_attr_op(entry_t* e1, entry_t* e2) {
  * Comparator by join attribute with decrypt/encrypt wrapper
  */
 void comparator_join_attr(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, comparator_join_attr_op);
+    // TDX: Direct call, no encryption wrapper needed
+    comparator_join_attr_op(e1, e2);
 }
 
 /**
@@ -174,7 +175,8 @@ void comparator_pairwise_op(entry_t* e1, entry_t* e2) {
  * Comparator for pairwise processing with decrypt/encrypt wrapper
  */
 void comparator_pairwise(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, comparator_pairwise_op);
+    // TDX: Direct call, no encryption wrapper needed
+    comparator_pairwise_op(e1, e2);
 }
 
 /**
@@ -209,7 +211,8 @@ void comparator_end_first_op(entry_t* e1, entry_t* e2) {
  * Comparator with END entries first with decrypt/encrypt wrapper
  */
 void comparator_end_first(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, comparator_end_first_op);
+    // TDX: Direct call, no encryption wrapper needed
+    comparator_end_first_op(e1, e2);
 }
 
 /**
@@ -249,7 +252,8 @@ void comparator_join_then_other_op(entry_t* e1, entry_t* e2) {
  * Comparator by join attribute then all attributes with decrypt/encrypt wrapper
  */
 void comparator_join_then_other(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, comparator_join_then_other_op);
+    // TDX: Direct call, no encryption wrapper needed
+    comparator_join_then_other_op(e1, e2);
 }
 
 /**
@@ -271,7 +275,8 @@ void comparator_original_index_op(entry_t* e1, entry_t* e2) {
  * Comparator by original index only with decrypt/encrypt wrapper
  */
 void comparator_original_index(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, comparator_original_index_op);
+    // TDX: Direct call, no encryption wrapper needed
+    comparator_original_index_op(e1, e2);
 }
 
 /**
@@ -311,7 +316,8 @@ void comparator_alignment_key_op(entry_t* e1, entry_t* e2) {
  * Comparator by alignment key with decrypt/encrypt wrapper
  */
 void comparator_alignment_key(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, comparator_alignment_key_op);
+    // TDX: Direct call, no encryption wrapper needed
+    comparator_alignment_key_op(e1, e2);
 }
 
 /**
@@ -346,7 +352,8 @@ void comparator_padding_last_op(entry_t* e1, entry_t* e2) {
  * Comparator to put DIST_PADDING entries last with decrypt/encrypt wrapper
  */
 void comparator_padding_last(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, comparator_padding_last_op);
+    // TDX: Direct call, no encryption wrapper needed
+    comparator_padding_last_op(e1, e2);
 }
 
 /**
@@ -377,6 +384,7 @@ void comparator_distribute_op(entry_t* e1, entry_t* e2) {
  * Comparator for distribution phase with decrypt/encrypt wrapper
  */
 void comparator_distribute(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, comparator_distribute_op);
+    // TDX: Direct call, no encryption wrapper needed
+    comparator_distribute_op(e1, e2);
 }
 

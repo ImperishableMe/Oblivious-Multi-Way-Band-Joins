@@ -5,12 +5,10 @@
 #include <vector>
 #include "../data_structures/data_structures.h"
 #include "../join/join_tree_node.h"
-#include "Enclave_u.h"
-#include "sgx_urts.h"
 
 /**
  * ObliviousJoin Class
- * 
+ *
  * Orchestrates the complete oblivious multi-way band join algorithm.
  * Combines all four phases to produce the final join result:
  * 

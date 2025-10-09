@@ -95,8 +95,7 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root) {
     return result;
 }
 
-Table ObliviousJoin::ExecuteWithDebug(JoinTreeNodePtr root, 
-                                       sgx_enclave_id_t eid,
+Table ObliviousJoin::ExecuteWithDebug(JoinTreeNodePtr root,
                                        const std::string& session_name) {
     // Initialize debug session
     debug_init_session(session_name.c_str());

@@ -5,8 +5,6 @@
 #include <string>
 #include <map>
 #include <dirent.h>
-#include "sgx_urts.h"
-#include "Enclave_u.h"
 #include "algorithms/oblivious_join.h"
 #include "join/join_tree_node.h"
 #include "join/join_tree_builder.h"
@@ -14,32 +12,6 @@
 #include "debug_util.h"
 #include "file_io/table_io.h"
 #include "batch/ecall_wrapper.h"
-
-/* Global enclave ID */
-sgx_enclave_id_t global_eid = 0;
-
-/* Initialize the enclave */
-int initialize_enclave() {
-    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
-    
-    /* Call sgx_create_enclave to initialize an enclave instance */
-    ret = sgx_create_enclave("enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
-    if (ret != SGX_SUCCESS) {
-        std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
-        return -1;
-    }
-    
-    // Enclave initialized
-    return 0;
-}
-
-/* Destroy the enclave */
-void destroy_enclave() {
-    if (global_eid != 0) {
-        sgx_destroy_enclave(global_eid);
-        // Enclave destroyed
-    }
-}
 
 /* Parse SQL query from file and build join tree */
 JoinTreeNodePtr parse_sql_query(const std::string& query_file, 
@@ -78,8 +50,8 @@ JoinTreeNodePtr parse_sql_query(const std::string& query_file,
 void print_usage(const char* program_name) {
     std::cout << "Usage: " << program_name << " <query_file> <input_dir> <output_file>" << std::endl;
     std::cout << "  query_file  : SQL query file (.sql)" << std::endl;
-    std::cout << "  input_dir   : Directory containing encrypted CSV table files" << std::endl;
-    std::cout << "  output_file : Output file for encrypted join result" << std::endl;
+    std::cout << "  input_dir   : Directory containing CSV table files" << std::endl;
+    std::cout << "  output_file : Output file for join result" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -91,16 +63,10 @@ int main(int argc, char* argv[]) {
     std::string query_file = argv[1];
     std::string input_dir = argv[2];
     std::string output_file = argv[3];
-    
-    // Starting SGX oblivious join
-    
+
+    // Starting TDX oblivious join
+
     try {
-        // Initialize the enclave
-        if (initialize_enclave() < 0) {
-            std::cerr << "Enclave initialization failed!" << std::endl;
-            return -1;
-        }
-        
         // Load all CSV files from input directory
         std::map<std::string, Table> tables;
         
@@ -129,31 +95,27 @@ int main(int argc, char* argv[]) {
         
         // Parse SQL query and build join tree
         JoinTreeNodePtr join_tree = parse_sql_query(query_file, tables);
-        
+
         // Reset counters before execution
         reset_ecall_count();
         reset_ocall_count();
-        
+
         // Execute oblivious join with debug output
-        Table result = ObliviousJoin::ExecuteWithDebug(join_tree, global_eid, "oblivious_join");
-        
-        // Save result (encrypted with nonce)
-        TableIO::save_encrypted_csv(result, output_file, global_eid);
+        Table result = ObliviousJoin::ExecuteWithDebug(join_tree, "oblivious_join");
+
+        // Save result
+        TableIO::save_csv(result, output_file);
         printf("Result: %zu rows\n", result.size());
-        
-        // Output ecall and ocall counts in parseable format
-        printf("ECALL_COUNT: %zu\n", get_ecall_count());
-        printf("OCALL_COUNT: %zu\n", get_ocall_count());
-        
-        // Cleanup
-        destroy_enclave();
-        
+
+        // Output operation counts in parseable format
+        printf("OPERATION_COUNT: %zu\n", get_ecall_count());
+        printf("CALLBACK_COUNT: %zu\n", get_ocall_count());
+
         // Join complete
         return 0;
-        
+
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
-        destroy_enclave();
         return 1;
     }
 }

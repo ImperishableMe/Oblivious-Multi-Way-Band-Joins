@@ -62,15 +62,15 @@
 
 ## Phase 5: Remove Encryption Layer (2 hours)
 
-- [ ] **5.1** Delete directory `app/crypto/` entirely
-- [ ] **5.2** Delete `main/tools/encrypt_tables.cpp`
-- [ ] **5.3** Search for `CryptoUtils::encrypt_entry()` calls - remove all
-- [ ] **5.4** Search for `CryptoUtils::decrypt_entry()` calls - remove all
-- [ ] **5.5** Update `app/data_structures/table.cpp` - remove encryption operations
-- [ ] **5.6** Grep for `#include "crypto/crypto_utils.h"` - remove from all files
-- [ ] **5.7** Grep for `#include "entry_crypto.h"` - remove or keep minimal
-- [ ] **5.8** Update `main/sgx_join/main.cpp` - remove any encrypt/decrypt on input/output
-- [ ] **5.9** Commit: "Phase 5: Remove encryption layer completely"
+- [x] **5.1** Delete directory `app/crypto/` entirely
+- [x] **5.2** Delete `main/tools/encrypt_tables.cpp`
+- [x] **5.3** Search for `CryptoUtils::encrypt_entry()` calls - remove all
+- [x] **5.4** Search for `CryptoUtils::decrypt_entry()` calls - remove all
+- [x] **5.5** Update `app/data_structures/table.cpp` - remove encryption operations
+- [x] **5.6** Grep for `#include "crypto/crypto_utils.h"` - remove from all files
+- [x] **5.7** Grep for `#include "entry_crypto.h"` - remove or keep minimal
+- [x] **5.8** Update `main/sgx_join/main.cpp` - remove any encrypt/decrypt on input/output
+- [x] **5.9** Commit: "Phase 5: Remove encryption layer completely"
 
 ---
 

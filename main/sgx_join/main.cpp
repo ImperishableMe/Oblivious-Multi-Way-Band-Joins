@@ -11,7 +11,6 @@
 #include "query/query_parser.h"
 #include "debug_util.h"
 #include "file_io/table_io.h"
-#include "batch/ecall_wrapper.h"
 
 /* Parse SQL query from file and build join tree */
 JoinTreeNodePtr parse_sql_query(const std::string& query_file, 
@@ -96,20 +95,12 @@ int main(int argc, char* argv[]) {
         // Parse SQL query and build join tree
         JoinTreeNodePtr join_tree = parse_sql_query(query_file, tables);
 
-        // Reset counters before execution
-        reset_ecall_count();
-        reset_ocall_count();
-
         // Execute oblivious join with debug output
         Table result = ObliviousJoin::ExecuteWithDebug(join_tree, "oblivious_join");
 
         // Save result
         TableIO::save_csv(result, output_file);
         printf("Result: %zu rows\n", result.size());
-
-        // Output operation counts in parseable format
-        printf("OPERATION_COUNT: %zu\n", get_ecall_count());
-        printf("CALLBACK_COUNT: %zu\n", get_ocall_count());
 
         // Join complete
         return 0;

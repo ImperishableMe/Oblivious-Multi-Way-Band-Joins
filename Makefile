@@ -42,7 +42,6 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/algorithms/oblivious_join.cpp \
                  app/algorithms/merge_sort_manager.cpp \
                  app/algorithms/shuffle_manager.cpp \
-                 app/batch/ecall_wrapper.cpp \
                  app/debug_stubs.cpp \
                  app/core_logic_callbacks.cpp
 
@@ -139,7 +138,6 @@ Test_Common_Objects := app/file_io/converters.o \
                       app/join/join_attribute_setter.o \
                       app/algorithms/merge_sort_manager.o \
                       app/algorithms/shuffle_manager.o \
-                      app/batch/ecall_wrapper.o \
                       app/core_logic_callbacks.o \
                       app/debug_stubs.o \
                       $(App_C_Files:.c=.o)

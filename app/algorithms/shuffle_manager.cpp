@@ -6,23 +6,7 @@
 // Static member initialization
 ShuffleManager* ShuffleManager::current_instance = nullptr;
 
-// Global ocall handlers (extern "C" for EDL)
-extern "C" {
-    void ocall_flush_to_group(int group_idx, entry_t* buffer, size_t buffer_size) {
-        g_ocall_count.fetch_add(1, std::memory_order_relaxed);  // Count the ocall
-        ShuffleManager::handle_flush_to_group(group_idx, buffer, buffer_size);
-    }
-    
-    void ocall_refill_from_group(int group_idx, entry_t* buffer, size_t buffer_size, size_t* actual_filled) {
-        g_ocall_count.fetch_add(1, std::memory_order_relaxed);  // Count the ocall
-        ShuffleManager::handle_refill_from_group(group_idx, buffer, buffer_size, actual_filled);
-    }
-    
-    void ocall_flush_output(entry_t* buffer, size_t buffer_size) {
-        g_ocall_count.fetch_add(1, std::memory_order_relaxed);  // Count the ocall
-        ShuffleManager::handle_flush_output(buffer, buffer_size);
-    }
-}
+// Note: ocall handlers removed - no longer needed without enclave
 
 ShuffleManager::ShuffleManager() 
      {

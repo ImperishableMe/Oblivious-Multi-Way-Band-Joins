@@ -34,7 +34,7 @@ public:
      * @param eid SGX enclave ID for secure operations
      * @return Final join result table
      */
-    static Table Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid);
+    static Table Execute(JoinTreeNodePtr root);
     
     /**
      * Get sorting metrics collected during align-concat phase
@@ -65,7 +65,7 @@ private:
      * @param eid SGX enclave ID
      * @return Accumulated join result for this subtree
      */
-    static Table ConstructJoinResult(JoinTreeNodePtr root, sgx_enclave_id_t eid);
+    static Table ConstructJoinResult(JoinTreeNodePtr root);
     
     /**
      * Align child table with accumulator and concatenate
@@ -108,7 +108,7 @@ private:
      * @param eid SGX enclave ID
      * @return Table with copy indices set
      */
-    static Table ComputeCopyIndices(const Table& table, sgx_enclave_id_t eid);
+    static Table ComputeCopyIndices(const Table& table);
     
     /**
      * Compute alignment keys for child table
@@ -118,7 +118,7 @@ private:
      * @param eid SGX enclave ID
      * @return Table with alignment keys computed
      */
-    static Table ComputeAlignmentKeys(const Table& table, sgx_enclave_id_t eid);
+    static Table ComputeAlignmentKeys(const Table& table);
 };
 
 #endif // ALIGN_CONCAT_H

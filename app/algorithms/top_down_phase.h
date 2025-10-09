@@ -23,7 +23,7 @@ public:
      * @param root Root of the join tree (with local_mult already computed)
      * @param eid Enclave ID for secure operations
      */
-    static void Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid);
+    static void Execute(JoinTreeNodePtr root);
 
 private:
     /**
@@ -32,7 +32,7 @@ private:
      * @param node Root node to initialize
      * @param eid Enclave ID
      */
-    static void InitializeRootTable(JoinTreeNodePtr node, sgx_enclave_id_t eid);
+    static void InitializeRootTable(JoinTreeNodePtr node);
     
     /**
      * Initialize foreign fields for a table
@@ -40,7 +40,7 @@ private:
      * @param node Node to initialize
      * @param eid Enclave ID
      */
-    static void InitializeForeignFields(JoinTreeNodePtr node, sgx_enclave_id_t eid);
+    static void InitializeForeignFields(JoinTreeNodePtr node);
     
     /**
      * Create combined table for foreign computation

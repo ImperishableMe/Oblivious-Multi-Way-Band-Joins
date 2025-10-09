@@ -48,16 +48,12 @@
 // The infinity values are just outside the valid range, making them easy to detect
 // Since we never perform inf + inf operations, this approach is safe
 
-// Entry structure for enclave processing
+// Entry structure for TDX processing
 typedef struct {
-    // Entry metadata (using int32_t for consistency across encrypt/decrypt)
+    // Entry metadata
     int32_t field_type;           // SORT_PADDING, SOURCE, START, END, TARGET, DIST_PADDING
     int32_t equality_type;        // EQ, NEQ, NONE
-    uint8_t is_encrypted;         // Whether data is encrypted (0 or 1)
-    
-    // Encryption nonce for AES-CTR mode
-    uint64_t nonce;               // Unique nonce for each encryption
-    
+
     // Join attribute (using int32_t for signed arithmetic)
     int32_t join_attr;
     

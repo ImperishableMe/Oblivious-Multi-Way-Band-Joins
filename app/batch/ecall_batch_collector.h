@@ -5,8 +5,6 @@
 #include <unordered_map>
 #include <functional>
 #include <string>
-#include "sgx_eid.h"
-#include "sgx_error.h"
 #include "batch_types.h"
 #include "types_common.h"
 #include "../data_structures/entry.h"
@@ -20,20 +18,19 @@ struct BatchStats {
 };
 
 /**
- * EcallBatchCollector - Batches multiple ecall operations to reduce SGX overhead
- * 
- * This class collects operations that would normally be individual ecalls
- * and batches them into a single ecall to the enclave. This dramatically
- * reduces the overhead of SGX transitions.
- * 
+ * EcallBatchCollector - Batches multiple operations to improve performance
+ *
+ * This class collects operations and batches them into a single call
+ * to the batch dispatcher. This reduces overhead and improves performance.
+ *
  * Features:
  * - Automatic deduplication of entries
  * - Auto-flush at configurable batch size
  * - Manual flush capability
  * - RAII - destructor ensures pending operations are flushed
- * 
+ *
  * Usage:
- *   EcallBatchCollector collector(eid, OP_ECALL_COMPARATOR_JOIN_ATTR);
+ *   EcallBatchCollector collector(OP_ECALL_COMPARATOR_JOIN_ATTR);
  *   for (...) {
  *     collector.add_operation(entry1, entry2);  // Automatically flushes at batch size
  *   }
@@ -43,35 +40,30 @@ class EcallBatchCollector {
 private:
     // Forward mapping: Entry pointer -> batch array index
     std::unordered_map<Entry*, int32_t> entry_map;
-    
+
     // Reverse mapping: batch array index -> Entry pointer (for write-back)
     std::vector<Entry*> entry_pointers;
-    
-    // Batch data to send to enclave (converted to entry_t format)
+
+    // Batch data (converted to entry_t format)
     std::vector<entry_t> batch_data;
-    
-    // Operations to execute in the enclave
+
+    // Operations to execute
     std::vector<BatchOperation> operations;
-    
+
     // Configuration
-    sgx_enclave_id_t eid;
     OpEcall op_type;
     size_t max_batch_size;
-    
+
     // Statistics for performance monitoring
     BatchStats stats;
-    
-    // Helper to check SGX status
-    void check_sgx_status(sgx_status_t status, const std::string& operation);
-    
+
 public:
     /**
      * Constructor
-     * @param eid SGX enclave ID
      * @param op Operation type to batch
      * @param max_size Maximum batch size before auto-flush (default: MAX_BATCH_SIZE)
      */
-    EcallBatchCollector(sgx_enclave_id_t eid, OpEcall op, size_t max_size = MAX_BATCH_SIZE);
+    EcallBatchCollector(OpEcall op, size_t max_size = MAX_BATCH_SIZE);
     
     /**
      * Add a two-parameter operation to the batch

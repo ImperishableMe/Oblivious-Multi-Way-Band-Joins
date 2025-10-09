@@ -249,40 +249,40 @@ void Table::batched_distribute_pass(sgx_enclave_id_t eid, size_t distance, OpEca
 // Batched Operations Implementation
 // ============================================================================
 
-Table Table::batched_map(sgx_enclave_id_t eid, OpEcall op_type, int32_t* params) const {
+Table Table::batched_map(OpEcall op_type, int32_t* params) const {
     DEBUG_TRACE("Table::batched_map: Starting with %zu entries, op_type=%d", entries.size(), op_type);
-    
+
     Table result(table_name, schema_column_names);  // Preserve schema
     result.set_num_columns(num_columns);
-    
+
     // Copy entries to result first (since we can't modify const entries)
     for (const auto& entry : entries) {
         result.add_entry(entry);
     }
-    
+
     // Create batch collector
-    EcallBatchCollector collector(eid, op_type);
-    
+    EcallBatchCollector collector(op_type);
+
     // Add all operations for map (single entry operations)
     for (size_t i = 0; i < result.entries.size(); i++) {
         collector.add_operation(result.entries[i], params);
     }
-    
+
     // Flush the batch - this writes back to result.entries
     collector.flush();
-    
+
     DEBUG_TRACE("Table::batched_map: Complete with %zu entries", result.size());
     return result;
 }
 
-void Table::batched_linear_pass(sgx_enclave_id_t eid, OpEcall op_type, int32_t* params) {
+void Table::batched_linear_pass(OpEcall op_type, int32_t* params) {
     if (entries.size() < 2) return;
-    
+
     DEBUG_TRACE("Table::batched_linear_pass: Starting with %zu entries, op_type=%d", entries.size(), op_type);
-    
+
     // Create batch collector
-    EcallBatchCollector collector(eid, op_type);
-    
+    EcallBatchCollector collector(op_type);
+
     // Add all window operations - work directly with Entry objects
     for (size_t i = 0; i < entries.size() - 1; i++) {
         collector.add_operation(entries[i], entries[i+1], params);

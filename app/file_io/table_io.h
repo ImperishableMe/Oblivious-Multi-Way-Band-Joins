@@ -7,25 +7,17 @@
 #include <memory>
 #include <fstream>
 #include "../data_structures/data_structures.h"
-#include "../crypto/crypto_utils.h"
-#include "sgx_urts.h"
 
 /**
  * TableIO Class
- * 
- * Handles loading and saving tables in various formats:
- * - CSV: Plain text format for initial data (TPC-H tables)
- * - Encrypted binary: Pre-encrypted format for production use
- * 
+ *
+ * Handles loading and saving tables in CSV format:
+ * - CSV: Plain text format for data (TPC-H tables)
+ *
  * CSV Format:
  * - First row contains column headers
  * - Subsequent rows contain data values
  * - All values are numeric (as seen in the TPC-H data)
- * 
- * Encrypted Binary Format:
- * - Header with metadata (magic, version, counts, table name)
- * - Array of encrypted entry_t structures
- * - Can be loaded directly without re-encryption
  */
 
 class TableIO {
@@ -39,34 +31,11 @@ public:
     static Table load_csv(const std::string& filepath);
     
     /**
-     * Save a Table to CSV format (PLAINTEXT ONLY)
-     * IMPORTANT: This enforces that ALL entries must have is_encrypted=false.
-     *            Use this for debugging or when you explicitly need plaintext output.
+     * Save a Table to CSV format
      * @param table Table to save
      * @param filepath Output CSV file path
-     * @throws runtime_error if any entry has is_encrypted=true
      */
     static void save_csv(const Table& table, const std::string& filepath);
-    
-    // Encrypted CSV Operations
-    
-    /**
-     * Save a table as encrypted CSV with nonce column
-     * IMPORTANT: Ensures ALL entries are encrypted before saving.
-     *            Any unencrypted entries will be automatically encrypted.
-     *            Output CSV contains ciphertext values and a nonce column.
-     * The encryption key is stored securely inside the enclave
-     * @param table Table to encrypt and save
-     * @param filepath Output CSV file path
-     * @param eid Enclave ID for encryption
-     * @throws runtime_error if encryption fails
-     */
-    static void save_encrypted_csv(const Table& table, 
-                                   const std::string& filepath,
-                                   sgx_enclave_id_t eid);
-    
-    // load_encrypted_csv has been deprecated
-    // Use load_csv() instead - it auto-detects encryption by checking for nonce column
     
     // Batch Operations
     /**
@@ -78,12 +47,11 @@ public:
         load_csv_directory(const std::string& dir_path);
     
     /**
-     * Load all tables from a directory (plain CSV or encrypted CSV)
-     * Auto-detects encryption by checking for nonce column in each file.
+     * Load all tables from a directory
      * @param dir_path Directory path
      * @return Map of table name to Table object
      */
-    static std::unordered_map<std::string, Table> 
+    static std::unordered_map<std::string, Table>
         load_tables_from_directory(const std::string& dir_path);
     
     // Utility Functions

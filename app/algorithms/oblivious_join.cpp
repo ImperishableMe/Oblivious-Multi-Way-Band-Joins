@@ -8,9 +8,7 @@
 #include <functional>
 #include <chrono>
 #include "debug_util.h"
-
-// Include counted ecalls (includes Enclave_u.h and ecall_wrapper.h)
-#include "../utils/counted_ecalls.h"
+#include "../batch/ecall_wrapper.h"
 
 // Helper function to calculate total size of all tables in tree
 static size_t GetTotalTreeSize(JoinTreeNodePtr node) {
@@ -29,10 +27,7 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root) {
     if (!ValidateJoinTree(root)) {
         throw std::runtime_error("Invalid join tree structure");
     }
-    
-    // Check initial encryption state
-    AssertTreeConsistentEncryption(root);
-    
+
     // Timing and ecall counting variables
     using Clock = std::chrono::high_resolution_clock;
     auto start_time = Clock::now();
@@ -43,37 +38,30 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root) {
     size_t start_ecalls = get_ecall_count();
     
     // Phase 1: Bottom-Up - Compute local multiplicities
-    AssertTreeConsistentEncryption(root);
     phase_start = Clock::now();
     size_t before_phase = get_ecall_count();
     BottomUpPhase::Execute(root);
     auto bottom_up_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t bottom_up_ecalls = get_ecall_count() - before_phase;
     size_t bottom_up_size = GetTotalTreeSize(root);
-    AssertTreeConsistentEncryption(root);
-    
+
     // Phase 2: Top-Down - Compute final multiplicities
-    AssertTreeConsistentEncryption(root);
     phase_start = Clock::now();
     before_phase = get_ecall_count();
     TopDownPhase::Execute(root);
     auto top_down_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t top_down_ecalls = get_ecall_count() - before_phase;
     size_t top_down_size = GetTotalTreeSize(root);
-    AssertTreeConsistentEncryption(root);
-    
+
     // Phase 3: Distribute-Expand - Replicate tuples
-    AssertTreeConsistentEncryption(root);
     phase_start = Clock::now();
     before_phase = get_ecall_count();
     DistributeExpand::Execute(root);
     auto distribute_expand_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t distribute_expand_ecalls = get_ecall_count() - before_phase;
     size_t distribute_expand_size = GetTotalTreeSize(root);
-    AssertTreeConsistentEncryption(root);
-    
+
     // Phase 4: Align-Concat - Construct result
-    AssertTreeConsistentEncryption(root);
     AlignConcat::ResetSortingMetrics();  // Reset metrics before execution
     phase_start = Clock::now();
     before_phase = get_ecall_count();
@@ -81,10 +69,7 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root) {
     auto align_concat_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t align_concat_ecalls = get_ecall_count() - before_phase;
     size_t align_concat_size = result.size();  // Final result size
-    
-    // Check final result encryption state
-    AssertConsistentEncryption(result);
-    
+
     // Calculate total time and ecalls
     auto total_time = std::chrono::duration<double>(Clock::now() - start_time).count();
     size_t total_ecalls = get_ecall_count() - start_ecalls;

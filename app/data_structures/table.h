@@ -112,33 +112,29 @@ public:
      * ShuffleMergeSort: Two-phase oblivious sort
      * Phase 1: Oblivious shuffle using ShuffleManager (Waksman network)
      * Phase 2: Non-oblivious merge sort using MergeSortManager
-     * @param eid SGX enclave ID
      * @param op_type Comparator operation type
      */
-    void shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type);
-    
+    void shuffle_merge_sort(OpEcall op_type);
+
     /**
      * BatchedDistributePass: Batched version of distribute_pass
-     * @param eid SGX enclave ID
      * @param distance Distance between pairs to process
      * @param op_type Operation type for batch dispatcher
      * @param params Optional parameters for operations (can be nullptr)
      */
-    void batched_distribute_pass(sgx_enclave_id_t eid, size_t distance, OpEcall op_type, int32_t* params = nullptr);
+    void batched_distribute_pass(size_t distance, OpEcall op_type, int32_t* params = nullptr);
     
     /**
-     * AddBatchedPadding: Add multiple padding entries using batched ecalls
+     * AddBatchedPadding: Add multiple padding entries using batched operations
      * @param count Number of padding entries to add
-     * @param eid SGX enclave ID
-     * @param encryption_status Encryption status to match table
+     * @param padding_op Operation type for padding creation
      */
-    void add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encryption_status, OpEcall padding_op = OP_ECALL_TRANSFORM_CREATE_DIST_PADDING);
-    
+    void add_batched_padding(size_t count, OpEcall padding_op = OP_ECALL_TRANSFORM_CREATE_DIST_PADDING);
+
     /**
      * PadToShuffleSize: Pad table to 2^a * k^b format for shuffle operations
-     * @param eid SGX enclave ID
      */
-    void pad_to_shuffle_size(sgx_enclave_id_t eid);
+    void pad_to_shuffle_size();
     
     /**
      * CalculateShufflePadding: Calculate target size for shuffle (2^a * k^b)

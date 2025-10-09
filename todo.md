@@ -17,25 +17,26 @@
 - [x] **2.3** Update `app/data_structures/entry.cpp` - remove encryption field initialization
 - [x] **2.4** Fix `toEntryT()` and `fromEntryT()` methods
 - [x] **2.5** Compile and fix immediate errors from removed fields
-- [ ] **2.6** Commit: "Phase 2: Remove encryption fields from Entry structure"
+- [x] **2.6** Commit: "Phase 2: Remove encryption fields from Entry structure"
 
 ---
 
 ## Phase 3: Merge Enclave Code into App (2 hours)
 
-- [ ] **3.1** Create directory `app/core_logic/algorithms`
-- [ ] **3.2** Create directory `app/core_logic/operations`
-- [ ] **3.3** Create directory `app/core_logic/batch`
-- [ ] **3.4** Copy algorithms: heap_sort.c, k_way_merge.c, k_way_shuffle.c, oblivious_waksman.c/h, min_heap.c/h
-- [ ] **3.5** Copy operations: comparators.c, window_functions.c, transform_functions.c, distribute_functions.c, merge_comparators.c
-- [ ] **3.6** Copy batch: batch_dispatcher.c/h
-- [ ] **3.7** Copy core.h to app/core_logic/
-- [ ] **3.8** Update include paths in all copied files (../../common → ../../../common)
-- [ ] **3.9** Remove `#include "../crypto/..."` lines from all copied files
-- [ ] **3.10** Remove `#include "Enclave_t.h"` from all copied files
-- [ ] **3.11** Remove `#ifdef ENCLAVE_BUILD` conditionals (keep the code)
-- [ ] **3.12** Update `oblivious_waksman.c` - replace SGX RNG with standard RNG (/dev/urandom)
-- [ ] **3.13** Commit: "Phase 3: Merge enclave code into app/core_logic"
+- [x] **3.1** Create directory `app/core_logic/algorithms`
+- [x] **3.2** Create directory `app/core_logic/operations`
+- [x] **3.3** Create directory `app/core_logic/batch`
+- [x] **3.4** Copy algorithms: heap_sort.c, k_way_merge.c, k_way_shuffle.c, oblivious_waksman.c/h, min_heap.c/h
+- [x] **3.5** Copy operations: comparators.c, window_functions.c, transform_functions.c, distribute_functions.c, merge_comparators.c
+- [x] **3.6** Copy batch: batch_dispatcher.c/h
+- [x] **3.7** Copy core.h to app/core_logic/
+- [x] **3.8** Update batch_dispatcher - remove crypto includes and encryption logic
+- [ ] **3.9** Update include paths in all copied files (../../common → ../../../common)
+- [ ] **3.10** Remove `#include "../crypto/..."` lines from all copied files
+- [ ] **3.11** Remove `#include "Enclave_t.h"` from all copied files
+- [ ] **3.12** Remove `#ifdef ENCLAVE_BUILD` conditionals (keep the code)
+- [ ] **3.13** Update `oblivious_waksman.c` - replace SGX RNG with standard RNG (/dev/urandom)
+- [ ] **3.14** Commit: "Phase 3: Merge enclave code into app/core_logic"
 
 ---
 

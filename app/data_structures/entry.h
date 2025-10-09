@@ -11,21 +11,17 @@
 
 /**
  * Entry Class - Represents a single row/tuple in a table
- * 
+ *
  * Encapsulates all metadata and attributes for oblivious multi-way band join processing.
- * Supports conversion between C++ and C structs for SGX enclave communication.
+ * Supports conversion between C++ and C structs for TDX processing.
  */
 class Entry {
 public:
-    // Entry metadata (using int32_t for consistency with enclave struct)
+    // Entry metadata (using int32_t for consistency with entry_t struct)
     int32_t field_type;      // entry_type_t
     int32_t equality_type;   // equality_type_t
-    bool is_encrypted;
-    
-    // Encryption nonce for AES-CTR mode
-    uint64_t nonce;
-    
-    // Join attribute  
+
+    // Join attribute
     int32_t join_attr;
     
     // Persistent metadata
@@ -63,7 +59,6 @@ public:
     
     // Utility methods
     void clear();
-    // NOTE: Use CryptoUtils::encrypt_entry() and CryptoUtils::decrypt_entry() for actual encryption/decryption
     
     // Note: Attribute access by column name has been moved to Table class
     // Use Table::get_attribute(row, column_name) instead

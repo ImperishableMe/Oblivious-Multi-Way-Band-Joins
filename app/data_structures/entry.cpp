@@ -5,21 +5,19 @@
 #include <sstream>
 #include "debug_util.h"
 
-Entry::Entry() 
-    : field_type(SOURCE), 
-      equality_type(EQ), 
-      is_encrypted(false),
-      nonce(0),
-      join_attr(0), 
-      original_index(0), 
-      local_mult(0), 
+Entry::Entry()
+    : field_type(SOURCE),
+      equality_type(EQ),
+      join_attr(0),
+      original_index(0),
+      local_mult(0),
       final_mult(0),
-      foreign_sum(0), 
-      local_cumsum(0), 
+      foreign_sum(0),
+      local_cumsum(0),
       local_interval(0),
-      foreign_interval(0), 
+      foreign_interval(0),
       local_weight(0),
-      copy_index(0), 
+      copy_index(0),
       alignment_key(0),
       dst_idx(0),
       index(0) {
@@ -33,15 +31,13 @@ Entry::Entry(const entry_t& c_entry) {
 
 entry_t Entry::to_entry_t() const {
     // Removed TRACE logs to reduce debug output volume
-    
+
     entry_t result;
     memset(&result, 0, sizeof(entry_t));
-    
+
     // Copy basic fields
     result.field_type = field_type;
     result.equality_type = equality_type;
-    result.is_encrypted = is_encrypted;
-    result.nonce = nonce;
     result.join_attr = join_attr;
     result.original_index = original_index;
     result.local_mult = local_mult;
@@ -66,11 +62,9 @@ entry_t Entry::to_entry_t() const {
 
 void Entry::from_entry_t(const entry_t& c_entry) {
     // Removed TRACE logs to reduce debug output volume
-    
+
     field_type = c_entry.field_type;
     equality_type = c_entry.equality_type;
-    is_encrypted = c_entry.is_encrypted;
-    nonce = c_entry.nonce;
     join_attr = c_entry.join_attr;
     original_index = c_entry.original_index;
     local_mult = c_entry.local_mult;
@@ -96,8 +90,6 @@ void Entry::from_entry_t(const entry_t& c_entry, const std::vector<std::string>&
     // Copy all metadata fields
     field_type = c_entry.field_type;
     equality_type = c_entry.equality_type;
-    is_encrypted = c_entry.is_encrypted;
-    nonce = c_entry.nonce;
     join_attr = c_entry.join_attr;
     original_index = c_entry.original_index;
     local_mult = c_entry.local_mult;

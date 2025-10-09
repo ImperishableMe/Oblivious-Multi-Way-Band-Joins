@@ -294,15 +294,15 @@ void Table::batched_linear_pass(OpEcall op_type, int32_t* params) {
     DEBUG_TRACE("Table::batched_linear_pass: Complete");
 }
 
-void Table::batched_parallel_pass(Table& other, sgx_enclave_id_t eid, OpEcall op_type, int32_t* params) {
+void Table::batched_parallel_pass(Table& other, OpEcall op_type, int32_t* params) {
     if (entries.size() != other.entries.size()) {
         throw std::runtime_error("Tables must have the same size for parallel pass");
     }
-    
+
     DEBUG_TRACE("Table::batched_parallel_pass: Starting with %zu entries, op_type=%d", entries.size(), op_type);
-    
+
     // Create batch collector
-    EcallBatchCollector collector(eid, op_type);
+    EcallBatchCollector collector(op_type);
     
     // Add all parallel operations - work directly with Entry objects
     for (size_t i = 0; i < entries.size(); i++) {

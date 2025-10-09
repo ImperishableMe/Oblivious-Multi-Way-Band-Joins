@@ -25,7 +25,7 @@ public:
      * @param root Root of the join tree with final_mult computed
      * @param eid Enclave ID for secure operations
      */
-    static void Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid);
+    static void Execute(JoinTreeNodePtr root);
 
 private:
     /**
@@ -34,7 +34,7 @@ private:
      * @param eid Enclave ID
      * @return Expanded table with each tuple replicated final_mult times
      */
-    static Table ExpandSingleTable(const Table& table, sgx_enclave_id_t eid);
+    static Table ExpandSingleTable(const Table& table);
     
     /**
      * Compute the output size for expansion
@@ -42,7 +42,7 @@ private:
      * @param eid Enclave ID
      * @return Total size after expansion
      */
-    static size_t ComputeOutputSize(const Table& table, sgx_enclave_id_t eid);
+    static size_t ComputeOutputSize(const Table& table);
     
     /**
      * Perform the distribution phase using variable-distance passes
@@ -50,14 +50,14 @@ private:
      * @param output_size Target size
      * @param eid Enclave ID
      */
-    static void DistributePhase(Table& table, size_t output_size, sgx_enclave_id_t eid);
+    static void DistributePhase(Table& table, size_t output_size);
     
     /**
      * Perform the expansion phase to fill gaps
      * @param table Distributed table
      * @param eid Enclave ID
      */
-    static void ExpansionPhase(Table& table, sgx_enclave_id_t eid);
+    static void ExpansionPhase(Table& table);
     
     /**
      * Get all nodes from the join tree in pre-order

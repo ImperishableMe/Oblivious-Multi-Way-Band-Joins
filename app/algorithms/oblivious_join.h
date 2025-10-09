@@ -35,7 +35,7 @@ public:
      * @param eid SGX enclave ID for secure operations
      * @return Final join result table (encrypted)
      */
-    static Table Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid);
+    static Table Execute(JoinTreeNodePtr root);
     
     /**
      * Execute join with debug session

@@ -24,7 +24,7 @@ static size_t GetTotalTreeSize(JoinTreeNodePtr node) {
 
 // Forward declaration for table debugging
 
-Table ObliviousJoin::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
+Table ObliviousJoin::Execute(JoinTreeNodePtr root) {
     // Validate the join tree
     if (!ValidateJoinTree(root)) {
         throw std::runtime_error("Invalid join tree structure");
@@ -46,7 +46,7 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     AssertTreeConsistentEncryption(root);
     phase_start = Clock::now();
     size_t before_phase = get_ecall_count();
-    BottomUpPhase::Execute(root, eid);
+    BottomUpPhase::Execute(root);
     auto bottom_up_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t bottom_up_ecalls = get_ecall_count() - before_phase;
     size_t bottom_up_size = GetTotalTreeSize(root);
@@ -56,7 +56,7 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     AssertTreeConsistentEncryption(root);
     phase_start = Clock::now();
     before_phase = get_ecall_count();
-    TopDownPhase::Execute(root, eid);
+    TopDownPhase::Execute(root);
     auto top_down_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t top_down_ecalls = get_ecall_count() - before_phase;
     size_t top_down_size = GetTotalTreeSize(root);
@@ -66,7 +66,7 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     AssertTreeConsistentEncryption(root);
     phase_start = Clock::now();
     before_phase = get_ecall_count();
-    DistributeExpand::Execute(root, eid);
+    DistributeExpand::Execute(root);
     auto distribute_expand_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t distribute_expand_ecalls = get_ecall_count() - before_phase;
     size_t distribute_expand_size = GetTotalTreeSize(root);
@@ -77,7 +77,7 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
     AlignConcat::ResetSortingMetrics();  // Reset metrics before execution
     phase_start = Clock::now();
     before_phase = get_ecall_count();
-    Table result = AlignConcat::Execute(root, eid);
+    Table result = AlignConcat::Execute(root);
     auto align_concat_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t align_concat_ecalls = get_ecall_count() - before_phase;
     size_t align_concat_size = result.size();  // Final result size
@@ -133,7 +133,7 @@ Table ObliviousJoin::ExecuteWithDebug(JoinTreeNodePtr root,
     }
     
     // Execute the join
-    Table result = Execute(root, eid);
+    Table result = Execute(root);
     
     // Dump final result
     

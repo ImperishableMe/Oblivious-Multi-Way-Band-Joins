@@ -16,18 +16,18 @@ static size_t g_child_sort_ecalls = 0;
 
 // Table debugging functions are declared in debug_util.h
 
-Table AlignConcat::Execute(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
+Table AlignConcat::Execute(JoinTreeNodePtr root) {
     DEBUG_INFO("Starting Align-Concat Phase...");
     
     // Construct the join result by traversing the tree
-    Table result = ConstructJoinResult(root, eid);
+    Table result = ConstructJoinResult(root);
     
     DEBUG_INFO("Align-Concat Phase completed. Final result size: %zu", result.size());
     
     return result;
 }
 
-Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
+Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root) {
     DEBUG_INFO("Constructing join result starting from table: %s", 
                root->get_table_name().c_str());
     
@@ -47,17 +47,17 @@ Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root, sgx_enclave_id_t ei
         // Set join_attr for accumulator to the child's join column with parent
         // This ensures proper alignment during concatenation
         DEBUG_INFO("Setting accumulator join_attr to: %s", constraint.get_target_column().c_str());
-        JoinAttributeSetter::SetJoinAttributesForTable(accumulator, constraint.get_target_column(), eid);
+        JoinAttributeSetter::SetJoinAttributesForTable(accumulator, constraint.get_target_column());
         
         // Recursively get the result for the child subtree
-        Table child_result = ConstructJoinResult(child, eid);
+        Table child_result = ConstructJoinResult(child);
         
         // Set join_attr for child result to its join column with parent
         DEBUG_INFO("Setting child result join_attr to: %s", constraint.get_source_column().c_str());
-        JoinAttributeSetter::SetJoinAttributesForTable(child_result, constraint.get_source_column(), eid);
+        JoinAttributeSetter::SetJoinAttributesForTable(child_result, constraint.get_source_column());
         
         // Align and concatenate with accumulator
-        accumulator = AlignAndConcatenate(accumulator, child_result, eid);
+        accumulator = AlignAndConcatenate(accumulator, child_result);
         
         DEBUG_INFO("Accumulator size after adding %s: %zu",
                    child->get_table_name().c_str(), accumulator.size());
@@ -89,7 +89,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     auto sort_start = Clock::now();
     size_t before_sort = get_ecall_count();
     
-    sorted_accumulator.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_JOIN_THEN_OTHER);
+    sorted_accumulator.shuffle_merge_sort( OP_ECALL_COMPARATOR_JOIN_THEN_OTHER);
     
     double acc_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
     size_t acc_sort_ecalls = get_ecall_count() - before_sort;
@@ -98,12 +98,12 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     // Step 2: Compute copy indices for child table
     DEBUG_INFO("Step 2: Computing copy indices");
     DEBUG_INFO("Child size before ComputeCopyIndices: %zu rows", child.size());
-    Table indexed_child = ComputeCopyIndices(child, eid);
+    Table indexed_child = ComputeCopyIndices(child);
     DEBUG_INFO("Child size after ComputeCopyIndices: %zu rows", indexed_child.size());
     
     // Step 3: Compute alignment keys
     DEBUG_INFO("Step 3: Computing alignment keys");
-    Table aligned_child = ComputeAlignmentKeys(indexed_child, eid);
+    Table aligned_child = ComputeAlignmentKeys(indexed_child);
     DEBUG_INFO("Child size after ComputeAlignmentKeys: %zu rows", aligned_child.size());
     
     // Step 4: Sort child by alignment key
@@ -114,7 +114,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     sort_start = Clock::now();
     before_sort = get_ecall_count();
     
-    aligned_child.shuffle_merge_sort(eid, OP_ECALL_COMPARATOR_ALIGNMENT_KEY);
+    aligned_child.shuffle_merge_sort( OP_ECALL_COMPARATOR_ALIGNMENT_KEY);
     
     DEBUG_INFO("Child size after sort: %zu rows", aligned_child.size());
     
@@ -143,12 +143,12 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     
     // Dump sorted accumulator (left side of concatenation)
     debug_dump_table(result, ("before_concat_accumulator_" + concat_label).c_str(), 
-                    ("align_step5a_before_concat_" + concat_label).c_str(), static_cast<uint32_t>(eid),
+                    ("align_step5a_before_concat_" + concat_label).c_str(), static_cast<uint32_t>(),
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     // Dump aligned child (right side of concatenation)  
     debug_dump_table(aligned_child, ("before_concat_child_" + concat_label).c_str(),
-                    ("align_step5b_before_concat_" + concat_label).c_str(), static_cast<uint32_t>(eid),
+                    ("align_step5b_before_concat_" + concat_label).c_str(), static_cast<uint32_t>(),
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     DEBUG_INFO("Table sizes - Accumulator: %zu rows, Child: %zu rows", result.size(), aligned_child.size());
@@ -201,7 +201,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     
     // Debug: Dump final result - show concatenated attributes WITH ALL COLUMNS
     debug_dump_table(result, ("final_result_" + concat_label).c_str(), 
-                    ("align_step5_" + concat_label).c_str(), static_cast<uint32_t>(eid),
+                    ("align_step5_" + concat_label).c_str(), static_cast<uint32_t>(),
                     {META_INDEX, META_ORIG_IDX, META_LOCAL_MULT, META_FINAL_MULT, META_FOREIGN_SUM, META_COPY_INDEX, META_ALIGN_KEY, META_JOIN_ATTR}, true);
     
     DEBUG_INFO("========================================");
@@ -212,7 +212,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     return result;
 }
 
-Table AlignConcat::ComputeCopyIndices(const Table& table, sgx_enclave_id_t eid) {
+Table AlignConcat::ComputeCopyIndices(const Table& table) {
     if (table.size() == 0) {
         return table;
     }
@@ -220,23 +220,23 @@ Table AlignConcat::ComputeCopyIndices(const Table& table, sgx_enclave_id_t eid) 
     DEBUG_DEBUG("Computing copy indices for %zu entries", table.size());
     
     // Initialize copy_index to 0 for all entries
-    Table result = table.batched_map(eid, OP_ECALL_TRANSFORM_INIT_COPY_INDEX);
+    Table result = table.batched_map( OP_ECALL_TRANSFORM_INIT_COPY_INDEX);
     
     // Linear pass to compute copy indices
     // Same original_index -> increment
     // Different original_index -> reset to 0
-    result.batched_linear_pass(eid, OP_ECALL_WINDOW_UPDATE_COPY_INDEX);
+    result.batched_linear_pass( OP_ECALL_WINDOW_UPDATE_COPY_INDEX);
     
     DEBUG_DEBUG("Copy indices computed");
     
     return result;
 }
 
-Table AlignConcat::ComputeAlignmentKeys(const Table& table, sgx_enclave_id_t eid) {
+Table AlignConcat::ComputeAlignmentKeys(const Table& table) {
     DEBUG_DEBUG("Computing alignment keys for %zu entries", table.size());
     
     // Apply transformation to compute alignment_key = foreign_sum + (copy_index / local_mult)
-    Table result = table.batched_map(eid, OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY);
+    Table result = table.batched_map( OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY);
     
     DEBUG_DEBUG("Alignment keys computed");
     

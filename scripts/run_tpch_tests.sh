@@ -11,9 +11,8 @@ PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 # Configuration
 SCALE="${1:-0_001}"  # Default to 0_001 if not specified
 QUERY_DIR="$PROJECT_ROOT/input/queries"
-DATA_DIR="$PROJECT_ROOT/input/encrypted/data_$SCALE"
-SRC_DIR="$PROJECT_ROOT/impl/src"
-TEST_PROG="$SRC_DIR/test/test_join"
+DATA_DIR="$PROJECT_ROOT/input/plaintext/data_$SCALE"
+TEST_PROG="$PROJECT_ROOT/test_join"
 OUTPUT_DIR="$PROJECT_ROOT/output"
 
 # Colors for output
@@ -33,7 +32,7 @@ fi
 if [ ! -d "$DATA_DIR" ]; then
     echo -e "${RED}Error: Data directory not found: $DATA_DIR${NC}"
     echo -e "${YELLOW}Available data scales:${NC}"
-    ls -d "$PROJECT_ROOT/input/encrypted/data_"* 2>/dev/null | xargs -n1 basename
+    ls -d "$PROJECT_ROOT/input/plaintext/data_"* 2>/dev/null | xargs -n1 basename
     exit 1
 fi
 

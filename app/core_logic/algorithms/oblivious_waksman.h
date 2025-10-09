@@ -2,9 +2,8 @@
 #define OBLIVIOUS_WAKSMAN_H
 
 #include <stddef.h>
-#include "sgx.h"
-#include "../../common/enclave_types.h"
-#include "../../common/batch_types.h"
+#include "../../../common/enclave_types.h"
+#include "../../../common/batch_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,15 +11,15 @@ extern "C" {
 
 /**
  * Oblivious 2-way Waksman shuffle
- * 
+ *
  * Performs data-oblivious shuffle of n entries using Waksman permutation network.
  * All memory accesses are independent of data values to prevent side-channel attacks.
- * 
+ *
  * @param data Array of entries to shuffle (in-place)
  * @param n Number of entries (must be <= MAX_BATCH_SIZE)
- * @return SGX_SUCCESS on success, error code otherwise
+ * @return 0 on success, -1 on error
  */
-sgx_status_t ecall_oblivious_2way_waksman(entry_t* data, size_t n);
+int oblivious_2way_waksman(entry_t* data, size_t n);
 
 #ifdef __cplusplus
 }

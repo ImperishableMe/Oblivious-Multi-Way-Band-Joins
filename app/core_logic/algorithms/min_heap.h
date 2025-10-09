@@ -1,7 +1,7 @@
 #ifndef MIN_HEAP_H
 #define MIN_HEAP_H
 
-#include "../enclave_types.h"
+#include "../../../common/enclave_types.h"
 #include "../../../common/comparator_convention.h"
 #include <stddef.h>
 

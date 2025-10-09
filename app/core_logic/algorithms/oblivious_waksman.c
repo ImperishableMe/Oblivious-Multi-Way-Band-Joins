@@ -6,67 +6,39 @@
  */
 
 #include "oblivious_waksman.h"
-#include "enclave_types.h"
-#include "debug_util.h"
+#include "../../../common/debug_util.h"
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
-
-// AES functions are declared in aes_crypto.h
+#include <time.h>
 
 // RNG state for deterministic switch generation
 typedef struct {
-    uint64_t shuffle_nonce;  // Unique nonce for this shuffle
+    uint64_t shuffle_seed;  // Seed for this shuffle
 } ShuffleRNG;
 
 /**
  * Initialize RNG for this shuffle operation
+ * Uses current time and random bits for seed
  */
 static void init_shuffle_rng(ShuffleRNG* rng) {
-    // Ensure AES key is initialized
-    if (!aes_key_initialized) {
-        init_aes_key();
-    }
-    
-    // Get unique nonce from global counter
-    rng->shuffle_nonce = get_next_nonce();
+    // Get random seed from stdlib
+    rng->shuffle_seed = (uint64_t)time(NULL) ^ ((uint64_t)rand() << 32) ^ (uint64_t)rand();
 }
 
 /**
- * Get switch bit using AES-CTR
+ * Get switch bit using hash function
  * Returns 0 for straight, 1 for cross
  */
 static uint8_t get_switch_bit(ShuffleRNG* rng, uint32_t level, uint32_t position) {
-    // Build counter block
-    uint8_t ctr[16] = {0};
-    *(uint64_t*)ctr = rng->shuffle_nonce;
-    *(uint32_t*)(ctr + 8) = level;
-    *(uint32_t*)(ctr + 12) = position;
-    
-    // Use zeros as plaintext (we just need the keystream)
-    uint8_t plaintext[16] = {0};
-    uint8_t output[16];
-    
-    // Use AES-CTR to generate random bit
-    sgx_status_t status = sgx_aes_ctr_encrypt(
-        (const sgx_aes_ctr_128bit_key_t*)aes_key,
-        plaintext,  // Use zeros as plaintext
-        16,         // Size
-        ctr,        // Counter
-        128,        // Counter bits
-        output      // Output buffer
-    );
-    
-    if (status != SGX_SUCCESS) {
-        // Fallback: use simple hash if AES fails
-        uint64_t hash = rng->shuffle_nonce ^ ((uint64_t)level << 32) ^ position;
-        hash ^= hash >> 33;
-        hash *= 0xff51afd7ed558ccdULL;
-        hash ^= hash >> 33;
-        return hash & 1;
-    }
-    
-    return output[0] & 1;  // Return single bit
+    // Use hash function to generate random bit deterministically
+    uint64_t hash = rng->shuffle_seed ^ ((uint64_t)level << 32) ^ position;
+    hash ^= hash >> 33;
+    hash *= 0xff51afd7ed558ccdULL;
+    hash ^= hash >> 33;
+    hash *= 0xc4ceb9fe1a85ec53ULL;
+    hash ^= hash >> 33;
+    return hash & 1;  // Return single bit
 }
 
 /**
@@ -190,59 +162,35 @@ void waksman_recursive(
  * Shuffles n entries in-place
  * REQUIRES: n must be a power of 2 (enforced by caller via padding)
  */
-sgx_status_t ecall_oblivious_2way_waksman(entry_t* data, size_t n) {
-    DEBUG_INFO("=== ecall_oblivious_2way_waksman START: n=%zu ===", n);
-    
+int oblivious_2way_waksman(entry_t* data, size_t n) {
+    DEBUG_INFO("=== oblivious_2way_waksman START: n=%zu ===", n);
+
     // Validate inputs
     if (!data || n == 0) {
         DEBUG_ERROR("Invalid parameters: data=%p, n=%zu", data, n);
-        return SGX_ERROR_INVALID_PARAMETER;
+        return -1;
     }
-    
+
     if (n > MAX_BATCH_SIZE) {
         DEBUG_ERROR("Array too large: n=%zu > MAX_BATCH_SIZE=%d", n, MAX_BATCH_SIZE);
-        return SGX_ERROR_INVALID_PARAMETER;  // Too large for in-memory shuffle
+        return -1;  // Too large for in-memory shuffle
     }
-    
+
     // Check that n is a power of 2
     if ((n & (n - 1)) != 0) {
         DEBUG_ERROR("n=%zu is not a power of 2. Padding required.", n);
-        return SGX_ERROR_INVALID_PARAMETER;
+        return -1;
     }
-    
-    DEBUG_TRACE("Starting decryption phase");
-    // Decrypt all entries
-    for (size_t i = 0; i < n; i++) {
-        if (data[i].is_encrypted) {
-            crypto_status_t status = aes_decrypt_entry(&data[i]);
-            if (status != CRYPTO_SUCCESS) {
-                // Re-encrypt any already decrypted entries before returning
-                for (size_t j = 0; j < i; j++) {
-                    aes_encrypt_entry(&data[j]);
-                }
-                return SGX_ERROR_UNEXPECTED;
-            }
-        }
-    }
-    
-    DEBUG_TRACE("Decryption complete, initializing RNG");
+
+    DEBUG_TRACE("Initializing RNG");
     // Initialize RNG for this shuffle
     ShuffleRNG rng;
     init_shuffle_rng(&rng);
-    
+
     DEBUG_INFO("Starting Waksman shuffle: n=%zu", n);
     // Apply Waksman shuffle
     waksman_recursive(data, 0, 1, n, 0, &rng);
-    
-    DEBUG_TRACE("Shuffle complete, starting re-encryption");
-    // Re-encrypt all entries
-    for (size_t i = 0; i < n; i++) {
-        crypto_status_t status = aes_encrypt_entry(&data[i]);
-        if (status != CRYPTO_SUCCESS && status != CRYPTO_ALREADY_ENCRYPTED) {
-            return SGX_ERROR_UNEXPECTED;
-        }
-    }
-    
-    DEBUG_INFO("=== ecall_oblivious_2way_waksman END: SUCCESS ===");
-    return SGX_SUCCESS;
+
+    DEBUG_INFO("=== oblivious_2way_waksman END: SUCCESS ===");
+    return 0;
 }

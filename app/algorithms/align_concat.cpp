@@ -6,12 +6,9 @@
 
 // Global variables to track sorting metrics across all concatenations
 static double g_total_sort_time = 0.0;
-static size_t g_total_sort_ecalls = 0;
 static size_t g_sort_operations = 0;
 static double g_accumulator_sort_time = 0.0;
 static double g_child_sort_time = 0.0;
-static size_t g_accumulator_sort_ecalls = 0;
-static size_t g_child_sort_ecalls = 0;
 
 // Table debugging functions are declared in debug_util.h
 
@@ -89,7 +86,6 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     sorted_accumulator.shuffle_merge_sort( OP_ECALL_COMPARATOR_JOIN_THEN_OTHER);
 
     double acc_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
-    size_t acc_sort_ecalls = 0;  // TDX: No ecalls in TDX, set to 0
     DEBUG_INFO("Accumulator sort: %.6fs", acc_sort_time);
     
     // Step 2: Compute copy indices for child table
@@ -115,16 +111,12 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     DEBUG_INFO("Child size after sort: %zu rows", aligned_child.size());
 
     double child_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
-    size_t child_sort_ecalls = 0;  // TDX: No ecalls in TDX, set to 0
     DEBUG_INFO("Child sort: %.6fs", child_sort_time);
     
     // Update global sorting metrics
     g_accumulator_sort_time += acc_sort_time;
     g_child_sort_time += child_sort_time;
-    g_accumulator_sort_ecalls += acc_sort_ecalls;
-    g_child_sort_ecalls += child_sort_ecalls;
     g_total_sort_time += acc_sort_time + child_sort_time;
-    g_total_sort_ecalls += acc_sort_ecalls + child_sort_ecalls;
     g_sort_operations += 2;
     
     // Step 5: Horizontal concatenation using parallel pass
@@ -183,7 +175,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     int32_t concat_params[MAX_EXTRA_PARAMS] = {left_attr_count, right_attr_count, 0, 0};
     
     // Use parallel_pass to concatenate attributes from aligned_child
-    result.batched_parallel_pass(aligned_child, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);
+    result.parallel_pass(aligned_child, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);
     
     // Update the result table's schema to include columns from both tables
     std::vector<std::string> combined_schema = result.get_schema();
@@ -216,12 +208,12 @@ Table AlignConcat::ComputeCopyIndices(const Table& table) {
     DEBUG_DEBUG("Computing copy indices for %zu entries", table.size());
     
     // Initialize copy_index to 0 for all entries
-    Table result = table.batched_map( OP_ECALL_TRANSFORM_INIT_COPY_INDEX);
-    
+    Table result = table.map(OP_ECALL_TRANSFORM_INIT_COPY_INDEX);
+
     // Linear pass to compute copy indices
     // Same original_index -> increment
     // Different original_index -> reset to 0
-    result.batched_linear_pass( OP_ECALL_WINDOW_UPDATE_COPY_INDEX);
+    result.linear_pass(OP_ECALL_WINDOW_UPDATE_COPY_INDEX);
     
     DEBUG_DEBUG("Copy indices computed");
     
@@ -232,7 +224,7 @@ Table AlignConcat::ComputeAlignmentKeys(const Table& table) {
     DEBUG_DEBUG("Computing alignment keys for %zu entries", table.size());
     
     // Apply transformation to compute alignment_key = foreign_sum + (copy_index / local_mult)
-    Table result = table.batched_map( OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY);
+    Table result = table.map(OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY);
     
     DEBUG_DEBUG("Alignment keys computed");
     
@@ -254,23 +246,17 @@ std::vector<JoinTreeNodePtr> AlignConcat::PreOrderTraversal(JoinTreeNodePtr root
     return result;
 }
 
-void AlignConcat::GetSortingMetrics(double& total_time, size_t& total_ecalls,
-                                    double& acc_time, double& child_time,
-                                    size_t& acc_ecalls, size_t& child_ecalls) {
+void AlignConcat::GetSortingMetrics(double& total_time,
+                                    double& acc_time,
+                                    double& child_time) {
     total_time = g_total_sort_time;
-    total_ecalls = g_total_sort_ecalls;
     acc_time = g_accumulator_sort_time;
     child_time = g_child_sort_time;
-    acc_ecalls = g_accumulator_sort_ecalls;
-    child_ecalls = g_child_sort_ecalls;
 }
 
 void AlignConcat::ResetSortingMetrics() {
     g_total_sort_time = 0.0;
-    g_total_sort_ecalls = 0;
     g_sort_operations = 0;
     g_accumulator_sort_time = 0.0;
     g_child_sort_time = 0.0;
-    g_accumulator_sort_ecalls = 0;
-    g_child_sort_ecalls = 0;
 }

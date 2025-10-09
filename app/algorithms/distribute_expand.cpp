@@ -65,12 +65,12 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     
     // Step 1: Initialize dst_idx field to 0
     DEBUG_INFO("Step 1 - Initializing dst_idx");
-    Table working = table.batched_map( OP_ECALL_TRANSFORM_INIT_DST_IDX);
+    Table working = table.map(OP_ECALL_TRANSFORM_INIT_DST_IDX);
     DEBUG_INFO("Step 1 complete");
     
     // Step 2: Compute cumulative sum of final_mult to get dst_idx
     DEBUG_INFO("Step 2 - Computing cumulative sum");
-    working.batched_linear_pass( OP_ECALL_WINDOW_COMPUTE_DST_IDX);
+    working.linear_pass(OP_ECALL_WINDOW_COMPUTE_DST_IDX);
     DEBUG_INFO("Step 2 complete");
     
     // Debug: Show dst_idx values after cumulative sum
@@ -91,7 +91,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     
     // Step 4: Mark entries with final_mult = 0 as DIST_PADDING
     DEBUG_INFO("Step 4 - Marking entries with final_mult=0 as padding");
-    working = working.batched_map( OP_ECALL_TRANSFORM_MARK_ZERO_MULT_PADDING);
+    working = working.map(OP_ECALL_TRANSFORM_MARK_ZERO_MULT_PADDING);
     DEBUG_INFO("Step 4 complete, table size=%zu", working.size());
     
     // Debug: Show which entries are marked as padding
@@ -124,15 +124,15 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     // Use batched padding creation for efficiency
     size_t padding_needed = output_size - current_size;
     if (padding_needed > 0) {
-        working.add_batched_padding(padding_needed);
+        working.add_padding(padding_needed);
     }
     DEBUG_INFO("Step 6 complete, table size after padding=%zu", working.size());
     
     // Step 7: Initialize index field (0 to output_size-1)
     DEBUG_INFO("Step 7 - Initializing index field");
-    working = working.batched_map( OP_ECALL_TRANSFORM_INIT_INDEX);
-    
-    working.batched_linear_pass( OP_ECALL_WINDOW_INCREMENT_INDEX);
+    working = working.map(OP_ECALL_TRANSFORM_INIT_INDEX);
+
+    working.linear_pass(OP_ECALL_WINDOW_INCREMENT_INDEX);
     DEBUG_INFO("Step 7 complete, table size=%zu", working.size());
     
     // Step 7b: Debug dump before distribution - shows initial state with non-padding at top
@@ -207,7 +207,7 @@ void DistributeExpand::DistributePhase(Table& table, size_t output_size) {
         DEBUG_DEBUG("Distribution pass with distance %zu", distance);
         
         // Use batched version for better performance
-        table.batched_distribute_pass( distance, OP_ECALL_COMPARATOR_DISTRIBUTE);
+        table.distribute_pass(distance, OP_ECALL_COMPARATOR_DISTRIBUTE);
         
         distance >>= 1;  // Halve the distance
     }
@@ -219,7 +219,7 @@ void DistributeExpand::ExpansionPhase(Table& table) {
     DEBUG_INFO("Starting expansion phase");
     
     // Linear pass to copy non-empty entries to fill DIST_PADDING slots
-    table.batched_linear_pass( OP_ECALL_WINDOW_EXPAND_COPY);
+    table.linear_pass(OP_ECALL_WINDOW_EXPAND_COPY);
     
     DEBUG_INFO("Expansion phase completed");
 }

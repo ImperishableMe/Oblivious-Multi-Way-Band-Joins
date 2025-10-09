@@ -3,7 +3,7 @@
 #include <iostream>
 #include "debug_util.h"
 #include "enclave_types.h"  // For METADATA_* constants
-#include "../batch/ecall_batch_collector.h"  // For batch operations
+#include "../core_logic/core.h"  // For direct core function calls
 
 // Debug functions are declared in debug_util.h
 
@@ -60,25 +60,24 @@ void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node) {
     
     // First batch: Initialize all metadata to NULL_VALUE
     int32_t params[1] = { METADATA_ALL };
-    Table temp = node->get_table().batched_map( OP_ECALL_INIT_METADATA_NULL, params);
+    Table temp = node->get_table().map( OP_ECALL_INIT_METADATA_NULL, params);
     
     // Second batch: Set local_mult to 1
-    node->set_table(temp.batched_map( OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE));
+    node->set_table(temp.map( OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE));
     
     // Set original indices using LinearPass with window function
     Table& table = node->get_table();
     if (table.size() > 0) {
-        // Set first entry's index to 0 using batch operation
+        // Set first entry's index to 0 using direct operation
         {
-            EcallBatchCollector collector( OP_ECALL_TRANSFORM_SET_INDEX);
-            int32_t params[MAX_EXTRA_PARAMS] = {0, BATCH_NO_PARAM, BATCH_NO_PARAM, BATCH_NO_PARAM};
-            collector.add_operation(table[0], params);
-            collector.flush();
+            entry_t e = table[0].to_entry_t();
+            transform_set_index_op(&e, 0);
+            table[0].from_entry_t(e);
         }
-        
-        // Use batched window function to set consecutive indices
+
+        // Use linear_pass window function to set consecutive indices
         if (table.size() > 1) {
-            table.batched_linear_pass( OP_ECALL_WINDOW_SET_ORIGINAL_INDEX);
+            table.linear_pass(OP_ECALL_WINDOW_SET_ORIGINAL_INDEX);
         }
     }
     
@@ -113,17 +112,17 @@ Table BottomUpPhase::CombineTable(
     
     // Transform source entries to SOURCE type
     DEBUG_INFO("Transforming source entries to SOURCE type");
-    Table source_entries = source.batched_map( OP_ECALL_TRANSFORM_TO_SOURCE);
+    Table source_entries = source.map( OP_ECALL_TRANSFORM_TO_SOURCE);
     
     // Transform target entries to START boundaries
     DEBUG_INFO("Transforming target entries to START boundaries");
     int32_t start_params[2] = { dev1, (int32_t)eq1 };
-    Table start_entries = target.batched_map( OP_ECALL_TRANSFORM_TO_START, start_params);
+    Table start_entries = target.map( OP_ECALL_TRANSFORM_TO_START, start_params);
     
     // Transform target entries to END boundaries
     DEBUG_INFO("Transforming target entries to END boundaries");
     int32_t end_params[2] = { dev2, (int32_t)eq2 };
-    Table end_entries = target.batched_map( OP_ECALL_TRANSFORM_TO_END, end_params);
+    Table end_entries = target.map( OP_ECALL_TRANSFORM_TO_END, end_params);
     
     // Combine all three tables
     DEBUG_INFO("Combining tables: source=%zu, start=%zu, end=%zu",
@@ -188,7 +187,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 2: Initialize temporary fields (local_cumsum = local_mult, local_interval = 0)
     DEBUG_INFO("Initializing temporary fields");
-    combined = combined.batched_map( OP_ECALL_TRANSFORM_INIT_LOCAL_TEMPS);
+    combined = combined.map( OP_ECALL_TRANSFORM_INIT_LOCAL_TEMPS);
     DEBUG_INFO("Temporary fields initialized");
     
     // Debug: Dump after initializing temps
@@ -207,7 +206,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 4: Compute local cumulative sums
     DEBUG_INFO("Computing local cumulative sums");
-    combined.batched_linear_pass( OP_ECALL_WINDOW_COMPUTE_LOCAL_SUM);
+    combined.linear_pass( OP_ECALL_WINDOW_COMPUTE_LOCAL_SUM);
     
     // Debug: Dump after computing cumulative sums
     debug_dump_with_mask(combined, "with_cumsum", "bottomup_step5_cumsum", 0, init_mask);
@@ -221,7 +220,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 6: Compute intervals between START/END pairs
     DEBUG_INFO("Computing intervals between START/END pairs");
-    combined.batched_linear_pass( OP_ECALL_WINDOW_COMPUTE_LOCAL_INTERVAL);
+    combined.linear_pass( OP_ECALL_WINDOW_COMPUTE_LOCAL_INTERVAL);
     
     // Debug: Dump after computing intervals
     debug_dump_with_mask(combined, "with_intervals", "bottomup_step7_intervals", 0, init_mask);
@@ -254,7 +253,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     // Debug: Parent before update
     debug_dump_with_mask(parent, "parent_before", "bottomup_step10_parent_before", 0, key_mask);
     
-    truncated.batched_parallel_pass(parent, OP_ECALL_UPDATE_TARGET_MULTIPLICITY);
+    truncated.parallel_pass(parent, OP_ECALL_UPDATE_TARGET_MULTIPLICITY);
     
     // Debug: Parent after update
     debug_dump_with_mask(parent, "parent_after", "bottomup_step11_parent_after", 0, key_mask);

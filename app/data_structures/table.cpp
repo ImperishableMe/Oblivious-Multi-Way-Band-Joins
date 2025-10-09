@@ -3,7 +3,7 @@
 #include <climits>
 #include <cstring>
 #include "debug_util.h"
-#include "../batch/ecall_batch_collector.h"
+#include "../core_logic/core.h"
 #include "../algorithms/merge_sort_manager.h"
 #include "../algorithms/shuffle_manager.h"
 
@@ -194,143 +194,284 @@ Table::EncryptionStatus Table::get_encryption_status() const {
 }
 
 // ============================================================================
-// Oblivious Operations Implementation
+// Direct Operations Implementation (TDX - no batching needed)
 // ============================================================================
 
+// Helper: Get single-entry operation function
+typedef void (*single_op_fn)(entry_t*);
+typedef void (*single_op_with_params_fn)(entry_t*, int32_t);
+typedef void (*two_param_op_fn)(entry_t*, int32_t, equality_type_t);
+typedef void (*dual_entry_op_fn)(entry_t*, entry_t*);
 
-
-
-
-
-
-
-void Table::batched_distribute_pass(size_t distance, OpEcall op_type, int32_t* params) {
-    DEBUG_TRACE("Table::batched_distribute_pass: Starting with distance %zu, op_type=%d", distance, op_type);
-
-    // Create batch collector
-    EcallBatchCollector collector(op_type);
-
-    // Add all pairs at given distance
-    // Process from right to left (same as non-batched version)
-    for (size_t i = entries.size() - distance; i > 0; i--) {
-        collector.add_operation(entries[i - 1], entries[i - 1 + distance], params);
+static single_op_fn get_single_op_function(OpEcall op_type) {
+    switch(op_type) {
+        case OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE:
+            return transform_set_local_mult_one_op;
+        case OP_ECALL_TRANSFORM_ADD_METADATA:
+            return transform_add_metadata_op;
+        case OP_ECALL_TRANSFORM_INIT_LOCAL_TEMPS:
+            return transform_init_local_temps_op;
+        case OP_ECALL_TRANSFORM_INIT_FINAL_MULT:
+            return transform_init_final_mult_op;
+        case OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS:
+            return transform_init_foreign_temps_op;
+        case OP_ECALL_TRANSFORM_TO_SOURCE:
+            return transform_to_source_op;
+        case OP_ECALL_TRANSFORM_SET_SORT_PADDING:
+            return transform_set_sort_padding_op;
+        case OP_ECALL_TRANSFORM_INIT_DST_IDX:
+            return transform_init_dst_idx_op;
+        case OP_ECALL_TRANSFORM_INIT_INDEX:
+            return transform_init_index_op;
+        case OP_ECALL_TRANSFORM_MARK_ZERO_MULT_PADDING:
+            return transform_mark_zero_mult_padding_op;
+        case OP_ECALL_TRANSFORM_CREATE_DIST_PADDING:
+            return transform_create_dist_padding_op;
+        case OP_ECALL_TRANSFORM_INIT_COPY_INDEX:
+            return transform_init_copy_index_op;
+        case OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY:
+            return transform_compute_alignment_key_op;
+        default:
+            return nullptr;
     }
-
-    // Handle i = 0 case separately to avoid underflow
-    if (distance < entries.size()) {
-        collector.add_operation(entries[0], entries[distance], params);
-    }
-
-    // Flush the batch - this writes back to entries
-    collector.flush();
-
-    DEBUG_TRACE("Table::batched_distribute_pass: Complete");
 }
 
+static dual_entry_op_fn get_dual_entry_op_function(OpEcall op_type) {
+    switch(op_type) {
+        // Comparators
+        case OP_ECALL_COMPARATOR_JOIN_ATTR:
+            return comparator_join_attr_op;
+        case OP_ECALL_COMPARATOR_PAIRWISE:
+            return comparator_pairwise_op;
+        case OP_ECALL_COMPARATOR_END_FIRST:
+            return comparator_end_first_op;
+        case OP_ECALL_COMPARATOR_JOIN_THEN_OTHER:
+            return comparator_join_then_other_op;
+        case OP_ECALL_COMPARATOR_ORIGINAL_INDEX:
+            return comparator_original_index_op;
+        case OP_ECALL_COMPARATOR_ALIGNMENT_KEY:
+            return comparator_alignment_key_op;
+        case OP_ECALL_COMPARATOR_PADDING_LAST:
+            return comparator_padding_last_op;
+        case OP_ECALL_COMPARATOR_DISTRIBUTE:
+            return comparator_distribute_op;
+        // Window operations
+        case OP_ECALL_WINDOW_SET_ORIGINAL_INDEX:
+            return window_set_original_index_op;
+        case OP_ECALL_WINDOW_COMPUTE_LOCAL_SUM:
+            return window_compute_local_sum_op;
+        case OP_ECALL_WINDOW_COMPUTE_LOCAL_INTERVAL:
+            return window_compute_local_interval_op;
+        case OP_ECALL_WINDOW_COMPUTE_FOREIGN_SUM:
+            return window_compute_foreign_sum_op;
+        case OP_ECALL_WINDOW_COMPUTE_FOREIGN_INTERVAL:
+            return window_compute_foreign_interval_op;
+        case OP_ECALL_WINDOW_PROPAGATE_FOREIGN_INTERVAL:
+            return window_propagate_foreign_interval_op;
+        case OP_ECALL_WINDOW_COMPUTE_DST_IDX:
+            return window_compute_dst_idx_op;
+        case OP_ECALL_WINDOW_INCREMENT_INDEX:
+            return window_increment_index_op;
+        case OP_ECALL_WINDOW_EXPAND_COPY:
+            return window_expand_copy_op;
+        case OP_ECALL_WINDOW_UPDATE_COPY_INDEX:
+            return window_update_copy_index_op;
+        // Update operations
+        case OP_ECALL_UPDATE_TARGET_MULTIPLICITY:
+            return update_target_multiplicity_op;
+        case OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY:
+            return update_target_final_multiplicity_op;
+        default:
+            return nullptr;
+    }
+}
 
-// ============================================================================
-// Batched Operations Implementation
-// ============================================================================
+Table Table::map(OpEcall op_type, int32_t* params) const {
+    DEBUG_TRACE("Table::map: Starting with %zu entries, op_type=%d", entries.size(), op_type);
 
-Table Table::batched_map(OpEcall op_type, int32_t* params) const {
-    DEBUG_TRACE("Table::batched_map: Starting with %zu entries, op_type=%d", entries.size(), op_type);
-
-    Table result(table_name, schema_column_names);  // Preserve schema
+    Table result(table_name, schema_column_names);
     result.set_num_columns(num_columns);
 
-    // Copy entries to result first (since we can't modify const entries)
-    for (const auto& entry : entries) {
-        result.add_entry(entry);
+    // Handle operations with special parameter signatures
+    if (op_type == OP_ECALL_TRANSFORM_TO_START || op_type == OP_ECALL_TRANSFORM_TO_END) {
+        // Two-parameter operations: deviation, equality_type
+        for (const auto& entry : entries) {
+            Entry new_entry = entry;
+            entry_t e = new_entry.to_entry_t();
+
+            int32_t deviation = params ? params[0] : 0;
+            equality_type_t equality = params ? (equality_type_t)params[1] : EQ;
+
+            if (op_type == OP_ECALL_TRANSFORM_TO_START) {
+                transform_to_start_op(&e, deviation, equality);
+            } else {
+                transform_to_end_op(&e, deviation, equality);
+            }
+
+            new_entry.from_entry_t(e);
+            result.add_entry(new_entry);
+        }
+    } else if (op_type == OP_ECALL_TRANSFORM_SET_INDEX ||
+               op_type == OP_ECALL_TRANSFORM_SET_JOIN_ATTR ||
+               op_type == OP_ECALL_INIT_METADATA_NULL) {
+        // Single-parameter operations
+        for (const auto& entry : entries) {
+            Entry new_entry = entry;
+            entry_t e = new_entry.to_entry_t();
+
+            int32_t param = params ? params[0] : 0;
+
+            if (op_type == OP_ECALL_TRANSFORM_SET_INDEX) {
+                transform_set_index_op(&e, (uint32_t)param);
+            } else if (op_type == OP_ECALL_TRANSFORM_SET_JOIN_ATTR) {
+                transform_set_join_attr_op(&e, param);
+            } else {
+                transform_init_metadata_null_op(&e, (uint32_t)param);
+            }
+
+            new_entry.from_entry_t(e);
+            result.add_entry(new_entry);
+        }
+    } else {
+        // No-parameter operations
+        single_op_fn func = get_single_op_function(op_type);
+        if (!func) {
+            throw std::runtime_error("Unknown single-entry operation type");
+        }
+
+        for (const auto& entry : entries) {
+            Entry new_entry = entry;
+            entry_t e = new_entry.to_entry_t();
+            func(&e);
+            new_entry.from_entry_t(e);
+            result.add_entry(new_entry);
+        }
     }
 
-    // Create batch collector
-    EcallBatchCollector collector(op_type);
-
-    // Add all operations for map (single entry operations)
-    for (size_t i = 0; i < result.entries.size(); i++) {
-        collector.add_operation(result.entries[i], params);
-    }
-
-    // Flush the batch - this writes back to result.entries
-    collector.flush();
-
-    DEBUG_TRACE("Table::batched_map: Complete with %zu entries", result.size());
+    DEBUG_TRACE("Table::map: Complete with %zu entries", result.size());
     return result;
 }
 
-void Table::batched_linear_pass(OpEcall op_type, int32_t* params) {
+void Table::linear_pass(OpEcall op_type, int32_t* /* params */) {
     if (entries.size() < 2) return;
 
-    DEBUG_TRACE("Table::batched_linear_pass: Starting with %zu entries, op_type=%d", entries.size(), op_type);
+    DEBUG_TRACE("Table::linear_pass: Starting with %zu entries, op_type=%d", entries.size(), op_type);
 
-    // Create batch collector
-    EcallBatchCollector collector(op_type);
+    dual_entry_op_fn func = get_dual_entry_op_function(op_type);
+    if (!func) {
+        throw std::runtime_error("Unknown dual-entry operation type for linear_pass");
+    }
 
-    // Add all window operations - work directly with Entry objects
+    // Window operation: process adjacent pairs
     for (size_t i = 0; i < entries.size() - 1; i++) {
-        collector.add_operation(entries[i], entries[i+1], params);
+        entry_t e1 = entries[i].to_entry_t();
+        entry_t e2 = entries[i+1].to_entry_t();
+
+        func(&e1, &e2);
+
+        entries[i].from_entry_t(e1);
+        entries[i+1].from_entry_t(e2);
     }
-    
-    // Flush the batch - this writes back to entries
-    collector.flush();
-    
-    DEBUG_TRACE("Table::batched_linear_pass: Complete");
+
+    DEBUG_TRACE("Table::linear_pass: Complete");
 }
 
-void Table::batched_parallel_pass(Table& other, OpEcall op_type, int32_t* params) {
+void Table::parallel_pass(Table& other, OpEcall op_type, int32_t* params) {
     if (entries.size() != other.entries.size()) {
-        throw std::runtime_error("Tables must have the same size for parallel pass");
+        throw std::runtime_error("Tables must have same size for parallel_pass");
     }
 
-    DEBUG_TRACE("Table::batched_parallel_pass: Starting with %zu entries, op_type=%d", entries.size(), op_type);
+    DEBUG_TRACE("Table::parallel_pass: Starting with %zu entries, op_type=%d", entries.size(), op_type);
 
-    // Create batch collector
-    EcallBatchCollector collector(op_type);
-    
-    // Add all parallel operations - work directly with Entry objects
-    for (size_t i = 0; i < entries.size(); i++) {
-        collector.add_operation(entries[i], other.entries[i], params);
+    // Handle concat operation specially (has extra parameters)
+    if (op_type == OP_ECALL_CONCAT_ATTRIBUTES) {
+        int32_t left_attr_count = params ? params[0] : 0;
+        int32_t right_attr_count = params ? params[1] : 0;
+
+        for (size_t i = 0; i < entries.size(); i++) {
+            entry_t e1 = entries[i].to_entry_t();
+            entry_t e2 = other.entries[i].to_entry_t();
+
+            concat_attributes_op(&e1, &e2, left_attr_count, right_attr_count);
+
+            entries[i].from_entry_t(e1);
+            other.entries[i].from_entry_t(e2);
+        }
+    } else {
+        dual_entry_op_fn func = get_dual_entry_op_function(op_type);
+        if (!func) {
+            throw std::runtime_error("Unknown dual-entry operation type for parallel_pass");
+        }
+
+        for (size_t i = 0; i < entries.size(); i++) {
+            entry_t e1 = entries[i].to_entry_t();
+            entry_t e2 = other.entries[i].to_entry_t();
+
+            func(&e1, &e2);
+
+            entries[i].from_entry_t(e1);
+            other.entries[i].from_entry_t(e2);
+        }
     }
-    
-    // Flush the batch - this writes back to both tables' entries
-    collector.flush();
-    
-    DEBUG_TRACE("Table::batched_parallel_pass: Complete");
+
+    DEBUG_TRACE("Table::parallel_pass: Complete");
 }
 
+void Table::distribute_pass(size_t distance, OpEcall op_type, int32_t* /* params */) {
+    DEBUG_TRACE("Table::distribute_pass: Starting with distance %zu, op_type=%d", distance, op_type);
 
-void Table::add_batched_padding(size_t count, OpEcall padding_op) {
-    if (count == 0) {
-        return;
+    dual_entry_op_fn func = get_dual_entry_op_function(op_type);
+    if (!func) {
+        throw std::runtime_error("Unknown dual-entry operation type for distribute_pass");
     }
 
-    DEBUG_TRACE("Table::add_batched_padding: Adding %zu padding entries", count);
+    // Process pairs at given distance (right to left to avoid underflow)
+    for (size_t i = entries.size() - distance; i > 0; i--) {
+        entry_t e1 = entries[i - 1].to_entry_t();
+        entry_t e2 = entries[i - 1 + distance].to_entry_t();
 
-    // Reserve space for new entries
+        func(&e1, &e2);
+
+        entries[i - 1].from_entry_t(e1);
+        entries[i - 1 + distance].from_entry_t(e2);
+    }
+
+    // Handle i = 0 separately
+    if (distance < entries.size()) {
+        entry_t e1 = entries[0].to_entry_t();
+        entry_t e2 = entries[distance].to_entry_t();
+
+        func(&e1, &e2);
+
+        entries[0].from_entry_t(e1);
+        entries[distance].from_entry_t(e2);
+    }
+
+    DEBUG_TRACE("Table::distribute_pass: Complete");
+}
+
+void Table::add_padding(size_t count, OpEcall padding_op) {
+    if (count == 0) return;
+
+    DEBUG_TRACE("Table::add_padding: Adding %zu padding entries", count);
+
     entries.reserve(entries.size() + count);
 
-    // Create batch collector for padding creation
-    EcallBatchCollector collector(padding_op);
-
-    // Create padding entries in batches
-    for (size_t i = 0; i < count; i++) {
-        Entry padding;
-        // Initialize entry_t structure instead of Entry class
-        entry_t padding_entry;
-        memset(&padding_entry, 0, sizeof(entry_t));
-        padding = Entry(padding_entry);
-
-        // Add to table first
-        entries.push_back(padding);
-
-        // Add to batch for transformation
-        collector.add_operation(entries.back());
+    single_op_fn func = get_single_op_function(padding_op);
+    if (!func) {
+        throw std::runtime_error("Unknown padding operation type");
     }
 
-    // Flush any remaining operations
-    collector.flush();
+    for (size_t i = 0; i < count; i++) {
+        entry_t padding_entry;
+        memset(&padding_entry, 0, sizeof(entry_t));
+        func(&padding_entry);
 
-    DEBUG_TRACE("Table::add_batched_padding: Complete - added %zu entries", count);
+        Entry padding(padding_entry);
+        entries.push_back(padding);
+    }
+
+    DEBUG_TRACE("Table::add_padding: Complete - added %zu entries", count);
 }
 
 
@@ -344,7 +485,7 @@ void Table::pad_to_shuffle_size() {
                    current_size, target_size, padding_count);
 
         // Add padding entries for shuffle sort
-        add_batched_padding(padding_count, OP_ECALL_TRANSFORM_SET_SORT_PADDING);
+        add_padding(padding_count, OP_ECALL_TRANSFORM_SET_SORT_PADDING);
     }
 }
 
@@ -422,10 +563,9 @@ void Table::shuffle_merge_sort(OpEcall op_type) {
     // Phase 4: Truncate to original size
     // After sorting, padding entries (with JOIN_ATTR_POS_INF) are at the end
     if (entries.size() > original_size) {
-        size_t padded_size = entries.size();
+        DEBUG_INFO("Table::shuffle_merge_sort: Truncating from %zu to %zu entries",
+                   entries.size(), original_size);
         entries.resize(original_size);
-        DEBUG_INFO("Table::shuffle_merge_sort: Truncated from %zu to %zu entries", 
-                   padded_size, original_size);
     }
     
     DEBUG_INFO("Table::shuffle_merge_sort: Complete with %zu entries", entries.size());

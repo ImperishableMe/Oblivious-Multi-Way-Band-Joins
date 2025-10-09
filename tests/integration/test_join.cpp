@@ -107,18 +107,6 @@ struct PhaseTimings {
                      align_concat(0), total(0), valid(false) {}
 };
 
-/* Structure to hold phase ecall counts */
-struct PhaseEcalls {
-    size_t bottom_up;
-    size_t top_down;
-    size_t distribute_expand;
-    size_t align_concat;
-    size_t total;
-    bool valid;
-    
-    PhaseEcalls() : bottom_up(0), top_down(0), distribute_expand(0),
-                    align_concat(0), total(0), valid(false) {}
-};
 
 /* Structure to hold phase sizes */
 struct PhaseSizes {
@@ -135,23 +123,19 @@ struct PhaseSizes {
 /* Structure to hold align-concat sorting metrics */
 struct AlignConcatSortMetrics {
     double total_time;
-    size_t total_ecalls;
     double accumulator_time;
-    size_t accumulator_ecalls;
     double child_time;
-    size_t child_ecalls;
     bool valid;
-    
-    AlignConcatSortMetrics() : total_time(0), total_ecalls(0),
-                               accumulator_time(0), accumulator_ecalls(0),
-                               child_time(0), child_ecalls(0), valid(false) {}
+
+    AlignConcatSortMetrics() : total_time(0),
+                               accumulator_time(0),
+                               child_time(0), valid(false) {}
 };
 
 /* Run a command and capture output with timing */
 struct CommandResult {
     double wall_time;
     PhaseTimings phase_timings;
-    PhaseEcalls phase_ecalls;
     PhaseSizes phase_sizes;
     AlignConcatSortMetrics sort_metrics;
     std::string output;
@@ -186,19 +170,6 @@ CommandResult run_command_with_output(const std::string& command) {
                 result.phase_timings.valid = true;
             }
         }
-        // Parse phase ecalls if present
-        else if (strncmp(buffer, "PHASE_ECALLS:", 13) == 0) {
-            size_t bu, td, de, ac, tot;
-            if (sscanf(buffer + 13, " Bottom-Up=%zu Top-Down=%zu Distribute-Expand=%zu Align-Concat=%zu Total=%zu",
-                       &bu, &td, &de, &ac, &tot) == 5) {
-                result.phase_ecalls.bottom_up = bu;
-                result.phase_ecalls.top_down = td;
-                result.phase_ecalls.distribute_expand = de;
-                result.phase_ecalls.align_concat = ac;
-                result.phase_ecalls.total = tot;
-                result.phase_ecalls.valid = true;
-            }
-        }
         // Parse phase sizes if present
         else if (strncmp(buffer, "PHASE_SIZES:", 12) == 0) {
             size_t bu, td, de, ac;
@@ -213,21 +184,15 @@ CommandResult run_command_with_output(const std::string& command) {
         } else if (strncmp(buffer, "ALIGN_CONCAT_SORTS:", 19) == 0) {
             // Parse sorting metrics
             double total_time;
-            size_t total_ecalls;
             double acc_time;
-            size_t acc_ecalls;
             double child_time;
-            size_t child_ecalls;
-            
-            // Look for pattern: Total=XXXs (YYY ecalls), Accumulator=XXXs (YYY ecalls), Child=XXXs (YYY ecalls)
-            if (sscanf(buffer + 19, " Total=%lfs (%zu ecalls), Accumulator=%lfs (%zu ecalls), Child=%lfs (%zu ecalls)",
-                       &total_time, &total_ecalls, &acc_time, &acc_ecalls, &child_time, &child_ecalls) == 6) {
+
+            // Look for pattern: Total=XXXs, Accumulator=XXXs, Child=XXXs
+            if (sscanf(buffer + 19, " Total=%lfs, Accumulator=%lfs, Child=%lfs",
+                       &total_time, &acc_time, &child_time) == 3) {
                 result.sort_metrics.total_time = total_time;
-                result.sort_metrics.total_ecalls = total_ecalls;
                 result.sort_metrics.accumulator_time = acc_time;
-                result.sort_metrics.accumulator_ecalls = acc_ecalls;
                 result.sort_metrics.child_time = child_time;
-                result.sort_metrics.child_ecalls = child_ecalls;
                 result.sort_metrics.valid = true;
             }
         }
@@ -336,16 +301,6 @@ int main(int argc, char* argv[]) {
             printf("  Total (phases): %.6fs\n", sgx_result.phase_timings.total);
         }
         
-        // Print phase ecalls if available
-        if (sgx_result.phase_ecalls.valid) {
-            printf("Phase Ecalls:\n");
-            printf("  Bottom-Up: %zu ecalls\n", sgx_result.phase_ecalls.bottom_up);
-            printf("  Top-Down: %zu ecalls\n", sgx_result.phase_ecalls.top_down);
-            printf("  Distribute-Expand: %zu ecalls\n", sgx_result.phase_ecalls.distribute_expand);
-            printf("  Align-Concat: %zu ecalls\n", sgx_result.phase_ecalls.align_concat);
-            printf("  Total: %zu ecalls\n", sgx_result.phase_ecalls.total);
-        }
-        
         // Print phase sizes if available
         if (sgx_result.phase_sizes.valid) {
             printf("Phase Sizes (total rows in tree):\n");
@@ -358,12 +313,12 @@ int main(int argc, char* argv[]) {
         // Display sorting metrics if available
         if (sgx_result.sort_metrics.valid) {
             printf("Align-Concat Sorting Details:\n");
-            printf("  Total sorting: %.6fs (%zu ecalls)\n", 
-                   sgx_result.sort_metrics.total_time, sgx_result.sort_metrics.total_ecalls);
-            printf("    - Accumulator sorts: %.6fs (%zu ecalls)\n",
-                   sgx_result.sort_metrics.accumulator_time, sgx_result.sort_metrics.accumulator_ecalls);
-            printf("    - Child sorts: %.6fs (%zu ecalls)\n",
-                   sgx_result.sort_metrics.child_time, sgx_result.sort_metrics.child_ecalls);
+            printf("  Total sorting: %.6fs\n",
+                   sgx_result.sort_metrics.total_time);
+            printf("    - Accumulator sorts: %.6fs\n",
+                   sgx_result.sort_metrics.accumulator_time);
+            printf("    - Child sorts: %.6fs\n",
+                   sgx_result.sort_metrics.child_time);
         }
         
         // Write summary to file
@@ -452,15 +407,6 @@ int main(int argc, char* argv[]) {
                 summary_file << "Total (phases): " << sgx_result.phase_timings.total << " seconds" << std::endl;
             }
             
-            if (sgx_result.phase_ecalls.valid) {
-                summary_file << "\n=== SGX Phase Ecalls ===" << std::endl;
-                summary_file << "Bottom-Up: " << sgx_result.phase_ecalls.bottom_up << " ecalls" << std::endl;
-                summary_file << "Top-Down: " << sgx_result.phase_ecalls.top_down << " ecalls" << std::endl;
-                summary_file << "Distribute-Expand: " << sgx_result.phase_ecalls.distribute_expand << " ecalls" << std::endl;
-                summary_file << "Align-Concat: " << sgx_result.phase_ecalls.align_concat << " ecalls" << std::endl;
-                summary_file << "Total: " << sgx_result.phase_ecalls.total << " ecalls" << std::endl;
-            }
-            
             if (sgx_result.phase_sizes.valid) {
                 summary_file << "\n=== SGX Phase Sizes ===" << std::endl;
                 summary_file << "Bottom-Up: " << sgx_result.phase_sizes.bottom_up << " rows in tree" << std::endl;
@@ -471,12 +417,9 @@ int main(int argc, char* argv[]) {
             
             if (sgx_result.sort_metrics.valid) {
                 summary_file << "\n=== Align-Concat Sorting Details ===" << std::endl;
-                summary_file << "Total sorting: " << sgx_result.sort_metrics.total_time << " seconds (" 
-                            << sgx_result.sort_metrics.total_ecalls << " ecalls)" << std::endl;
-                summary_file << "  - Accumulator sorts: " << sgx_result.sort_metrics.accumulator_time << " seconds (" 
-                            << sgx_result.sort_metrics.accumulator_ecalls << " ecalls)" << std::endl;
-                summary_file << "  - Child sorts: " << sgx_result.sort_metrics.child_time << " seconds (" 
-                            << sgx_result.sort_metrics.child_ecalls << " ecalls)" << std::endl;
+                summary_file << "Total sorting: " << sgx_result.sort_metrics.total_time << " seconds" << std::endl;
+                summary_file << "  - Accumulator sorts: " << sgx_result.sort_metrics.accumulator_time << " seconds" << std::endl;
+                summary_file << "  - Child sorts: " << sgx_result.sort_metrics.child_time << " seconds" << std::endl;
             }
             
             summary_file.close();

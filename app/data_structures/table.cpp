@@ -221,26 +221,26 @@ void Table::check_sgx_status(sgx_status_t status, const std::string& operation) 
 
 
 
-void Table::batched_distribute_pass(sgx_enclave_id_t eid, size_t distance, OpEcall op_type, int32_t* params) {
+void Table::batched_distribute_pass(size_t distance, OpEcall op_type, int32_t* params) {
     DEBUG_TRACE("Table::batched_distribute_pass: Starting with distance %zu, op_type=%d", distance, op_type);
-    
+
     // Create batch collector
-    EcallBatchCollector collector(eid, op_type);
-    
+    EcallBatchCollector collector(op_type);
+
     // Add all pairs at given distance
     // Process from right to left (same as non-batched version)
     for (size_t i = entries.size() - distance; i > 0; i--) {
         collector.add_operation(entries[i - 1], entries[i - 1 + distance], params);
     }
-    
+
     // Handle i = 0 case separately to avoid underflow
     if (distance < entries.size()) {
         collector.add_operation(entries[0], entries[distance], params);
     }
-    
+
     // Flush the batch - this writes back to entries
     collector.flush();
-    
+
     DEBUG_TRACE("Table::batched_distribute_pass: Complete");
 }
 
@@ -316,59 +316,52 @@ void Table::batched_parallel_pass(Table& other, OpEcall op_type, int32_t* params
 }
 
 
-void Table::add_batched_padding(size_t count, sgx_enclave_id_t eid, uint8_t encryption_status, OpEcall padding_op) {
+void Table::add_batched_padding(size_t count, OpEcall padding_op) {
     if (count == 0) {
         return;
     }
-    
+
     DEBUG_TRACE("Table::add_batched_padding: Adding %zu padding entries", count);
-    
+
     // Reserve space for new entries
     entries.reserve(entries.size() + count);
-    
+
     // Create batch collector for padding creation
-    EcallBatchCollector collector(eid, padding_op);
-    
+    EcallBatchCollector collector(padding_op);
+
     // Create padding entries in batches
     for (size_t i = 0; i < count; i++) {
         Entry padding;
         // Initialize entry_t structure instead of Entry class
         entry_t padding_entry;
         memset(&padding_entry, 0, sizeof(entry_t));
-        padding_entry.is_encrypted = encryption_status;  // Match table's encryption
         padding = Entry(padding_entry);
-        
+
         // Add to table first
         entries.push_back(padding);
-        
+
         // Add to batch for transformation
         collector.add_operation(entries.back());
     }
-    
+
     // Flush any remaining operations
     collector.flush();
-    
+
     DEBUG_TRACE("Table::add_batched_padding: Complete - added %zu entries", count);
 }
 
 
-void Table::pad_to_shuffle_size(sgx_enclave_id_t eid) {
+void Table::pad_to_shuffle_size() {
     size_t current_size = entries.size();
     size_t target_size = calculate_shuffle_padding(current_size);
-    
+
     if (target_size > current_size) {
         size_t padding_count = target_size - current_size;
-        DEBUG_INFO("Table::pad_to_shuffle_size: Padding from %zu to %zu (adding %zu entries)", 
+        DEBUG_INFO("Table::pad_to_shuffle_size: Padding from %zu to %zu (adding %zu entries)",
                    current_size, target_size, padding_count);
-        
-        // Determine encryption status from existing entries
-        uint8_t encryption_status = 0;
-        if (!entries.empty() && entries[0].is_encrypted) {
-            encryption_status = 1;
-        }
-        
+
         // Add padding entries for shuffle sort
-        add_batched_padding(padding_count, eid, encryption_status, OP_ECALL_TRANSFORM_SET_SORT_PADDING);
+        add_batched_padding(padding_count, OP_ECALL_TRANSFORM_SET_SORT_PADDING);
     }
 }
 
@@ -422,24 +415,24 @@ bool Table::is_valid_shuffle_size(size_t n) {
     return n <= MAX_BATCH_SIZE && (n & (n - 1)) == 0;
 }
 
-void Table::shuffle_merge_sort(sgx_enclave_id_t eid, OpEcall op_type) {
+void Table::shuffle_merge_sort(OpEcall op_type) {
     if (entries.size() <= 1) return;
-    
+
     size_t original_size = entries.size();
-    DEBUG_INFO("Table::shuffle_merge_sort: Starting with %zu entries, op_type=%d", 
+    DEBUG_INFO("Table::shuffle_merge_sort: Starting with %zu entries, op_type=%d",
                original_size, op_type);
-    
+
     // Phase 1: Pad to 2^a * k^b format
-    pad_to_shuffle_size(eid);
+    pad_to_shuffle_size();
     DEBUG_INFO("Table::shuffle_merge_sort: Padded to %zu entries", entries.size());
-    
+
     // Phase 2: Shuffle using ShuffleManager (expects padded input)
-    ShuffleManager shuffle_mgr(eid);
+    ShuffleManager shuffle_mgr;
     shuffle_mgr.shuffle(*this);
     DEBUG_INFO("Table::shuffle_merge_sort: Shuffle phase complete");
-    
+
     // Phase 3: Merge sort using MergeSortManager (works with padded data)
-    MergeSortManager merge_mgr(eid, op_type);
+    MergeSortManager merge_mgr(op_type);
     merge_mgr.sort(*this);
     DEBUG_INFO("Table::shuffle_merge_sort: Merge sort phase complete");
     

@@ -55,12 +55,12 @@ void TopDownPhase::Execute(JoinTreeNodePtr root) {
 void TopDownPhase::InitializeRootTable(JoinTreeNodePtr node) {
     // Initialize root table only: final_mult = local_mult
     // Initialize root table
-    node->set_table(node->get_table().batched_map( OP_ECALL_TRANSFORM_INIT_FINAL_MULT));
+    node->set_table(node->get_table().map( OP_ECALL_TRANSFORM_INIT_FINAL_MULT));
 }
 
 void TopDownPhase::InitializeForeignFields(JoinTreeNodePtr node) {
     // Initialize foreign-related fields to 0
-    node->set_table(node->get_table().batched_map( OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS));
+    node->set_table(node->get_table().map( OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS));
 }
 
 Table TopDownPhase::CombineTableForForeign(
@@ -89,17 +89,17 @@ Table TopDownPhase::CombineTableForForeign(
     
     // Transform parent entries to SOURCE type (parent provides multiplicities)
     DEBUG_INFO("Transforming parent entries to SOURCE type");
-    Table source_entries = parent.batched_map( OP_ECALL_TRANSFORM_TO_SOURCE);
+    Table source_entries = parent.map( OP_ECALL_TRANSFORM_TO_SOURCE);
     
     // Transform child entries to START boundaries (child receives multiplicities)
     DEBUG_INFO("Transforming child entries to START boundaries");
     int32_t start_params[] = {dev1, eq1};
-    Table start_entries = child.batched_map( OP_ECALL_TRANSFORM_TO_START, start_params);
+    Table start_entries = child.map( OP_ECALL_TRANSFORM_TO_START, start_params);
     
     // Transform child entries to END boundaries
     DEBUG_INFO("Transforming child entries to END boundaries");
     int32_t end_params[] = {dev2, eq2};
-    Table end_entries = child.batched_map( OP_ECALL_TRANSFORM_TO_END, end_params);
+    Table end_entries = child.map( OP_ECALL_TRANSFORM_TO_END, end_params);
     
     // Combine all three tables
     // Use parent schema for combined table (all three should have same schema)
@@ -149,7 +149,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 2: Initialize foreign temporary fields
     DEBUG_INFO("Initializing foreign temporary fields");
-    combined = combined.batched_map( OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS);
+    combined = combined.map( OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS);
     
     // Debug: Dump after initializing foreign temps
     uint32_t foreign_init_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE |
@@ -167,7 +167,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 4: Compute foreign cumulative sums and weights
     DEBUG_INFO("Computing foreign cumulative sums");
-    combined.batched_linear_pass( OP_ECALL_WINDOW_COMPUTE_FOREIGN_SUM);
+    combined.linear_pass( OP_ECALL_WINDOW_COMPUTE_FOREIGN_SUM);
     
     // Debug: Dump after computing foreign cumulative sums
     uint32_t foreign_sum_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE |
@@ -185,7 +185,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 6: Compute foreign intervals
     DEBUG_INFO("Computing foreign intervals");
-    combined.batched_linear_pass( OP_ECALL_WINDOW_COMPUTE_FOREIGN_INTERVAL);
+    combined.linear_pass( OP_ECALL_WINDOW_COMPUTE_FOREIGN_INTERVAL);
     
     // Debug: Dump after computing foreign intervals
     uint32_t foreign_interval_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE |
@@ -235,7 +235,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
                    first.field_type, first.equality_type);
     }
     
-    truncated.batched_parallel_pass(child, OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY);
+    truncated.parallel_pass(child, OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY);
     
     // Debug: Check field types after update
     DEBUG_INFO("After parallel_pass - checking first entry field types");

@@ -42,7 +42,6 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/algorithms/oblivious_join.cpp \
                  app/algorithms/merge_sort_manager.cpp \
                  app/algorithms/shuffle_manager.cpp \
-                 app/batch/ecall_batch_collector.cpp \
                  app/batch/ecall_wrapper.cpp \
                  app/debug_stubs.cpp \
                  app/core_logic_callbacks.cpp
@@ -57,8 +56,7 @@ App_C_Files := app/core_logic/algorithms/min_heap.c \
                app/core_logic/operations/merge_comparators.c \
                app/core_logic/operations/window_functions.c \
                app/core_logic/operations/transform_functions.c \
-               app/core_logic/operations/distribute_functions.c \
-               app/core_logic/batch/batch_dispatcher.c
+               app/core_logic/operations/distribute_functions.c
 
 # Include paths
 App_Include_Paths := -Icommon -Iapp -Iapp/core_logic
@@ -141,7 +139,6 @@ Test_Common_Objects := app/file_io/converters.o \
                       app/join/join_attribute_setter.o \
                       app/algorithms/merge_sort_manager.o \
                       app/algorithms/shuffle_manager.o \
-                      app/batch/ecall_batch_collector.o \
                       app/batch/ecall_wrapper.o \
                       app/core_logic_callbacks.o \
                       app/debug_stubs.o \

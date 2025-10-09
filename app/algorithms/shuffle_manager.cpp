@@ -1,8 +1,6 @@
 #include "shuffle_manager.h"
-#include "../utils/counted_ecalls.h"  // For counted ecall wrappers
-#include "../batch/ecall_wrapper.h"  // For ocall counter
 #include "debug_util.h"
-#include "../crypto/crypto_utils.h"
+#include "../core_logic/algorithms/oblivious_waksman.h"
 #include <algorithm>
 
 // Static member initialization
@@ -94,13 +92,11 @@ void ShuffleManager::shuffle_small(std::vector<Entry>& entries) {
     }
     
     // Call 2-way Waksman shuffle
-    sgx_status_t status = SGX_SUCCESS;
-    sgx_status_t ecall_status = ecall_oblivious_2way_waksman(
-        eid, &status, c_entries.data(), n);
-    
-    if (ecall_status != SGX_SUCCESS || status != SGX_SUCCESS) {
-        DEBUG_ERROR("Waksman shuffle failed: ecall_status=%d, status=%d", 
-                    ecall_status, status);
+    // Call oblivious Waksman shuffle directly
+    int result = oblivious_2way_waksman(c_entries.data(), n);
+
+    if (result != 0) {
+        DEBUG_ERROR("Waksman shuffle failed: result=%d", result);
         return;
     }
     
@@ -141,48 +137,25 @@ void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
         c_entries.push_back(e.to_entry_t());
     }
     
-    sgx_status_t status = SGX_SUCCESS;
-    sgx_status_t ecall_status = counted_ecall_k_way_shuffle_decompose(
-        eid, &status, c_entries.data(), n);
-    
-    if (ecall_status != SGX_SUCCESS || status != SGX_SUCCESS) {
-        DEBUG_ERROR("K-way decompose failed: ecall_status=%d, status=%d", 
-                    ecall_status, status);
+    // For TDX: k-way shuffle not yet ported - use simpler approach
+    // Just shuffle the whole array at once if it fits
+    DEBUG_INFO("Using simplified shuffle for large vector (size=%zu)", n);
+
+    int result = oblivious_2way_waksman(c_entries.data(), n);
+
+    if (result != 0) {
+        DEBUG_ERROR("K-way shuffle failed: result=%d", result);
         clear_current();
         return;
     }
-    
-    DEBUG_TRACE("Decomposition complete, group sizes:");
-    for (size_t i = 0; i < k; i++) {
-        DEBUG_TRACE("  Group %zu: %zu entries", i, groups[i].size());
+
+    // Convert back to entries
+    entries.clear();
+    for (size_t i = 0; i < n; i++) {
+        Entry e;
+        e.from_entry_t(c_entries[i]);
+        entries.push_back(e);
     }
-    
-    // Phase 2: Recursively shuffle each group
-    for (size_t i = 0; i < k; i++) {
-        DEBUG_TRACE("Recursively shuffling group %zu", i);
-        recursive_shuffle(groups[i]);
-    }
-    
-    // Phase 3: K-way reconstruction
-    output_entries.clear();
-    output_entries.reserve(n);
-    
-    // Reset positions for reading
-    group_positions.clear();
-    group_positions.resize(k, 0);
-    
-    ecall_status = counted_ecall_k_way_shuffle_reconstruct(
-        eid, &status, n);
-    
-    if (ecall_status != SGX_SUCCESS || status != SGX_SUCCESS) {
-        DEBUG_ERROR("K-way reconstruct failed: ecall_status=%d, status=%d", 
-                    ecall_status, status);
-        clear_current();
-        return;
-    }
-    
-    // Move output to entries vector (keep all entries including padding)
-    entries = std::move(output_entries);
     
     clear_current();
     

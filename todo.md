@@ -42,18 +42,20 @@
 
 ## Phase 4: Replace Ecalls with Direct Function Calls (2 hours)
 
-- [ ] **4.1** Update `app/batch/ecall_batch_collector.cpp` - replace `ecall_batch_dispatcher()` with direct call
-- [ ] **4.2** Add include for `core_logic/batch/batch_dispatcher.h`
-- [ ] **4.3** Remove `global_eid` parameter from batch calls
-- [ ] **4.4** Update `app/algorithms/merge_sort_manager.cpp` - replace `ecall_heap_sort()` with `heap_sort()`
-- [ ] **4.5** Update k_way_merge calls: `ecall_k_way_merge_init/process/cleanup()` → direct calls
-- [ ] **4.6** Update `app/algorithms/shuffle_manager.cpp` - replace all shuffle ecalls with direct calls
-- [ ] **4.7** Replace `ecall_oblivious_2way_waksman()` with `oblivious_2way_waksman()`
-- [ ] **4.8** Replace `ecall_k_way_shuffle_decompose/reconstruct()` with direct calls
-- [ ] **4.9** Remove all SGX status checking (sgx_status_t, SGX_SUCCESS, etc.)
-- [ ] **4.10** Update `app/batch/ecall_wrapper.h` - keep counters, remove ecall macros
-- [ ] **4.11** Delete `app/utils/counted_ecalls.h` (no longer needed)
-- [ ] **4.12** Commit: "Phase 4: Replace ecalls with direct function calls"
+- [x] **4.1** Update `app/batch/ecall_batch_collector.cpp` - replace `ecall_batch_dispatcher()` with direct call
+- [x] **4.2** Add include for `core_logic/batch/batch_dispatcher.h`
+- [x] **4.3** Remove `eid` parameter from EcallBatchCollector constructor
+- [x] **4.4** Remove `eid` from Table::batched_map, batched_linear_pass, batched_parallel_pass
+- [ ] **4.5** Update all algorithm files to remove eid parameters from function signatures
+- [ ] **4.6** Update `app/algorithms/merge_sort_manager.cpp` - replace `ecall_heap_sort()` with `heap_sort()`
+- [ ] **4.7** Update k_way_merge calls: `ecall_k_way_merge_init/process/cleanup()` → direct calls
+- [ ] **4.8** Update `app/algorithms/shuffle_manager.cpp` - replace all shuffle ecalls with direct calls
+- [ ] **4.9** Replace `ecall_oblivious_2way_waksman()` with `oblivious_2way_waksman()`
+- [ ] **4.10** Replace `ecall_k_way_shuffle_decompose/reconstruct()` with direct calls
+- [ ] **4.11** Remove all SGX status checking (sgx_status_t, SGX_SUCCESS, etc.)
+- [ ] **4.12** Update `app/batch/ecall_wrapper.h` - keep counters, remove ecall macros
+- [ ] **4.13** Delete `app/utils/counted_ecalls.h` (no longer needed)
+- [ ] **4.14** Commit: "Phase 4: Replace ecalls with direct function calls"
 
 ---
 

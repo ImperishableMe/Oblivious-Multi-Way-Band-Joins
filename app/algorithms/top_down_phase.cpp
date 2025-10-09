@@ -2,7 +2,6 @@
 #include "../join/join_attribute_setter.h"
 #include <iostream>
 #include "debug_util.h"
-#include "../utils/counted_ecalls.h"  // Use counted ecalls
 
 // Debug functions are declared in debug_util.h
 
@@ -25,8 +24,7 @@ void TopDownPhase::Execute(JoinTreeNodePtr root) {
             ComputeForeignMultiplicities(
                 parent->get_table(),
                 node->get_table(),
-                node->get_constraint_with_parent(),
-                eid);
+                node->get_constraint_with_parent());
         }
     }
     
@@ -50,7 +48,7 @@ void TopDownPhase::Execute(JoinTreeNodePtr root) {
                        DEBUG_COL_FIELD_TYPE | DEBUG_COL_EQUALITY_TYPE | 
                        DEBUG_COL_JOIN_ATTR;
         std::string step_name = "topdown_step12_final_" + node->get_table_name();
-        debug_dump_with_mask(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), static_cast<uint32_t>(), mask);
+        debug_dump_with_mask(node->get_table(), node->get_table_name().c_str(), step_name.c_str(), 0, mask);
     }
 }
 
@@ -68,8 +66,7 @@ void TopDownPhase::InitializeForeignFields(JoinTreeNodePtr node) {
 Table TopDownPhase::CombineTableForForeign(
     const Table& parent,
     const Table& child,
-    const JoinConstraint& constraint,
-    sgx_enclave_id_t eid) {
+    const JoinConstraint& constraint) {
     
     DEBUG_INFO("CombineTableForForeign: parent=%zu entries, child=%zu entries", 
                parent.size(), child.size());
@@ -131,8 +128,7 @@ Table TopDownPhase::CombineTableForForeign(
 void TopDownPhase::ComputeForeignMultiplicities(
     Table& parent,
     Table& child,
-    const JoinConstraint& constraint,
-    sgx_enclave_id_t eid) {
+    const JoinConstraint& constraint) {
     
     // Step 0: Set join_attr for both parent and child based on their join columns
     DEBUG_INFO("Setting join_attr for parent using column: %s", constraint.get_target_column().c_str());
@@ -149,7 +145,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     uint32_t combined_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE | 
                             DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | DEBUG_COL_FINAL_MULT |
                             DEBUG_COL_EQUALITY_TYPE;
-    debug_dump_with_mask(combined, "combined_foreign", "topdown_step1_combined", static_cast<uint32_t>(), combined_mask);
+    debug_dump_with_mask(combined, "combined_foreign", "topdown_step1_combined", 0, combined_mask);
     
     // Step 2: Initialize foreign temporary fields
     DEBUG_INFO("Initializing foreign temporary fields");
@@ -160,14 +156,14 @@ void TopDownPhase::ComputeForeignMultiplicities(
                                 DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | DEBUG_COL_FINAL_MULT |
                                 DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_FOREIGN_SUM | 
                                 DEBUG_COL_LOCAL_WEIGHT;
-    debug_dump_with_mask(combined, "foreign_temps_init", "topdown_step2_init_temps", static_cast<uint32_t>(), foreign_init_mask);
+    debug_dump_with_mask(combined, "foreign_temps_init", "topdown_step2_init_temps", 0, foreign_init_mask);
     
     // Step 3: Sort by join attribute
     DEBUG_INFO("Sorting by join attribute");
     combined.shuffle_merge_sort( OP_ECALL_COMPARATOR_JOIN_ATTR);
     
     // Debug: Dump after sorting by join attribute
-    debug_dump_with_mask(combined, "sorted_by_join", "topdown_step3_sorted", static_cast<uint32_t>(), foreign_init_mask);
+    debug_dump_with_mask(combined, "sorted_by_join", "topdown_step3_sorted", 0, foreign_init_mask);
     
     // Step 4: Compute foreign cumulative sums and weights
     DEBUG_INFO("Computing foreign cumulative sums");
@@ -178,14 +174,14 @@ void TopDownPhase::ComputeForeignMultiplicities(
                                DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | DEBUG_COL_FINAL_MULT |
                                DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_FOREIGN_SUM | 
                                DEBUG_COL_LOCAL_WEIGHT;
-    debug_dump_with_mask(combined, "foreign_sum", "topdown_step4_cumsum", static_cast<uint32_t>(), foreign_sum_mask);
+    debug_dump_with_mask(combined, "foreign_sum", "topdown_step4_cumsum", 0, foreign_sum_mask);
     
     // Step 5: Sort for pairwise processing
     DEBUG_INFO("Sorting for pairwise processing");
     combined.shuffle_merge_sort( OP_ECALL_COMPARATOR_PAIRWISE);
     
     // Debug: Dump after pairwise sort
-    debug_dump_with_mask(combined, "sorted_pairwise", "topdown_step5_pairwise", static_cast<uint32_t>(), foreign_sum_mask);
+    debug_dump_with_mask(combined, "sorted_pairwise", "topdown_step5_pairwise", 0, foreign_sum_mask);
     
     // Step 6: Compute foreign intervals
     DEBUG_INFO("Computing foreign intervals");
@@ -197,14 +193,14 @@ void TopDownPhase::ComputeForeignMultiplicities(
                                      DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_FOREIGN_SUM |
                                      DEBUG_COL_FOREIGN_INTERVAL | 
                                      DEBUG_COL_LOCAL_WEIGHT;
-    debug_dump_with_mask(combined, "foreign_intervals", "topdown_step6_intervals", static_cast<uint32_t>(), foreign_interval_mask);
+    debug_dump_with_mask(combined, "foreign_intervals", "topdown_step6_intervals", 0, foreign_interval_mask);
     
     // Step 7: Sort END entries first to extract computed intervals
     DEBUG_INFO("Sorting END entries first");
     combined.shuffle_merge_sort( OP_ECALL_COMPARATOR_END_FIRST);
     
     // Debug: Dump after END-first sort
-    debug_dump_with_mask(combined, "sorted_end_first", "topdown_step7_end_first", static_cast<uint32_t>(), foreign_interval_mask);
+    debug_dump_with_mask(combined, "sorted_end_first", "topdown_step7_end_first", 0, foreign_interval_mask);
     
     // Step 8: Truncate to child size
     DEBUG_INFO("Truncating to %zu entries (child size)", child.size());
@@ -220,7 +216,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
                              DEBUG_COL_EQUALITY_TYPE | DEBUG_COL_FOREIGN_SUM |
                              DEBUG_COL_FOREIGN_INTERVAL |
                              DEBUG_COL_LOCAL_WEIGHT;
-    debug_dump_with_mask(truncated, "truncated_foreign", "topdown_step8_truncated", static_cast<uint32_t>(), truncated_mask);
+    debug_dump_with_mask(truncated, "truncated_foreign", "topdown_step8_truncated", 0, truncated_mask);
     
     // Step 9: Update child's final multiplicities
     DEBUG_INFO("Updating child's final multiplicities");
@@ -229,7 +225,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     uint32_t child_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE |
                          DEBUG_COL_JOIN_ATTR | DEBUG_COL_LOCAL_MULT | 
                          DEBUG_COL_FINAL_MULT | DEBUG_COL_EQUALITY_TYPE;
-    debug_dump_with_mask(child, "child_before_update", "topdown_step9a_before", static_cast<uint32_t>(), child_mask);
+    debug_dump_with_mask(child, "child_before_update", "topdown_step9a_before", 0, child_mask);
     
     // Debug: Check field types before update
     DEBUG_INFO("Before parallel_pass - checking first entry field types");
@@ -239,7 +235,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
                    first.field_type, first.equality_type);
     }
     
-    truncated.batched_parallel_pass(child, eid, OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY);
+    truncated.batched_parallel_pass(child, OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY);
     
     // Debug: Check field types after update
     DEBUG_INFO("After parallel_pass - checking first entry field types");
@@ -250,7 +246,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     }
     
     // Debug: Dump child table after update
-    debug_dump_with_mask(child, "child_after_update", "topdown_step9b_after", static_cast<uint32_t>(), child_mask);
+    debug_dump_with_mask(child, "child_after_update", "topdown_step9b_after", 0, child_mask);
     
     DEBUG_INFO("Child final multiplicities updated");
 }

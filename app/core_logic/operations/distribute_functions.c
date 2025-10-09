@@ -13,12 +13,6 @@
  * Returns dst_idx + final_mult
  */
 int32_t obtain_output_size(const entry_t* last_entry) {
-    // Check if encrypted and decrypt if needed
-    if (last_entry->is_encrypted) {
-        entry_t decrypted = *last_entry;
-        aes_decrypt_entry(&decrypted);
-        return decrypted.dst_idx + decrypted.final_mult;
-    } else {
-        return last_entry->dst_idx + last_entry->final_mult;
-    }
+    // TDX: Direct access, no encryption to check
+    return last_entry->dst_idx + last_entry->final_mult;
 }

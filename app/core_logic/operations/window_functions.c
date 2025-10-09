@@ -1,5 +1,6 @@
 #include "enclave_types.h"
 #include "debug_util.h"
+#include <stddef.h>
 #include <stdint.h>
 
 /**
@@ -19,7 +20,8 @@ void window_set_original_index_op(entry_t* e1, entry_t* e2) {
  * Sets consecutive indices as the window slides through the table
  */
 void window_set_original_index(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_set_original_index_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_set_original_index_op(e1, e2);
 }
 
 void update_target_multiplicity_op(entry_t* source, entry_t* target) {
@@ -36,7 +38,8 @@ void update_target_multiplicity_op(entry_t* source, entry_t* target) {
  * Parameters: source (with intervals), target (to update)
  */
 void update_target_multiplicity(entry_t* source, entry_t* target) {
-    apply_to_decrypted_pair(source, target, update_target_multiplicity_op);
+    // TDX: Direct call, no encryption wrapper needed
+    update_target_multiplicity_op(source, target);
 }
 
 void update_target_final_multiplicity_op(entry_t* source, entry_t* target) {
@@ -51,7 +54,8 @@ void update_target_final_multiplicity_op(entry_t* source, entry_t* target) {
  * Parameters: source (with foreign intervals), target (to update)
  */
 void update_target_final_multiplicity(entry_t* source, entry_t* target) {
-    apply_to_decrypted_pair(source, target, update_target_final_multiplicity_op);
+    // TDX: Direct call, no encryption wrapper needed
+    update_target_final_multiplicity_op(source, target);
 }
 
 void window_compute_local_sum_op(entry_t* e1, entry_t* e2) {
@@ -81,7 +85,8 @@ void window_compute_local_sum_op(entry_t* e1, entry_t* e2) {
  * e1 is window[0], e2 is window[1] in the sliding window
  */
 void window_compute_local_sum(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_compute_local_sum_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_compute_local_sum_op(e1, e2);
 }
 
 void window_compute_local_interval_op(entry_t* e1, entry_t* e2) {
@@ -113,7 +118,8 @@ void window_compute_local_interval_op(entry_t* e1, entry_t* e2) {
  * e1 is window[0], e2 is window[1] in the sliding window
  */
 void window_compute_local_interval(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_compute_local_interval_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_compute_local_interval_op(e1, e2);
 }
 
 void window_compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
@@ -155,7 +161,8 @@ void window_compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
  * e1 is window[0], e2 is window[1] in the sliding window
  */
 void window_compute_foreign_sum(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_compute_foreign_sum_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_compute_foreign_sum_op(e1, e2);
 }
 
 void window_compute_foreign_interval_op(entry_t* e1, entry_t* e2) {
@@ -183,7 +190,8 @@ void window_compute_foreign_interval_op(entry_t* e1, entry_t* e2) {
  * e1 is window[0], e2 is window[1] in the sliding window
  */
 void window_compute_foreign_interval(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_compute_foreign_interval_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_compute_foreign_interval_op(e1, e2);
 }
 
 void window_propagate_foreign_interval_op(entry_t* e1, entry_t* e2) {
@@ -206,7 +214,8 @@ void window_propagate_foreign_interval_op(entry_t* e1, entry_t* e2) {
  * After computing intervals for START/END pairs, propagate to SOURCE entries
  */
 void window_propagate_foreign_interval(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_propagate_foreign_interval_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_propagate_foreign_interval_op(e1, e2);
 }
 
 // ============================================================================
@@ -222,7 +231,8 @@ void window_compute_dst_idx_op(entry_t* e1, entry_t* e2) {
 }
 
 void window_compute_dst_idx(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_compute_dst_idx_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_compute_dst_idx_op(e1, e2);
 }
 
 /**
@@ -234,7 +244,8 @@ void window_increment_index_op(entry_t* e1, entry_t* e2) {
 }
 
 void window_increment_index(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_increment_index_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_increment_index_op(e1, e2);
 }
 
 /**
@@ -267,7 +278,8 @@ void window_expand_copy_op(entry_t* e1, entry_t* e2) {
 }
 
 void window_expand_copy(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_expand_copy_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_expand_copy_op(e1, e2);
 }
 
 // ============================================================================
@@ -288,7 +300,8 @@ void window_update_copy_index_op(entry_t* e1, entry_t* e2) {
 }
 
 void window_update_copy_index(entry_t* e1, entry_t* e2) {
-    apply_to_decrypted_pair(e1, e2, window_update_copy_index_op);
+    // TDX: Direct call, no encryption wrapper needed
+    window_update_copy_index_op(e1, e2);
 }
 
 /**

@@ -4,7 +4,6 @@
 #include "../join/join_tree_node.h"
 #include "../data_structures/table.h"
 #include "../join/join_constraint.h"
-#include "sgx_eid.h"
 #include <vector>
 
 /**
@@ -21,7 +20,6 @@ public:
     /**
      * Execute the top-down phase on the join tree
      * @param root Root of the join tree (with local_mult already computed)
-     * @param eid Enclave ID for secure operations
      */
     static void Execute(JoinTreeNodePtr root);
 
@@ -30,15 +28,13 @@ private:
      * Initialize root table for top-down phase
      * Sets final_mult = local_mult for root entries only
      * @param node Root node to initialize
-     * @param eid Enclave ID
      */
     static void InitializeRootTable(JoinTreeNodePtr node);
-    
+
     /**
      * Initialize foreign fields for a table
      * Sets foreign_sum = 0, local_weight = 0
      * @param node Node to initialize
-     * @param eid Enclave ID
      */
     static void InitializeForeignFields(JoinTreeNodePtr node);
     
@@ -48,14 +44,12 @@ private:
      * @param parent Parent table (with final_mult set)
      * @param child Child table (to receive foreign multiplicities)
      * @param constraint Join constraint between parent and child
-     * @param eid Enclave ID
      * @return Combined table with SOURCE, START, END entries
      */
     static Table CombineTableForForeign(
         const Table& parent,
         const Table& child,
-        const JoinConstraint& constraint,
-        sgx_enclave_id_t eid);
+        const JoinConstraint& constraint);
     
     /**
      * Compute foreign multiplicities for child table
@@ -63,13 +57,11 @@ private:
      * @param parent Parent table (already has final_mult)
      * @param child Child table (will receive final_mult)
      * @param constraint Join constraint
-     * @param eid Enclave ID
      */
     static void ComputeForeignMultiplicities(
         Table& parent,
         Table& child,
-        const JoinConstraint& constraint,
-        sgx_enclave_id_t eid);
+        const JoinConstraint& constraint);
     
     /**
      * Pre-order traversal of join tree (root to leaves)

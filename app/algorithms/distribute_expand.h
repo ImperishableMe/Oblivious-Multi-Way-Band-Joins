@@ -3,7 +3,6 @@
 
 #include "../join/join_tree_node.h"
 #include "../data_structures/table.h"
-#include "sgx_eid.h"
 #include <vector>
 
 /**
@@ -23,7 +22,6 @@ public:
     /**
      * Execute the distribute-expand phase on all tables in the join tree
      * @param root Root of the join tree with final_mult computed
-     * @param eid Enclave ID for secure operations
      */
     static void Execute(JoinTreeNodePtr root);
 
@@ -31,31 +29,27 @@ private:
     /**
      * Expand a single table according to final multiplicities
      * @param table Input table with final_mult values
-     * @param eid Enclave ID
      * @return Expanded table with each tuple replicated final_mult times
      */
     static Table ExpandSingleTable(const Table& table);
-    
+
     /**
      * Compute the output size for expansion
      * @param table Table with dst_idx computed
-     * @param eid Enclave ID
      * @return Total size after expansion
      */
     static size_t ComputeOutputSize(const Table& table);
-    
+
     /**
      * Perform the distribution phase using variable-distance passes
      * @param table Table with entries and padding
      * @param output_size Target size
-     * @param eid Enclave ID
      */
     static void DistributePhase(Table& table, size_t output_size);
-    
+
     /**
      * Perform the expansion phase to fill gaps
      * @param table Distributed table
-     * @param eid Enclave ID
      */
     static void ExpansionPhase(Table& table);
     

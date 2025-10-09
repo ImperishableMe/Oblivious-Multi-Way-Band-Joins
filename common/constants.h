@@ -14,6 +14,9 @@
 // Maximum table size for testing
 #define MAX_TABLE_SIZE 10000
 
+// Batch processing parameters
+#define MAX_BATCH_SIZE 2000               // Maximum batch size for operations
+
 // Merge sort parameters
 #define MERGE_SORT_K 8                    // Number of ways for k-way merge
 #define MERGE_BUFFER_SIZE (MAX_BATCH_SIZE / MERGE_SORT_K)  // Buffer size per run

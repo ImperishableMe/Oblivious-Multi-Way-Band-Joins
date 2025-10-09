@@ -1,6 +1,7 @@
 #ifndef ECALL_WRAPPER_H
 #define ECALL_WRAPPER_H
 
+#include <cstddef>
 #include <atomic>
 
 /*

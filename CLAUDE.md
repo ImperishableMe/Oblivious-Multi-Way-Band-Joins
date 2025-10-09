@@ -2,6 +2,18 @@
 
 This document contains comprehensive instructions and context for AI assistants working with this codebase.
 
+## ⚠️ IMPORTANT: TDX MIGRATION COMPLETED (October 2025)
+
+**This codebase has been migrated from Intel SGX to Intel TDX architecture.**
+
+Key changes:
+- ❌ **No application-level encryption** - TDX encrypts entire VM
+- ❌ **No enclave boundary** - Direct function calls instead of ecalls
+- ✅ **Oblivious algorithms preserved** - All security properties maintained
+- ✅ **Simplified architecture** - No crypto layer, unified codebase
+
+See `TDX_MIGRATION_SUMMARY.md` for complete migration details.
+
 # ============== CRITICAL RULES (MUST FOLLOW) ==============
 
 ## Code Modification Rules
@@ -33,11 +45,19 @@ This document contains comprehensive instructions and context for AI assistants 
 
 ### Core Design
 - **Oblivious Multi-Way Join**: Implements data-oblivious join algorithms with constant memory overhead
-- **SGX Enclave**: Secure execution inside Intel SGX for confidentiality
-- **Two-Phase Processing**:
-  - Outside enclave: Manipulating encrypted data using C++ STL
-  - Inside enclave: Operating on decrypted data using native C
+- **TDX VM Protection**: Secure execution inside Intel TDX trusted VM (migrated from SGX)
+- **Unified Processing**:
+  - Single codebase - no enclave boundary
+  - Direct function calls - no ecalls/ocalls
+  - VM-level encryption - no application crypto
 - **Memory Access Patterns**: All access patterns are data-independent to prevent side-channel attacks
+
+### TDX Migration (October 2025)
+- **Architecture**: Moved from SGX enclaves to TDX trusted VMs
+- **Encryption**: Removed application-level encryption (TDX handles transparently)
+- **Code Organization**: Merged `enclave/trusted/` → `app/core_logic/`
+- **Performance**: Eliminated ecall overhead, faster execution
+- **Security**: Maintained data-oblivious properties, VM-level protection
 
 ### Key Components
 1. **Join Algorithms** (`app/algorithms/`):
@@ -88,7 +108,7 @@ This document contains comprehensive instructions and context for AI assistants 
 ## Build Commands
 
 ```bash
-# Standard build
+# Standard build (TDX - no SGX SDK needed)
 make clean && make
 
 # Debug build (enables debug output to files)
@@ -98,12 +118,18 @@ DEBUG=1 make
 make SLIM_ENTRY=1
 
 # Build test programs
-make tests
+make test_join        # Integration test (works)
+# Note: sqlite_baseline requires libsqlite3-dev (optional)
 
-# Build individual test programs
-make test_join        # Comparison test
-make sqlite_baseline  # SQLite reference implementation
+# Run the application
+./sgx_app <query.sql> <input_dir> <output.csv>
 ```
+
+### TDX Build Notes
+- ✅ No SGX SDK installation required
+- ✅ No enclave signing needed
+- ✅ Standard GCC/G++ compilation
+- ✅ Direct linking of all components
 
 ## Build Modes
 - **Fat Entry Mode** (default): Full entry structure (~2256 bytes per entry)
@@ -125,14 +151,11 @@ make sqlite_baseline  # SQLite reference implementation
 ./sgx_app input/queries/tpch_tb1.sql input/encrypted/data_0_001 output.csv
 ```
 
-### Data Encryption
-```bash
-# Encrypt plaintext CSV files
-./encrypt_tables <plaintext_dir> <encrypted_output_dir>
-
-# Example
-./encrypt_tables input/plaintext/data_0_001 /tmp/encrypted_data
-```
+### Data Format (TDX)
+**Note**: After TDX migration, no encryption tool is needed. Data files are used directly as CSV.
+- Input: Plaintext CSV files
+- Output: Plaintext CSV files
+- Protection: TDX VM encrypts filesystem transparently
 
 ### Testing
 ```bash

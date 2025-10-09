@@ -3,7 +3,6 @@
 #include <cmath>
 #include <cstring>
 #include "debug_util.h"
-#include "../utils/counted_ecalls.h"  // Includes both Enclave_u.h and ecall_wrapper.h
 
 // Debug functions are declared in debug_util.h
 // debug_dump_table is already declared in debug_util.h
@@ -61,8 +60,8 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     // Targeted debug: Check final_mult values before expansion
     uint32_t key_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_LOCAL_MULT | 
                        DEBUG_COL_FINAL_MULT | DEBUG_COL_FIELD_TYPE;
-    debug_dump_with_mask(table, ("pre_expand_" + table_name).c_str(), 
-                        ("distexp_pre_expand_" + table_name).c_str(), static_cast<uint32_t>(), key_mask);
+    debug_dump_with_mask(table, ("pre_expand_" + table_name).c_str(),
+                        ("distexp_pre_expand_" + table_name).c_str(), 0, key_mask);
     
     // Step 1: Initialize dst_idx field to 0
     DEBUG_INFO("Step 1 - Initializing dst_idx");
@@ -77,7 +76,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     // Debug: Show dst_idx values after cumulative sum
     uint32_t dst_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FINAL_MULT | DEBUG_COL_DST_IDX;
     debug_dump_with_mask(working, ("step2_dst_idx_" + table_name).c_str(),
-                        ("distexp_step2_cumsum_" + table_name).c_str(), static_cast<uint32_t>(), dst_mask);
+                        ("distexp_step2_cumsum_" + table_name).c_str(), 0, dst_mask);
     
     // Step 3: Get output size from last entry
     DEBUG_INFO("Step 3 - Getting output size");
@@ -99,7 +98,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     uint32_t padding_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FINAL_MULT | 
                            DEBUG_COL_FIELD_TYPE | DEBUG_COL_DST_IDX;
     debug_dump_with_mask(working, ("step4_marked_padding_" + table_name).c_str(),
-                        ("distexp_step4_padding_" + table_name).c_str(), static_cast<uint32_t>(), padding_mask);
+                        ("distexp_step4_padding_" + table_name).c_str(), 0, padding_mask);
     
     // Step 5: Sort to move DIST_PADDING entries to the end
     DEBUG_INFO("Step 5 - Sorting (size=%zu)", working.size());
@@ -141,7 +140,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
                                DEBUG_COL_FINAL_MULT | DEBUG_COL_DST_IDX | 
                                DEBUG_COL_FIELD_TYPE;
     debug_dump_with_mask(working, ("step7_before_distribute_" + table_name).c_str(),
-                        ("distexp_step7_before_dist_" + table_name).c_str(), static_cast<uint32_t>(), before_dist_mask);
+                        ("distexp_step7_before_dist_" + table_name).c_str(), 0, before_dist_mask);
     
     // Step 8: Distribution phase using variable-distance passes
     DEBUG_INFO("Step 8 - Distribution phase");
@@ -152,14 +151,14 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     DEBUG_INFO("Step 9 - Expansion phase");
     
     // Debug: Dump table before expansion copy
-    debug_dump_table(working, ("before_expansion_copy_" + table_name).c_str(), 
-                    ("distexp_step9a_before_" + table_name).c_str(), static_cast<uint32_t>());
+    debug_dump_table(working, ("before_expansion_copy_" + table_name).c_str(),
+                    ("distexp_step9a_before_" + table_name).c_str(), 0);
     
     ExpansionPhase(working);
     
     // Debug: Dump table after expansion copy
-    debug_dump_table(working, ("after_expansion_copy_" + table_name).c_str(), 
-                    ("distexp_step9b_after_" + table_name).c_str(), static_cast<uint32_t>());
+    debug_dump_table(working, ("after_expansion_copy_" + table_name).c_str(),
+                    ("distexp_step9b_after_" + table_name).c_str(), 0);
     
     DEBUG_INFO("Step 9 complete, final table size=%zu", working.size());
     
@@ -169,7 +168,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
                          DEBUG_COL_FINAL_MULT | DEBUG_COL_COPY_INDEX | 
                          DEBUG_COL_DST_IDX | DEBUG_COL_FIELD_TYPE;
     debug_dump_with_mask(working, ("final_expanded_" + table_name).c_str(),
-                        ("distexp_step10_final_" + table_name).c_str(), static_cast<uint32_t>(), final_mask);
+                        ("distexp_step10_final_" + table_name).c_str(), 0, final_mask);
     
     return working;
 }
@@ -178,17 +177,11 @@ size_t DistributeExpand::ComputeOutputSize(const Table& table) {
     if (table.size() == 0) {
         return 0;
     }
-    
+
     // Get the last entry's dst_idx + final_mult
-    entry_t last_entry = table[table.size() - 1].to_entry_t();
-    int32_t output_size = 0;
-    
-    sgx_status_t status = counted_ecall_obtain_output_size( &output_size, &last_entry);
-    if (status != SGX_SUCCESS) {
-        DEBUG_ERROR("Failed to obtain output size: %d", status);
-        return 0;
-    }
-    
+    const Entry& last_entry = table[table.size() - 1];
+    int32_t output_size = last_entry.dst_idx + last_entry.final_mult;
+
     return static_cast<size_t>(output_size);
 }
 

@@ -7,7 +7,7 @@
 #include <climits>  // For INT32_MAX, INT32_MIN
 #include "converters.h"
 #include "io_entry.h"  // For IO_Entry
-#include "Enclave_u.h"
+#include "sgx_compat/Enclave_u.h"
 #include "types_common.h"  // For NULL_VALUE and type constants
 #include "debug_util.h"
 

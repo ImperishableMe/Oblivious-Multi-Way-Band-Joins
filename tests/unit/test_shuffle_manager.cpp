@@ -15,8 +15,8 @@
 #include "../../app/crypto/crypto_utils.h"
 #include "../../common/enclave_types.h"
 #include "../../common/constants.h"
-#include "Enclave_u.h"
-#include "sgx_urts.h"
+#include "sgx_compat/Enclave_u.h"
+#include "sgx_compat/sgx_urts.h"
 
 // Global enclave ID
 sgx_enclave_id_t global_eid = 0;

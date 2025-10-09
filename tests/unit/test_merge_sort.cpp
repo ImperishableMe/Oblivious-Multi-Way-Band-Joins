@@ -5,8 +5,8 @@
 #include <chrono>
 #include "app/data_structures/data_structures.h"
 #include "app/crypto/crypto_utils.h"
-#include "enclave/untrusted/Enclave_u.h"
-#include "sgx_urts.h"
+#include "sgx_compat/Enclave_u.h"
+#include "sgx_compat/sgx_urts.h"
 #include "common/batch_types.h"
 #include "common/debug_util.h"
 

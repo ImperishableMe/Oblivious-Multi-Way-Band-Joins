@@ -7,8 +7,7 @@
 #include "../data_structures/entry.h"
 #include "../../common/batch_types.h"
 #include "../../common/constants.h"
-#include "sgx_eid.h"
-#include "sgx_error.h"
+#include "sgx_compat/sgx_types.h"
 
 /**
  * MergeSortManager - Manages non-oblivious k-way merge sort

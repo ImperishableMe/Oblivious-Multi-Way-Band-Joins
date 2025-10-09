@@ -1,6 +1,6 @@
 #include <iostream>
 #include <cstring>
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 #include "app/Enclave_u.h"
 #include "enclave/enclave_types.h"
 

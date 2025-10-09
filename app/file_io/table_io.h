@@ -8,7 +8,7 @@
 #include <fstream>
 #include "../data_structures/data_structures.h"
 #include "../crypto/crypto_utils.h"
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 
 /**
  * TableIO Class

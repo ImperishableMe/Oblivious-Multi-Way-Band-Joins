@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 #include "app/Enclave_u.h"
 
 // Test suite declarations

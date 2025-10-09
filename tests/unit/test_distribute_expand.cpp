@@ -8,7 +8,7 @@
 #include "../../app/file_io/table_io.h"
 #include "constants.h"
 #include "debug_util.h"
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 
 #define ENCLAVE_FILENAME "enclave.signed.so"
 

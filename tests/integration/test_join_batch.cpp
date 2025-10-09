@@ -21,10 +21,10 @@
 #include <algorithm>
 #include <unistd.h>
 #include "app/batch/ecall_wrapper.h"
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 #include "file_io/table_io.h"
 #include "crypto/crypto_utils.h"
-#include "Enclave_u.h"
+#include "sgx_compat/Enclave_u.h"
 
 struct TestConfig {
     std::string query_file;

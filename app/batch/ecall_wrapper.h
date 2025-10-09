@@ -1,8 +1,8 @@
 #ifndef ECALL_WRAPPER_H
 #define ECALL_WRAPPER_H
 
-#include "sgx_urts.h"
-#include "Enclave_u.h"
+#include "sgx_compat/sgx_urts.h"
+#include "sgx_compat/Enclave_u.h"
 #include <atomic>
 
 // Global ecall counter

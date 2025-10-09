@@ -1,5 +1,5 @@
 #include "join_attribute_setter.h"
-#include "Enclave_u.h"
+#include "sgx_compat/Enclave_u.h"
 #include "batch_types.h"
 #include <stdexcept>
 #include <sstream>

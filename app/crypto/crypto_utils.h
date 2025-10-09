@@ -3,7 +3,7 @@
 
 #include "../data_structures/data_structures.h"
 #include "entry_crypto.h"
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 #include <string>
 
 /**

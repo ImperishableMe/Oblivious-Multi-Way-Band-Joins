@@ -14,8 +14,8 @@
 #include "test_utils/join_result_comparator.h"
 #include "../../app/file_io/table_io.h"
 #include "../../src/crypto/crypto_utils.h"
-#include "Enclave_u.h"
-#include "sgx_urts.h"
+#include "sgx_compat/Enclave_u.h"
+#include "sgx_compat/sgx_urts.h"
 
 namespace fs = std::filesystem;
 

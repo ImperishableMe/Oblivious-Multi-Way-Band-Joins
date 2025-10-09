@@ -19,9 +19,9 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 #include "file_io/table_io.h"
-#include "Enclave_u.h"
+#include "sgx_compat/Enclave_u.h"
 
 // Global enclave ID
 sgx_enclave_id_t global_eid = 0;

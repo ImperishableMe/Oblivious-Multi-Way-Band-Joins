@@ -95,11 +95,11 @@ void ShuffleManager::shuffle_small(std::vector<Entry>& entries) {
     
     // Call 2-way Waksman shuffle
     sgx_status_t status = SGX_SUCCESS;
-    sgx_status_t ecall_status = ecall_oblivious_2way_waksman(
+    sgx_status_t ecall_status = counted_ecall_oblivious_2way_waksman(
         eid, &status, c_entries.data(), n);
-    
+
     if (ecall_status != SGX_SUCCESS || status != SGX_SUCCESS) {
-        DEBUG_ERROR("Waksman shuffle failed: ecall_status=%d, status=%d", 
+        DEBUG_ERROR("Waksman shuffle failed: ecall_status=%d, status=%d",
                     ecall_status, status);
         return;
     }

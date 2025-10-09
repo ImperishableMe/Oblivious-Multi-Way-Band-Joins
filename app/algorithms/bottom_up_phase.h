@@ -6,8 +6,8 @@
 #include "../data_structures/data_structures.h"
 #include "../join/join_tree_node.h"
 #include "../join/join_constraint.h"
-#include "Enclave_u.h"
-#include "sgx_urts.h"
+#include "sgx_compat/Enclave_u.h"
+#include "sgx_compat/sgx_urts.h"
 
 /**
  * BottomUpPhase Class

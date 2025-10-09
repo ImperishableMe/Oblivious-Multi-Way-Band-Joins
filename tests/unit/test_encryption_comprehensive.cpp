@@ -4,8 +4,8 @@
 #include <vector>
 #include <random>
 #include <limits>
-#include "sgx_urts.h"
-#include "Enclave_u.h"
+#include "sgx_compat/sgx_urts.h"
+#include "sgx_compat/Enclave_u.h"
 #include "../../src/core/entry.h"
 #include "../../src/crypto/crypto_utils.h"
 

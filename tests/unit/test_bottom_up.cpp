@@ -17,10 +17,10 @@
 #include "../../src/core/join_tree_builder.h"
 #include "../../app/file_io/table_io.h"
 #include "../../src/crypto/crypto_utils.h"
-#include "Enclave_u.h"
+#include "sgx_compat/Enclave_u.h"
 #include "../utils/subtree_verifier.h"
 #include "debug_util.h"
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 
 sgx_enclave_id_t global_eid = 0;
 

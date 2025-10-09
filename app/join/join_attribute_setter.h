@@ -5,7 +5,7 @@
 #include <string>
 #include "join_tree_node.h"
 #include "../../common/debug_util.h"
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 
 /**
  * JoinAttributeSetter - Sets join_attr field for all entries in the join tree

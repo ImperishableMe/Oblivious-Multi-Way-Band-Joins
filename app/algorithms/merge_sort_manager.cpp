@@ -169,8 +169,8 @@ void MergeSortManager::sort_run_in_enclave(std::vector<Entry>& entries) {
     
     // Call enclave to sort
     sgx_status_t retval;
-    sgx_status_t status = COUNTED_ECALL(ecall_heap_sort, eid, &retval, entry_array.data(), size, 
-                                          (int)comparator_type);
+    sgx_status_t status = counted_ecall_heap_sort(eid, &retval, entry_array.data(), size,
+                                                  (int)comparator_type);
     
     if (status != SGX_SUCCESS) {
         DEBUG_ERROR("ecall_heap_sort failed with status %d", status);
@@ -275,42 +275,42 @@ std::vector<Entry> MergeSortManager::k_way_merge(const std::vector<size_t>& run_
     
     // Initialize merge in enclave
     sgx_status_t retval;
-    sgx_status_t status = COUNTED_ECALL(ecall_k_way_merge_init, eid, &retval, k, (int)comparator_type);
+    sgx_status_t status = counted_ecall_k_way_merge_init(eid, &retval, k, (int)comparator_type);
     if (status != SGX_SUCCESS || retval != SGX_SUCCESS) {
         DEBUG_ERROR("ecall_k_way_merge_init failed with status %d, retval %d", status, retval);
         clear_current();
         return {};
     }
-    
+
     // Collect merged output
     std::vector<Entry> result;
     std::vector<entry_t> output_buffer(MERGE_BUFFER_SIZE);
-    
+
     int merge_complete = 0;
     while (!merge_complete) {
         size_t output_produced = 0;
-        
-        status = COUNTED_ECALL(ecall_k_way_merge_process, eid, &retval, output_buffer.data(), 
-                                          MERGE_BUFFER_SIZE,
-                                          &output_produced, &merge_complete);
-        
+
+        status = counted_ecall_k_way_merge_process(eid, &retval, output_buffer.data(),
+                                                   MERGE_BUFFER_SIZE,
+                                                   &output_produced, &merge_complete);
+
         if (status != SGX_SUCCESS) {
             DEBUG_ERROR("ecall_k_way_merge_process failed with status %d", status);
             break;
         }
-        
+
         // Add produced entries to result
         for (size_t i = 0; i < output_produced; i++) {
             Entry e;
             e.from_entry_t(output_buffer[i]);
             result.push_back(e);
         }
-        
+
         DEBUG_TRACE("Merge produced %zu entries, complete=%d", output_produced, merge_complete);
     }
-    
+
     // Clean up merge state
-    COUNTED_ECALL(ecall_k_way_merge_cleanup, eid, &retval);
+    counted_ecall_k_way_merge_cleanup(eid, &retval);
     clear_current();
     
     DEBUG_TRACE("K-way merge complete, produced %zu entries (expected %zu)", 

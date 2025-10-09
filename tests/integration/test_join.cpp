@@ -14,8 +14,8 @@
 #include "app/data_structures/data_structures.h"
 #include "app/file_io/table_io.h"
 #include "app/crypto/crypto_utils.h"
-#include "sgx_urts.h"
-#include "enclave/untrusted/Enclave_u.h"
+#include "sgx_compat/sgx_urts.h"
+#include "sgx_compat/Enclave_u.h"
 #include "common/debug_util.h"
 
 /* Global enclave ID for decryption */

@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstring>
 #include <cassert>
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 #include "app/Enclave_u.h"
 #include "enclave/enclave_types.h"
 #include "enclave/crypto/entry_crypto.h"

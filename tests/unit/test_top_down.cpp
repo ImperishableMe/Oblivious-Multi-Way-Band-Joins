@@ -16,9 +16,9 @@
 #include "../../src/query/query_parser.h"
 #include "../../src/core/join_tree_builder.h"
 #include "../../app/file_io/table_io.h"
-#include "Enclave_u.h"
+#include "sgx_compat/Enclave_u.h"
 #include "debug_util.h"
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 
 class TopDownTest {
 private:

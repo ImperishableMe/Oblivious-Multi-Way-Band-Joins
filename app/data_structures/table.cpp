@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <climits>
 #include "debug_util.h"
-#include "Enclave_u.h"
+#include "sgx_compat/Enclave_u.h"
 #include "../batch/ecall_batch_collector.h"
 #include "../algorithms/merge_sort_manager.h"
 #include "../algorithms/shuffle_manager.h"

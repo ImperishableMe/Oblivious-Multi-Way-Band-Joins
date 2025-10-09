@@ -3,7 +3,7 @@
 
 #include "../join/join_tree_node.h"
 #include "../data_structures/table.h"
-#include "sgx_eid.h"
+#include "sgx_compat/sgx_types.h"
 #include <vector>
 
 /**

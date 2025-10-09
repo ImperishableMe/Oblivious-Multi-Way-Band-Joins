@@ -5,8 +5,7 @@
 #include <unordered_map>
 #include <functional>
 #include <string>
-#include "sgx_eid.h"
-#include "sgx_error.h"
+#include "sgx_compat/sgx_types.h"
 #include "batch_types.h"
 #include "types_common.h"
 #include "../data_structures/entry.h"

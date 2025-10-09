@@ -5,7 +5,7 @@
 #include <string>
 #include <functional>
 #include "entry.h"
-#include "sgx_urts.h"
+#include "sgx_compat/sgx_urts.h"
 #include "../../common/batch_types.h"
 
 /**

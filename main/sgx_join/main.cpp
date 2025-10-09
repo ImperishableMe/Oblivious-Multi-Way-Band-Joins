@@ -5,8 +5,8 @@
 #include <string>
 #include <map>
 #include <dirent.h>
-#include "sgx_urts.h"
-#include "Enclave_u.h"
+#include "sgx_compat/sgx_urts.h"
+#include "sgx_compat/Enclave_u.h"
 #include "algorithms/oblivious_join.h"
 #include "join/join_tree_node.h"
 #include "join/join_tree_builder.h"

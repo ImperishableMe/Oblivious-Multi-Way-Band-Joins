@@ -182,11 +182,10 @@ static inline const char* debug_level_str(uint32_t level) {
     }
 }
 
-// Table dumping support (only in app environment)
-#ifndef ENCLAVE_BUILD
+// C++ declarations and table dumping support
 #ifdef __cplusplus
 
-// Forward declarations
+// Forward declarations (needed for both enclave and app builds)
 class Table;
 class Entry;
 class JoinTreeNode;
@@ -221,7 +220,7 @@ void debug_close_session();
 void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid,
                       const std::vector<MetadataColumn>& columns = {}, bool include_attributes = true);
 void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid);
-void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
+void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name,
                                  uint32_t eid, const std::vector<std::string>& columns);
 void debug_dump_with_mask(const Table& table, const char* label, const char* step_name,
                           uint32_t eid, uint32_t column_mask);
@@ -243,6 +242,5 @@ void AssertTreeConsistentEncryption(JoinTreeNodePtr root);
 #endif
 
 #endif // __cplusplus
-#endif // !ENCLAVE_BUILD
 
 #endif // DEBUG_UTIL_H

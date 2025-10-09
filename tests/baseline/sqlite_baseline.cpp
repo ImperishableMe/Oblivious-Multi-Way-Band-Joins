@@ -8,65 +8,9 @@
 #include "app/data_structures/data_structures.h"
 #include "app/file_io/table_io.h"
 #include "app/file_io/io_entry.h"  // Use IO_Entry for dynamic data
-#include "app/crypto/crypto_utils.h"
-#include "sgx_urts.h"
 #include "common/debug_util.h"
-#include "enclave/untrusted/Enclave_u.h"
 
-/* Global enclave ID for decryption/encryption */
-sgx_enclave_id_t global_eid = 0;
-
-/* Initialize the enclave */
-int initialize_enclave() {
-    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
-    
-    ret = sgx_create_enclave("enclave.signed.so", SGX_DEBUG_FLAG, NULL, NULL, &global_eid, NULL);
-    if (ret != SGX_SUCCESS) {
-        std::cerr << "Failed to create enclave, error code: 0x" << std::hex << ret << std::endl;
-        return -1;
-    }
-    
-    // Enclave initialized
-    return 0;
-}
-
-/* Destroy the enclave */
-void destroy_enclave() {
-    if (global_eid != 0) {
-        sgx_destroy_enclave(global_eid);
-        // Enclave destroyed
-    }
-}
-
-/* Decrypt a table for SQLite processing */
-Table decrypt_table(const Table& encrypted_table) {
-    Table decrypted = encrypted_table;
-    
-    for (size_t i = 0; i < decrypted.size(); i++) {
-        Entry& entry = decrypted[i];
-        if (entry.is_encrypted) {
-            CryptoUtils::decrypt_entry(entry, global_eid);
-        }
-    }
-    
-    return decrypted;
-}
-
-/* Encrypt a table after SQLite processing */
-Table encrypt_table(const Table& plain_table) {
-    Table encrypted = plain_table;
-    
-    for (size_t i = 0; i < encrypted.size(); i++) {
-        Entry& entry = encrypted[i];
-        if (!entry.is_encrypted) {
-            CryptoUtils::encrypt_entry(entry, global_eid);
-        }
-    }
-    
-    return encrypted;
-}
-
-/* Create SQLite table from decrypted data */
+/* Create SQLite table from plaintext data */
 void create_sqlite_table(sqlite3* db, const std::string& table_name, const Table& table) {
     if (table.size() == 0) {
         throw std::runtime_error("Cannot create table from empty data");
@@ -202,8 +146,8 @@ std::string read_sql_query(const std::string& sql_file) {
 void print_usage(const char* program_name) {
     std::cout << "Usage: " << program_name << " <sql_file> <input_dir> <output_file>" << std::endl;
     std::cout << "  sql_file    : SQL file containing the query" << std::endl;
-    std::cout << "  input_dir   : Directory containing encrypted CSV table files" << std::endl;
-    std::cout << "  output_file : Output file for encrypted join result" << std::endl;
+    std::cout << "  input_dir   : Directory containing plaintext CSV table files" << std::endl;
+    std::cout << "  output_file : Output file for plaintext join result" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -219,84 +163,67 @@ int main(int argc, char* argv[]) {
     // Starting SQLite baseline
     
     sqlite3* db = nullptr;
-    
+
     try {
-        // Initialize the enclave for crypto operations
-        if (initialize_enclave() < 0) {
-            std::cerr << "Enclave initialization failed!" << std::endl;
-            return -1;
-        }
-        
         // Create in-memory SQLite database
         int rc = sqlite3_open(":memory:", &db);
         if (rc != SQLITE_OK) {
             throw std::runtime_error("Cannot open SQLite database");
         }
         // Database created
-        
-        // Load and decrypt all CSV files
+
+        // Load all CSV files (plaintext for TDX)
         // Loading tables
         std::map<std::string, Table> tables;
-        
+
         DIR* dir = opendir(input_dir.c_str());
         if (!dir) {
             throw std::runtime_error("Cannot open input directory: " + input_dir);
         }
-        
+
         struct dirent* entry;
         while ((entry = readdir(dir)) != nullptr) {
             std::string filename = entry->d_name;
             if (filename.size() > 4 && filename.substr(filename.size() - 4) == ".csv") {
                 std::string filepath = input_dir + "/" + filename;
                 std::string table_name = filename.substr(0, filename.size() - 4);
-                
+
                 // Loading file
-                Table encrypted_table = TableIO::load_csv(filepath);
-                
-                // Decrypting
-                Table decrypted_table = decrypt_table(encrypted_table);
-                
+                Table plaintext_table = TableIO::load_csv(filepath);
+
                 // Create SQLite table
-                create_sqlite_table(db, table_name, decrypted_table);
-                
-                tables.emplace(table_name, std::move(decrypted_table));
+                create_sqlite_table(db, table_name, plaintext_table);
+
+                tables.emplace(table_name, std::move(plaintext_table));
             }
         }
         closedir(dir);
-        
+
         if (tables.empty()) {
             throw std::runtime_error("No CSV files found in input directory");
         }
-        
+
         // Read and execute SQL query
         // Reading query
         std::string join_query = read_sql_query(sql_file);
         // Query loaded
-        
-        // Debug output removed for cleaner output
-        
+
         Table join_result = execute_sqlite_join(db, join_query);
-        
-        // Encrypt the result
-        // Encrypting result
-        Table encrypted_result = encrypt_table(join_result);
-        
-        // Save result (encrypted with nonce)
+
+        // Save result (plaintext for TDX)
         // Saving result
-        TableIO::save_encrypted_csv(encrypted_result, output_file, global_eid);
-        printf("Result: %zu rows\n", encrypted_result.size());
-        
+        TableIO::save_csv(join_result, output_file);
+        printf("Result: %zu rows\n", join_result.size());
+
         // Cleanup
         sqlite3_close(db);
-        destroy_enclave();
-        
+
         // Join complete
         return 0;
-        
+
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         if (db) sqlite3_close(db);
-        destroy_enclave();
         return 1;
     }
 }

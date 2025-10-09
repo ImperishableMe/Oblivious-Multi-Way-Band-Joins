@@ -380,7 +380,7 @@ int main(int argc, char* argv[]) {
         }
         
         // Create output directory if it doesn't exist
-        std::string summary_dir = "/home/r33wei/omwj/memory_const_public/output";
+        std::string summary_dir = "output";
         mkdir(summary_dir.c_str(), 0755);
         
         std::string summary_filename = summary_dir + "/" + query_basename + "_" + data_basename + "_summary.txt";

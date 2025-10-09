@@ -89,25 +89,25 @@
 
 ## Phase 7: Update Build System (1.5 hours)
 
-- [ ] **7.1** Delete SGX SDK variables section from Makefile (lines 6-44)
-- [ ] **7.2** Keep only DEBUG and SLIM_ENTRY flags
-- [ ] **7.3** Remove `Gen_Untrusted_Source` and `Gen_Untrusted_Object` variables
-- [ ] **7.4** Add `App_C_Files` list with all core_logic .c files
-- [ ] **7.5** Update `App_Cpp_Files` - remove crypto_utils.cpp
-- [ ] **7.6** Update `App_Objects` to include both C and C++ objects
-- [ ] **7.7** Update `App_Include_Paths` to `-Icommon -Iapp -Iapp/core_logic`
-- [ ] **7.8** Remove SGX SDK include paths
-- [ ] **7.9** Update `App_Link_Flags` to just `-lpthread`
-- [ ] **7.10** Remove all SGX library linking flags
-- [ ] **7.11** Update compile flags - remove SGX-specific flags
-- [ ] **7.12** Delete entire "Enclave Build" section (lines 267-318)
-- [ ] **7.13** Delete EDL processing rules
-- [ ] **7.14** Update main target - remove enclave.signed.so dependency
-- [ ] **7.15** Add compilation rules for app/core_logic/**/*.c files
-- [ ] **7.16** Update `Test_Include_Paths`
-- [ ] **7.17** Update `Test_Common_Objects` - remove crypto, remove Gen_Untrusted_Object
-- [ ] **7.18** Delete encrypt_tables tool target and objects
-- [ ] **7.19** Commit: "Phase 7: Update build system for TDX"
+- [x] **7.1** Delete SGX SDK variables section from Makefile (lines 6-44)
+- [x] **7.2** Keep only DEBUG and SLIM_ENTRY flags
+- [x] **7.3** Remove `Gen_Untrusted_Source` and `Gen_Untrusted_Object` variables
+- [x] **7.4** Add `App_C_Files` list with all core_logic .c files
+- [x] **7.5** Update `App_Cpp_Files` - remove crypto_utils.cpp
+- [x] **7.6** Update `App_Objects` to include both C and C++ objects
+- [x] **7.7** Update `App_Include_Paths` to `-Icommon -Iapp -Iapp/core_logic`
+- [x] **7.8** Remove SGX SDK include paths
+- [x] **7.9** Update `App_Link_Flags` to just `-lpthread`
+- [x] **7.10** Remove all SGX library linking flags
+- [x] **7.11** Update compile flags - remove SGX-specific flags
+- [x] **7.12** Delete entire "Enclave Build" section (lines 267-318)
+- [x] **7.13** Delete EDL processing rules
+- [x] **7.14** Update main target - remove enclave.signed.so dependency
+- [x] **7.15** Add compilation rules for app/core_logic/**/*.c files
+- [x] **7.16** Update `Test_Include_Paths`
+- [x] **7.17** Update `Test_Common_Objects` - remove crypto, remove Gen_Untrusted_Object
+- [x] **7.18** Delete encrypt_tables tool target and objects
+- [x] **7.19** Commit: "Phase 7: Update build system for TDX"
 
 ---
 

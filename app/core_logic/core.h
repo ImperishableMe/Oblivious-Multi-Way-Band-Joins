@@ -1,7 +1,7 @@
 #ifndef ENCLAVE_CORE_H
 #define ENCLAVE_CORE_H
 
-#include "enclave_types.h"
+#include "../../common/enclave_types.h"
 
 #ifdef __cplusplus
 extern "C" {

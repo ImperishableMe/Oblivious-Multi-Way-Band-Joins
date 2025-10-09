@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <sstream>
 
-void JoinAttributeSetter::SetJoinAttributesForTree(JoinTreeNodePtr root, sgx_enclave_id_t eid) {
+void JoinAttributeSetter::SetJoinAttributesForTree(JoinTreeNodePtr root) {
     DEBUG_DEBUG("Setting join attributes for tree rooted at %s", root->get_table_name().c_str());
     
     // Process current node
@@ -16,7 +16,7 @@ void JoinAttributeSetter::SetJoinAttributesForTree(JoinTreeNodePtr root, sgx_enc
     }
 }
 
-void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node, sgx_enclave_id_t eid) {
+void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node) {
     std::string join_column = node->get_join_column();
     
     // Root node might not have a join column set
@@ -89,7 +89,7 @@ void JoinAttributeSetter::SetJoinAttributesForNode(JoinTreeNodePtr node, sgx_enc
     }
 }
 
-void JoinAttributeSetter::SetJoinAttributesForTable(Table& table, const std::string& column_name, sgx_enclave_id_t eid) {
+void JoinAttributeSetter::SetJoinAttributesForTable(Table& table, const std::string& column_name) {
     if (table.size() == 0) {
         DEBUG_WARN("Table is empty, cannot set join attributes");
         return;

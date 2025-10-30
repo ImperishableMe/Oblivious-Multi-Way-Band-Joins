@@ -116,9 +116,9 @@ $(App_Name): $(App_Objects)
 ######## Test Programs ########
 
 # Test program settings
-Test_Include_Paths := -I. -Icommon -Iapp -Iapp/core_logic
+Test_Include_Paths := -I. -Icommon -Iapp -Iapp/core_logic -Iobligraph/include
 Test_Compile_CFlags := $(COMMON_FLAGS) -fPIC $(Test_Include_Paths)
-Test_Compile_CXXFlags := $(Test_Compile_CFlags) -std=c++17
+Test_Compile_CXXFlags := $(Test_Compile_CFlags) -std=c++20
 
 # Test programs
 Test_Join_Objects := tests/integration/test_join.o
@@ -128,6 +128,7 @@ Test_Merge_Sort_Objects := tests/unit/test_merge_sort.o
 Test_Waksman_Objects := tests/unit/test_waksman_shuffle.o
 Test_Waksman_Dist_Objects := tests/unit/test_waksman_distribution.o
 Test_Shuffle_Manager_Objects := tests/unit/test_shuffle_manager.o
+Benchmark_Sorting_Objects := tests/performance/benchmark_sorting.o
 
 # Common objects needed by test programs (reuse from main app)
 Test_Common_Objects := app/file_io/converters.o \
@@ -171,6 +172,10 @@ test_join_batch: $(Test_Join_Batch_Objects) $(Test_Common_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags) -lsqlite3
 	@echo "LINK =>  $@"
 
+benchmark_sorting: $(Benchmark_Sorting_Objects) $(Test_Common_Objects)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
 # Compile test source files
 tests/integration/%.o: tests/integration/%.cpp
 	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
@@ -184,6 +189,10 @@ tests/unit/%.o: tests/unit/%.cpp
 	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
+tests/performance/%.o: tests/performance/%.cpp
+	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
 # Build all tests
 tests: test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksman_distribution test_shuffle_manager
 	@echo "All tests built successfully"
@@ -193,6 +202,6 @@ tests: test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksm
 clean:
 	@rm -f $(App_Name)
 	@rm -f $(App_Objects)
-	@rm -f test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksman_distribution test_shuffle_manager test_join_batch
-	@rm -f $(Test_Join_Objects) $(Sqlite_Baseline_Objects) $(Test_Merge_Sort_Objects) $(Test_Waksman_Objects) $(Test_Waksman_Dist_Objects) $(Test_Shuffle_Manager_Objects) $(Test_Join_Batch_Objects)
+	@rm -f test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksman_distribution test_shuffle_manager test_join_batch benchmark_sorting
+	@rm -f $(Test_Join_Objects) $(Sqlite_Baseline_Objects) $(Test_Merge_Sort_Objects) $(Test_Waksman_Objects) $(Test_Waksman_Dist_Objects) $(Test_Shuffle_Manager_Objects) $(Test_Join_Batch_Objects) $(Benchmark_Sorting_Objects)
 	@rm -f app/core_logic/**/*.o

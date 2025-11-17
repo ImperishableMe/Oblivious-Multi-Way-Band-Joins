@@ -1,5 +1,5 @@
 SELECT *
-FROM supplier, customer, nation1, nation2
-WHERE supplier.S_NATIONKEY = nation1.N1_N_NATIONKEY
-AND customer.C_NATIONKEY = nation2.N2_N_NATIONKEY
-AND nation1.N1_N_REGIONKEY = nation2.N2_N_REGIONKEY;
+FROM supplier AS s, customer AS c, nation AS n1, nation AS n2
+WHERE s.S_NATIONKEY = n1.N_NATIONKEY
+AND c.C_NATIONKEY = n2.N_NATIONKEY
+AND n1.N_REGIONKEY = n2.N_REGIONKEY;

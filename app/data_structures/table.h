@@ -23,7 +23,10 @@ private:
 public:
     // Constructor - requires schema
     Table(const std::string& name, const std::vector<std::string>& schema);
-    
+
+    // Copy constructor - deep copy for table aliasing
+    Table(const Table& other);
+
     // Entry management
     void add_entry(const Entry& entry);
     Entry& get_entry(size_t index);

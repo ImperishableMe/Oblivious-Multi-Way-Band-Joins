@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <sstream>
 #include "../join/join_constraint.h"
 
@@ -15,10 +16,11 @@
 struct ParsedQuery {
     // SELECT clause
     std::vector<std::string> select_columns;  // ["*"] for SELECT *
-    
+
     // FROM clause
-    std::vector<std::string> tables;  // Table names
-    
+    std::vector<std::string> tables;  // Table aliases (e.g., ["a1", "a2", "t"])
+    std::map<std::string, std::string> table_aliases;  // alias → CSV filename (e.g., {"a1": "account", "a2": "account", "t": "txn"})
+
     // WHERE clause - separated into joins and filters
     std::vector<JoinConstraint> join_conditions;  // Join constraints (possibly merged)
     std::vector<std::string> filter_conditions;   // Non-join conditions (not yet supported)
@@ -35,7 +37,21 @@ struct ParsedQuery {
     size_t num_joins() const {
         return join_conditions.size();
     }
-    
+
+    /**
+     * Resolve a table alias to its CSV filename
+     * @param alias The table alias from the query
+     * @return The CSV filename (without .csv extension)
+     */
+    std::string resolve_table(const std::string& alias) const {
+        auto it = table_aliases.find(alias);
+        if (it != table_aliases.end()) {
+            return it->second;
+        }
+        // If not found in aliases map, return as-is (shouldn't happen with proper parsing)
+        return alias;
+    }
+
     std::string to_string() const {
         std::stringstream ss;
         
@@ -100,6 +116,7 @@ struct ParsedQuery {
     void clear() {
         select_columns.clear();
         tables.clear();
+        table_aliases.clear();
         join_conditions.clear();
         filter_conditions.clear();
     }

@@ -1,6 +1,6 @@
 SELECT *
-FROM nation, supplier, customer, orders, lineitem
-WHERE nation.N_NATIONKEY = supplier.S_NATIONKEY
-AND supplier.S_NATIONKEY = customer.C_NATIONKEY
-AND customer.C_CUSTKEY = orders.O_CUSTKEY
-AND orders.O_ORDERKEY = lineitem.L_ORDERKEY;
+FROM nation AS n, supplier AS s, customer AS c, orders AS o, lineitem AS l
+WHERE n.N_NATIONKEY = s.S_NATIONKEY
+AND s.S_NATIONKEY = c.C_NATIONKEY
+AND c.C_CUSTKEY = o.O_CUSTKEY
+AND o.O_ORDERKEY = l.L_ORDERKEY;

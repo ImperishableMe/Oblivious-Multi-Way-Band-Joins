@@ -12,6 +12,7 @@ std::string Token::to_string() const {
         case TokenType::FROM: ss << "FROM"; break;
         case TokenType::WHERE: ss << "WHERE"; break;
         case TokenType::AND: ss << "AND"; break;
+        case TokenType::AS: ss << "AS"; break;
         case TokenType::EQUALS: ss << "="; break;
         case TokenType::GREATER_EQ: ss << ">="; break;
         case TokenType::GREATER: ss << ">"; break;
@@ -202,12 +203,13 @@ TokenType QueryTokenizer::identify_keyword(const std::string& str) {
     // Convert to uppercase for comparison
     std::string upper = str;
     std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-    
+
     if (upper == "SELECT") return TokenType::SELECT;
     if (upper == "FROM") return TokenType::FROM;
     if (upper == "WHERE") return TokenType::WHERE;
     if (upper == "AND") return TokenType::AND;
-    
+    if (upper == "AS") return TokenType::AS;
+
     // Not a keyword, it's an identifier
     return TokenType::IDENTIFIER;
 }

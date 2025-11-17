@@ -3,11 +3,13 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <regex>
 #include <dirent.h>
 #include <sqlite3.h>
 #include "app/data_structures/data_structures.h"
 #include "app/file_io/table_io.h"
 #include "app/file_io/io_entry.h"  // Use IO_Entry for dynamic data
+#include "app/query/query_parser.h"  // For parsing queries
 #include "common/debug_util.h"
 
 /* Create SQLite table from plaintext data */
@@ -93,29 +95,90 @@ static int query_callback(void* data, int argc, char** argv, char** col_names) {
     return 0;
 }
 
+/* Rewrite SELECT * to explicitly list columns with alias prefixes */
+std::string rewrite_query_with_aliases(const std::string& original_query,
+                                       const std::map<std::string, Table>& tables) {
+    try {
+        // Parse the query to extract aliases
+        QueryParser parser;
+        ParsedQuery parsed = parser.parse(original_query);
+
+        // Build the SELECT clause with aliased columns
+        std::string select_clause = "SELECT ";
+        bool first_col = true;
+
+        for (const auto& alias : parsed.tables) {
+            // Resolve alias to table name
+            std::string table_name = parsed.resolve_table(alias);
+
+            // Find the table
+            auto it = tables.find(table_name);
+            if (it == tables.end()) {
+                throw std::runtime_error("Table '" + table_name + "' not found for alias '" + alias + "'");
+            }
+
+            // Get schema from the table
+            std::vector<std::string> schema = it->second.get_schema();
+
+            // Add each column with alias prefix
+            for (const auto& col : schema) {
+                if (!first_col) select_clause += ", ";
+                first_col = false;
+                // Format: alias.column AS 'alias.column'
+                select_clause += alias + "." + col + " AS '" + alias + "." + col + "'";
+            }
+        }
+
+        // Replace SELECT * with the explicit column list
+        // Find the FROM keyword to know where SELECT clause ends
+        size_t from_pos = original_query.find("FROM");
+        if (from_pos == std::string::npos) {
+            from_pos = original_query.find("from");
+        }
+
+        if (from_pos == std::string::npos) {
+            throw std::runtime_error("No FROM clause found in query");
+        }
+
+        // Build the rewritten query
+        std::string rewritten = select_clause + " " + original_query.substr(from_pos);
+
+        return rewritten;
+
+    } catch (const std::exception& e) {
+        // If parsing fails, return original query
+        std::cerr << "Warning: Could not rewrite query: " << e.what() << std::endl;
+        return original_query;
+    }
+}
+
 /* Execute join query and get result */
-Table execute_sqlite_join(sqlite3* db, const std::string& join_query) {
+Table execute_sqlite_join(sqlite3* db, const std::string& join_query,
+                          const std::map<std::string, Table>& tables) {
+    // Rewrite query to include alias prefixes in column names
+    std::string rewritten_query = rewrite_query_with_aliases(join_query, tables);
+
     QueryResult result;
-    
+
     char* err_msg = nullptr;
-    int rc = sqlite3_exec(db, join_query.c_str(), query_callback, &result, &err_msg);
-    
+    int rc = sqlite3_exec(db, rewritten_query.c_str(), query_callback, &result, &err_msg);
+
     if (rc != SQLITE_OK) {
         std::string error = std::string("SQL error during join: ") + err_msg;
         sqlite3_free(err_msg);
         throw std::runtime_error(error);
     }
-    
+
     // Query executed
-    
+
     // If no results, create empty table with generic schema
     if (!result.table) {
         return Table("result", {"col1"});
     }
-    
+
     // Set the schema for the result table (already set in callback)
     // result.table->set_schema(result.column_names);  // Already done in callback
-    
+
     Table ret_table = *result.table;
     delete result.table;
     return ret_table;
@@ -208,7 +271,7 @@ int main(int argc, char* argv[]) {
         std::string join_query = read_sql_query(sql_file);
         // Query loaded
 
-        Table join_result = execute_sqlite_join(db, join_query);
+        Table join_result = execute_sqlite_join(db, join_query, tables);
 
         // Save result (plaintext for TDX)
         // Saving result

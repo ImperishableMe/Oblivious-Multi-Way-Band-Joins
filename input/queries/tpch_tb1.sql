@@ -1,3 +1,3 @@
 SELECT *
-FROM supplier1, supplier2
-WHERE supplier1.S1_S_ACCTBAL < supplier2.S2_S_ACCTBAL;
+FROM supplier AS s1, supplier AS s2
+WHERE s1.S_ACCTBAL < s2.S_ACCTBAL;

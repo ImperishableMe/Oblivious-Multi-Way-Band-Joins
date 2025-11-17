@@ -148,7 +148,7 @@ test_join: $(Test_Join_Objects) $(Test_Common_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
-sqlite_baseline: $(Sqlite_Baseline_Objects) $(Test_Common_Objects)
+sqlite_baseline: $(Sqlite_Baseline_Objects) $(Test_Common_Objects) app/query/query_parser.o app/query/query_tokenizer.o app/query/inequality_parser.o app/query/condition_merger.o app/join/join_constraint.o app/join/join_condition.o
 	@$(CXX) $^ -o $@ $(App_Link_Flags) -lsqlite3
 	@echo "LINK =>  $@"
 

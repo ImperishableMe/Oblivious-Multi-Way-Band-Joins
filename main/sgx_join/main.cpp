@@ -12,39 +12,6 @@
 #include "debug_util.h"
 #include "file_io/table_io.h"
 
-/* Parse SQL query from file and build join tree */
-JoinTreeNodePtr parse_sql_query(const std::string& query_file, 
-                                const std::map<std::string, Table>& tables) {
-    // Read SQL query from file
-    std::ifstream file(query_file);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open query file: " + query_file);
-    }
-    
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string sql_query = buffer.str();
-    file.close();
-    
-    // SQL Query loaded
-    
-    // Parse SQL query
-    QueryParser parser;
-    ParsedQuery parsed_query = parser.parse(sql_query);
-    
-    // Query parsed
-    
-    // Build join tree from parsed query
-    JoinTreeBuilder builder;
-    JoinTreeNodePtr root = builder.build_from_query(parsed_query, tables);
-    
-    if (!root) {
-        throw std::runtime_error("Failed to build join tree from query");
-    }
-    
-    return root;
-}
-
 /* Print usage information */
 void print_usage(const char* program_name) {
     std::cout << "Usage: " << program_name << " <query_file> <input_dir> <output_file>" << std::endl;
@@ -58,7 +25,7 @@ int main(int argc, char* argv[]) {
         print_usage(argv[0]);
         return 1;
     }
-    
+
     std::string query_file = argv[1];
     std::string input_dir = argv[2];
     std::string output_file = argv[3];
@@ -66,34 +33,73 @@ int main(int argc, char* argv[]) {
     // Starting TDX oblivious join
 
     try {
-        // Load all CSV files from input directory
-        std::map<std::string, Table> tables;
-        
+        // Step 1: Parse SQL query to get table aliases
+        std::ifstream file(query_file);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open query file: " + query_file);
+        }
+
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string sql_query = buffer.str();
+        file.close();
+
+        QueryParser parser;
+        ParsedQuery parsed_query = parser.parse(sql_query);
+
+        // Step 2: Load base CSV files from input directory
+        std::map<std::string, Table> base_tables;
+
         DIR* dir = opendir(input_dir.c_str());
         if (!dir) {
             throw std::runtime_error("Cannot open input directory: " + input_dir);
         }
-        
+
         struct dirent* entry;
         while ((entry = readdir(dir)) != nullptr) {
             std::string filename = entry->d_name;
             if (filename.size() > 4 && filename.substr(filename.size() - 4) == ".csv") {
                 std::string filepath = input_dir + "/" + filename;
                 std::string table_name = filename.substr(0, filename.size() - 4);
-                
+
                 Table table = TableIO::load_csv(filepath);
                 table.set_table_name(table_name);
-                tables.emplace(table_name, std::move(table));
+                base_tables.emplace(table_name, std::move(table));
             }
         }
         closedir(dir);
-        
-        if (tables.empty()) {
+
+        if (base_tables.empty()) {
             throw std::runtime_error("No CSV files found in input directory");
         }
-        
-        // Parse SQL query and build join tree
-        JoinTreeNodePtr join_tree = parse_sql_query(query_file, tables);
+
+        // Step 3: Create aliased tables by copying base tables
+        std::map<std::string, Table> aliased_tables;
+
+        for (const auto& alias : parsed_query.tables) {
+            // Resolve alias to CSV filename
+            std::string filename = parsed_query.resolve_table(alias);
+
+            // Find the base table
+            auto it = base_tables.find(filename);
+            if (it == base_tables.end()) {
+                throw std::runtime_error("Table '" + filename + "' (for alias '" + alias +
+                                       "') not found in input directory");
+            }
+
+            // Create a copy of the table with the alias name
+            Table table_copy(it->second);  // Use copy constructor
+            table_copy.set_table_name(alias);
+            aliased_tables.emplace(alias, std::move(table_copy));
+        }
+
+        // Step 4: Build join tree using aliased tables
+        JoinTreeBuilder builder;
+        JoinTreeNodePtr join_tree = builder.build_from_query(parsed_query, aliased_tables);
+
+        if (!join_tree) {
+            throw std::runtime_error("Failed to build join tree from query");
+        }
 
         // Execute oblivious join with debug output
         Table result = ObliviousJoin::ExecuteWithDebug(join_tree, "oblivious_join");

@@ -1,4 +1,4 @@
 SELECT *
-FROM customer, orders, lineitem
-WHERE customer.C_CUSTKEY = orders.O_CUSTKEY
-AND orders.O_ORDERKEY = lineitem.L_ORDERKEY;
+FROM customer AS c, orders AS o, lineitem AS l
+WHERE c.C_CUSTKEY = o.O_CUSTKEY
+AND o.O_ORDERKEY = l.L_ORDERKEY;

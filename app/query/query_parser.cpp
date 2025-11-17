@@ -55,16 +55,36 @@ void QueryParser::parse_select(ParsedQuery& query) {
 
 void QueryParser::parse_from(ParsedQuery& query) {
     expect(TokenType::FROM, "Expected FROM keyword");
-    
-    // Parse comma-separated table list
+
+    // Parse comma-separated table list with aliases
+    // Format: table_name AS alias, table_name AS alias, ...
     do {
         if (!match(TokenType::IDENTIFIER)) {
             throw ParseException("Expected table name in FROM clause");
         }
-        
-        query.tables.push_back(current().value);
+
+        // Get the CSV filename (table name)
+        std::string table_filename = current().value;
         consume();
-        
+
+        // Expect AS keyword
+        if (!match(TokenType::AS)) {
+            throw ParseException("Expected AS keyword after table name '" + table_filename +
+                               "'. All tables must use aliases in FROM clause.");
+        }
+        consume();
+
+        // Get the alias
+        if (!match(TokenType::IDENTIFIER)) {
+            throw ParseException("Expected alias name after AS keyword for table '" + table_filename + "'");
+        }
+        std::string alias = current().value;
+        consume();
+
+        // Store alias in tables vector and mapping in table_aliases
+        query.tables.push_back(alias);
+        query.table_aliases[alias] = table_filename;
+
         // Check for comma
         if (match(TokenType::COMMA)) {
             consume();

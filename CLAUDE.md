@@ -167,15 +167,29 @@ make test_join        # Integration test (works)
 ```
 
 ## SQL Query Format
+
+**IMPORTANT**: All queries must use the AS keyword for table aliases.
+
 Standard SQL SELECT statements with joins:
 ```sql
 -- Two-way join
-SELECT * FROM T1, T2 WHERE T1.attr < T2.attr;
+SELECT * FROM T1 AS t1, T2 AS t2
+WHERE t1.attr < t2.attr;
 
 -- Three-way join
-SELECT * FROM T1, T2, T3 
-WHERE T1.attr = T2.attr AND T2.attr = T3.attr;
+SELECT * FROM T1 AS t1, T2 AS t2, T3 AS t3
+WHERE t1.attr = t2.attr AND t2.attr = t3.attr;
+
+-- Self-join (same table with multiple aliases)
+SELECT * FROM T1 AS a, T1 AS b, T1 AS c
+WHERE a.attr < b.attr AND b.attr < c.attr;
 ```
+
+**Table Aliasing**:
+- ALL tables must use `AS` keyword to specify an alias
+- Each alias creates a logical in-memory copy of the table
+- Output columns are prefixed with the alias (e.g., `t1.attr`, `t2.attr`)
+- Self-joins work by using the same table name with different aliases
 
 ## Data Format Requirements
 - CSV files with header row containing column names

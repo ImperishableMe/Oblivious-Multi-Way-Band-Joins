@@ -15,7 +15,8 @@ enum class TokenType {
     FROM,
     WHERE,
     AND,
-    
+    AS,
+
     // Operators
     EQUALS,      // =
     GREATER_EQ,  // >=

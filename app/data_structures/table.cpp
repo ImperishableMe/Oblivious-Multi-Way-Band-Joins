@@ -8,17 +8,26 @@
 #include "../algorithms/shuffle_manager.h"
 
 // Constructor with required schema
-Table::Table(const std::string& name, const std::vector<std::string>& schema) 
+Table::Table(const std::string& name, const std::vector<std::string>& schema)
     : table_name(name), num_columns(schema.size()), schema_column_names(schema) {
     if (schema.empty()) {
         throw std::runtime_error("Table '" + name + "' cannot be created with empty schema");
     }
     if (schema.size() > MAX_ATTRIBUTES) {
-        throw std::runtime_error("Table '" + name + "' schema has " + std::to_string(schema.size()) + 
+        throw std::runtime_error("Table '" + name + "' schema has " + std::to_string(schema.size()) +
                                " columns, exceeds MAX_ATTRIBUTES=" + std::to_string(MAX_ATTRIBUTES));
     }
 }
 
+// Copy constructor - deep copy for table aliasing
+Table::Table(const Table& other)
+    : entries(other.entries),
+      table_name(other.table_name),
+      num_columns(other.num_columns),
+      schema_column_names(other.schema_column_names) {
+    // Deep copy of entries vector is handled by std::vector copy constructor
+    // All other fields are primitive or strings, copied automatically
+}
 
 void Table::add_entry(const Entry& entry) {
     entries.push_back(entry);

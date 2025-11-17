@@ -178,11 +178,38 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     result.parallel_pass(aligned_child, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);
     
     // Update the result table's schema to include columns from both tables
-    std::vector<std::string> combined_schema = result.get_schema();
+    // Prefix columns with table alias for clarity in self-joins
+    std::vector<std::string> combined_schema;
+
+    // Get schemas from both tables
+    std::vector<std::string> result_schema = result.get_schema();
     std::vector<std::string> child_schema = aligned_child.get_schema();
-    
-    // Append child schema to the combined schema
-    combined_schema.insert(combined_schema.end(), child_schema.begin(), child_schema.end());
+
+    // Prefix result columns with table name (if not already prefixed)
+    // Check if columns already have dots (indicating they're already prefixed)
+    std::string result_table_name = result.get_table_name();
+    for (const auto& col : result_schema) {
+        if (col.find('.') == std::string::npos) {
+            // Not yet prefixed, add table name prefix
+            combined_schema.push_back(result_table_name + "." + col);
+        } else {
+            // Already prefixed (from previous concat), keep as-is
+            combined_schema.push_back(col);
+        }
+    }
+
+    // Prefix child columns with table name (if not already prefixed)
+    std::string child_table_name = aligned_child.get_table_name();
+    for (const auto& col : child_schema) {
+        if (col.find('.') == std::string::npos) {
+            // Not yet prefixed, add table name prefix
+            combined_schema.push_back(child_table_name + "." + col);
+        } else {
+            // Already prefixed (from previous concat), keep as-is
+            combined_schema.push_back(col);
+        }
+    }
+
     result.set_schema(combined_schema);
     
     DEBUG_INFO("Updated schema after concatenation: %zu columns", combined_schema.size());

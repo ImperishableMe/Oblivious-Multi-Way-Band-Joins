@@ -1,17 +1,16 @@
 #!/bin/bash
 
-# Run all TPCH queries with specified dataset
-# Usage: ./run_tpch_tests.sh [scale]
-#   scale: data scale (0_001, 0_01, etc.) - default is 0_001
+# Run tests on small banking dataset (100 accounts, 200 txns)
+# This dataset is suitable for complex queries like triple self-joins
+# Usage: ./run_banking_small_tests.sh
 
 # Get script directory and project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 # Configuration
-SCALE="${1:-0_001}"  # Default to 0_001 if not specified
 QUERY_DIR="$PROJECT_ROOT/input/queries"
-DATA_DIR="$PROJECT_ROOT/input/plaintext/data_$SCALE"
+DATA_DIR="$PROJECT_ROOT/input/plaintext/banking_small"
 TEST_PROG="$PROJECT_ROOT/test_join"
 OUTPUT_DIR="$PROJECT_ROOT/output"
 
@@ -24,23 +23,22 @@ NC='\033[0m'
 # Check if test_join exists
 if [ ! -f "$TEST_PROG" ]; then
     echo -e "${RED}Error: test_join not found at $TEST_PROG${NC}"
-    echo -e "${YELLOW}Please build first: $SCRIPT_DIR/build.sh --test${NC}"
+    echo -e "${YELLOW}Please build first: make tests${NC}"
     exit 1
 fi
 
 # Check if data directory exists
 if [ ! -d "$DATA_DIR" ]; then
     echo -e "${RED}Error: Data directory not found: $DATA_DIR${NC}"
-    echo -e "${YELLOW}Available data scales:${NC}"
-    ls -d "$PROJECT_ROOT/input/plaintext/data_"* 2>/dev/null | xargs -n1 basename
+    echo -e "${YELLOW}Generate dataset first: python3 scripts/generate_banking_small.py${NC}"
     exit 1
 fi
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 
-echo -e "${GREEN}=== Running TPCH Tests ===${NC}"
-echo "Data scale: $SCALE"
+echo -e "${GREEN}=== Running Small Banking Dataset Tests ===${NC}"
+echo "Dataset: banking_small (100 accounts, 200 transactions)"
 echo "Data directory: $DATA_DIR"
 echo "Query directory: $QUERY_DIR"
 echo ""
@@ -50,23 +48,30 @@ PASSED=0
 FAILED=0
 TOTAL=0
 
-# Process each SQL file
-for query_file in $QUERY_DIR/tpch_*.sql; do
+# Test queries suitable for small dataset
+QUERIES=(
+    "banking_simple.sql"
+    "banking_account_to_account.sql"
+    "test_triple_self_join.sql"
+)
+
+for query_name in "${QUERIES[@]}"; do
+    query_file="$QUERY_DIR/$query_name"
     if [ -f "$query_file" ]; then
-        query_name=$(basename "$query_file" .sql)
         TOTAL=$((TOTAL + 1))
+        query_base=$(basename "$query_name" .sql)
 
         echo "----------------------------------------"
-        echo -e "${GREEN}Running: $query_name${NC}"
+        echo -e "${GREEN}Running: $query_base${NC}"
         echo "----------------------------------------"
 
         # Run test_join and capture output
         OUTPUT=$($TEST_PROG "$query_file" "$DATA_DIR" 2>&1)
         RESULT=$?
-        
+
         # Show last 15 lines of output
         echo "$OUTPUT" | tail -15
-        
+
         # Check if test passed
         if echo "$OUTPUT" | grep -q "Match: YES"; then
             echo -e "${GREEN}✓ Test PASSED${NC}"
@@ -78,8 +83,10 @@ for query_file in $QUERY_DIR/tpch_*.sql; do
             echo -e "${RED}✗ Test FAILED${NC}"
             FAILED=$((FAILED + 1))
         fi
-        
+
         echo ""
+    else
+        echo -e "${YELLOW}Warning: Query file not found: $query_file${NC}"
     fi
 done
 

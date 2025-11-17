@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# Run all TPCH queries with specified dataset
-# Usage: ./run_tpch_tests.sh [scale]
-#   scale: data scale (0_001, 0_01, etc.) - default is 0_001
+# Run all banking queries with specified dataset
+# Usage: ./run_banking_tests.sh [dataset]
+#   dataset: banking (default), account_txn, banking_with_copies, etc.
 
 # Get script directory and project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 # Configuration
-SCALE="${1:-0_001}"  # Default to 0_001 if not specified
+DATASET="${1:-banking}"  # Default to banking if not specified
 QUERY_DIR="$PROJECT_ROOT/input/queries"
-DATA_DIR="$PROJECT_ROOT/input/plaintext/data_$SCALE"
+DATA_DIR="$PROJECT_ROOT/input/plaintext/$DATASET"
 TEST_PROG="$PROJECT_ROOT/test_join"
 OUTPUT_DIR="$PROJECT_ROOT/output"
 
@@ -24,23 +24,23 @@ NC='\033[0m'
 # Check if test_join exists
 if [ ! -f "$TEST_PROG" ]; then
     echo -e "${RED}Error: test_join not found at $TEST_PROG${NC}"
-    echo -e "${YELLOW}Please build first: $SCRIPT_DIR/build.sh --test${NC}"
+    echo -e "${YELLOW}Please build first: make tests${NC}"
     exit 1
 fi
 
 # Check if data directory exists
 if [ ! -d "$DATA_DIR" ]; then
     echo -e "${RED}Error: Data directory not found: $DATA_DIR${NC}"
-    echo -e "${YELLOW}Available data scales:${NC}"
-    ls -d "$PROJECT_ROOT/input/plaintext/data_"* 2>/dev/null | xargs -n1 basename
+    echo -e "${YELLOW}Available datasets:${NC}"
+    ls -d "$PROJECT_ROOT/input/plaintext/"* 2>/dev/null | grep -v data_ | xargs -n1 basename
     exit 1
 fi
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 
-echo -e "${GREEN}=== Running TPCH Tests ===${NC}"
-echo "Data scale: $SCALE"
+echo -e "${GREEN}=== Running Banking Tests ===${NC}"
+echo "Dataset: $DATASET"
 echo "Data directory: $DATA_DIR"
 echo "Query directory: $QUERY_DIR"
 echo ""
@@ -50,8 +50,8 @@ PASSED=0
 FAILED=0
 TOTAL=0
 
-# Process each SQL file
-for query_file in $QUERY_DIR/tpch_*.sql; do
+# Process each banking SQL file
+for query_file in $QUERY_DIR/banking_*.sql; do
     if [ -f "$query_file" ]; then
         query_name=$(basename "$query_file" .sql)
         TOTAL=$((TOTAL + 1))
@@ -63,10 +63,10 @@ for query_file in $QUERY_DIR/tpch_*.sql; do
         # Run test_join and capture output
         OUTPUT=$($TEST_PROG "$query_file" "$DATA_DIR" 2>&1)
         RESULT=$?
-        
+
         # Show last 15 lines of output
         echo "$OUTPUT" | tail -15
-        
+
         # Check if test passed
         if echo "$OUTPUT" | grep -q "Match: YES"; then
             echo -e "${GREEN}✓ Test PASSED${NC}"
@@ -78,7 +78,7 @@ for query_file in $QUERY_DIR/tpch_*.sql; do
             echo -e "${RED}✗ Test FAILED${NC}"
             FAILED=$((FAILED + 1))
         fi
-        
+
         echo ""
     fi
 done

@@ -28,6 +28,7 @@ protected:
     }
 
     std::string testCsvPath;
+    ThreadPool pool{4};  // Thread pool for parallel operations
 };
 
 TEST_F(OperatorTest, FilterAndProject_BasicFunctionality) {
@@ -314,9 +315,9 @@ TEST_F(OperatorTest, UnionOperator_DisjointSchemas) {
     EXPECT_EQ(secondTable.rowCount, 2);
     EXPECT_EQ(firstTable.schema.columnMetas.size(), 2); // emp_id, name
     EXPECT_EQ(secondTable.schema.columnMetas.size(), 2); // salary_id, salary
-    
+
     // Perform union operation
-    firstTable.unionWith(secondTable);
+    firstTable.unionWith(secondTable, pool);
     
     // Verify expanded schema includes all columns
     EXPECT_EQ(firstTable.schema.columnMetas.size(), 4); // All columns from both tables
@@ -373,7 +374,7 @@ TEST_F(OperatorTest, UnionOperator_OverlappingSchemas) {
     ColumnValue originalAge1 = firstTable.rows[0].getColumnValue("age", firstTable.schema);
     
     // Perform union operation
-    firstTable.unionWith(secondTable);
+    firstTable.unionWith(secondTable, pool);
     
     // Verify the result includes all unique columns
     std::set<std::string> columnNames;
@@ -436,7 +437,7 @@ TEST_F(OperatorTest, UnionOperator_SameSchemas) {
     ColumnValue originalAge1 = firstTable.rows[0].getColumnValue("age", firstTable.schema);
     
     // Perform union operation
-    firstTable.unionWith(secondTable);
+    firstTable.unionWith(secondTable, pool);
     
     // Schema should remain the same size (no new columns)
     EXPECT_EQ(firstTable.schema.columnMetas.size(), 3); // id, name, age
@@ -474,7 +475,7 @@ TEST_F(OperatorTest, UnionOperator_EmptyTables) {
     table2.schema.columnMetas = {col2};
     
     // Perform union
-    table1.unionWith(table2);
+    table1.unionWith(table2, pool);
     
     // Should still be empty but with expanded schema
     EXPECT_EQ(table1.rowCount, 0);

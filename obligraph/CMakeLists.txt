@@ -54,12 +54,13 @@ add_custom_target(generate_test_data
 # include core and definitions
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_library(core 
+add_library(core
     src/definitions.cpp
     src/operators.cpp
     src/oneHop.cpp
     src/par_obl_primitives.cpp
     src/config.cpp
+    src/schema_parser.cpp
 )
 
 target_compile_definitions(core PRIVATE XXH_INLINE_ALL)
@@ -85,12 +86,13 @@ target_link_libraries(custom_dataset_queries PRIVATE core)
 enable_testing()
 
 # Unit tests executable
-add_executable(unit_tests 
+add_executable(unit_tests
     tests/catalogTests.cpp
     tests/operatorTests.cpp
     tests/oneHopTests.cpp
     tests/parallelSortTests.cpp
     tests/obliviousPrimitivesTests.cpp
+    tests/cypherSchemaTests.cpp
 )
 target_link_libraries(unit_tests 
     PRIVATE core

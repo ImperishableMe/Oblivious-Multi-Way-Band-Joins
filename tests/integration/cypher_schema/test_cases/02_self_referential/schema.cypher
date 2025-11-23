@@ -1,0 +1,2 @@
+CREATE NODE TABLE User(id INT64, name STRING, PRIMARY KEY (id))
+CREATE REL TABLE Follows(FROM User TO User, since INT64)

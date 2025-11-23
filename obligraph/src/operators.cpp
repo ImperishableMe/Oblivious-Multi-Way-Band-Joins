@@ -179,7 +179,7 @@ namespace obligraph {
         this->rowCount = filteredCount;
     }
 
-    void Table::unionWith(const Table& other, ThreadPool& pool) {
+    void Table::unionWith(const Table& other, ThreadPool& pool, const string& columnPrefix) {
         ScopedTimer timer("Union Table: " + this->name + " with " + other.name);
         // Verify both tables have the same number of rows
         if (this->rowCount != other.rowCount) {
@@ -187,22 +187,29 @@ namespace obligraph {
             cerr << "Error: Cannot union tables with different row counts: "
                  << this->name << " (" << this->rowCount << " rows) vs "
                  << other.name << " (" << other.rowCount << " rows)" << endl;
-            throw runtime_error("Cannot union tables with different row counts: " + 
+            throw runtime_error("Cannot union tables with different row counts: " +
                               to_string(this->rowCount) + " vs " + to_string(other.rowCount));
         }
 
         // Find columns in the other table that don't exist in this table
+        // If columnPrefix is provided, ALL columns from 'other' get added with the prefix
         vector<const ColumnMeta*> newColumns;
+        vector<string> newColumnNames;  // Store the final (possibly prefixed) names
+
         for (const auto& otherMeta : other.schema.columnMetas) {
+            // Determine the column name (with optional prefix)
+            string finalName = columnPrefix.empty() ? otherMeta.name : columnPrefix + "_" + otherMeta.name;
+
             bool existsInThis = false;
             for (const auto& thisMeta : this->schema.columnMetas) {
-                if (thisMeta.name == otherMeta.name) {
+                if (thisMeta.name == finalName) {
                     existsInThis = true;
                     break;
                 }
             }
             if (!existsInThis) {
                 newColumns.push_back(&otherMeta);
+                newColumnNames.push_back(finalName);
             }
         }
 
@@ -231,8 +238,10 @@ namespace obligraph {
 
         // Add new columns to the schema
         size_t currentOffset = currentRowSize;
-        for (const auto* newCol : newColumns) {
+        for (size_t i = 0; i < newColumns.size(); i++) {
+            const auto* newCol = newColumns[i];
             ColumnMeta newMeta = *newCol;  // Copy the column metadata
+            newMeta.name = newColumnNames[i];  // Use the prefixed name
             newMeta.offset = currentOffset;  // Update offset for our schema
             this->schema.columnMetas.push_back(newMeta);
             currentOffset += newCol->size;

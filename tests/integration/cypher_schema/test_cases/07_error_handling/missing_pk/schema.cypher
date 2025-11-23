@@ -1,0 +1,1 @@
+CREATE NODE TABLE Person(id INT64)

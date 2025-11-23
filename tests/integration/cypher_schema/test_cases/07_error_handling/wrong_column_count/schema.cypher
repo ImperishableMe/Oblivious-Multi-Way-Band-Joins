@@ -1,0 +1,1 @@
+CREATE NODE TABLE Person(id INT64, name STRING, age INT64, PRIMARY KEY (id))

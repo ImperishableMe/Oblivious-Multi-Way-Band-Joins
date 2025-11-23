@@ -1,0 +1,2 @@
+CREATE NODE TABLE Product(id INT64, sku INT32, name STRING, price DOUBLE, available BOOLEAN, created TIMESTAMP, launch_date DATE, metadata BLOB, PRIMARY KEY (id))
+CREATE REL TABLE Similar(FROM Product TO Product, score DOUBLE)

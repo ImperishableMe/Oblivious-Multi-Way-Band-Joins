@@ -1,0 +1,3 @@
+CREATE NODE TABLE Person(id INT64, name STRING, age INT64, PRIMARY KEY (id))
+CREATE NODE TABLE City(id INT64, name STRING, population INT64, PRIMARY KEY (id))
+CREATE REL TABLE LivesIn(FROM Person TO City)

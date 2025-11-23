@@ -17,8 +17,8 @@ using namespace std;
 
 
 namespace obligraph {
-constexpr int STRING_LENGTH_CUT_OFF = 2; // All strings are assumed to be of 2 bytes, anything larger will be truncated
-constexpr size_t ROW_DATA_MAX_SIZE = 32; // Maximum size for row data in bytes
+constexpr int STRING_LENGTH_CUT_OFF = 64; // All strings are assumed to be of 64 bytes, anything larger will be truncated
+constexpr size_t ROW_DATA_MAX_SIZE = 1024; // Maximum size for row data in bytes
 
 
 using key_t = uint64_t;  // Type for primary keys
@@ -165,7 +165,8 @@ struct Table {
     // Modifies the current table in place.
     // If the column exists in both tables, it will keep the current table's column
     // If the column exists only in the other table, it will add it to the current
-    void unionWith(const Table& other, ThreadPool& pool);
+    // If columnPrefix is provided, all columns from 'other' will be prefixed (e.g., "Person_name")
+    void unionWith(const Table& other, ThreadPool& pool, const string& columnPrefix = "");
 
     void printSchema() {
         cout << "Printing the schema: " << endl;
@@ -239,12 +240,12 @@ struct Catalog {
         }
     }
 
+    // Helper function to serialize a row's data based on schema
+    void serializeRowData(Row& row, const vector<ColumnMeta>& columnMetas, const vector<string>& values);
+
 private:
     // Helper function to split string by delimiter
     vector<string> splitString(const string& str, char delimiter);
-
-    // Helper function to serialize a row's data based on schema
-    void serializeRowData(Row& row, const vector<ColumnMeta>& columnMetas, const vector<string>& values);
 };
 
 // Struct to encapsulate all parameters for one-hop cypher query

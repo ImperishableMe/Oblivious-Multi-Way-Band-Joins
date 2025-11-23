@@ -161,7 +161,13 @@ namespace obligraph {
         deduplicateRows(srcSide);
         build_and_probe(srcProjected, srcSide, pool);
         reduplicateRows(srcSide);
-        edgeProjectedFwd.unionWith(srcSide, pool);
+
+        // For self-referential joins, use "_src" suffix to distinguish from destination
+        string srcPrefix = query.sourceNodeTableName;
+        if (query.sourceNodeTableName == query.destNodeTableName) {
+            srcPrefix += "_src";
+        }
+        edgeProjectedFwd.unionWith(srcSide, pool, srcPrefix);
         return edgeProjectedFwd;
     }
 
@@ -205,7 +211,12 @@ namespace obligraph {
         }
         {
             ScopedTimer timerUnion("Union with Edge Table");
-            edgeTableRev.unionWith(dstSide, pool);
+            // For self-referential joins, use "_dest" suffix to distinguish from source
+            string dstPrefix = query.destNodeTableName;
+            if (query.sourceNodeTableName == query.destNodeTableName) {
+                dstPrefix += "_dest";
+            }
+            edgeTableRev.unionWith(dstSide, pool, dstPrefix);
         }
 
         {
@@ -241,15 +252,53 @@ namespace obligraph {
         // Table edgeProjectedRev = buildDestinationTable(catalog, query, pool);
         edgeProjectedFwd.unionWith(edgeProjectedRev, pool);
 
+        // Detect self-referential join
+        bool isSelfReferential = (query.sourceNodeTableName == query.destNodeTableName);
+
         vector<Predicate> allPredicates;
         for (const auto& tablePred : query.tablePredicates) {
-            allPredicates.insert(allPredicates.end(), tablePred.second.begin(), tablePred.second.end());
+            // Qualify column names in predicates with table names
+            for (const auto& pred : tablePred.second) {
+                Predicate qualifiedPred = pred;
+                string tablePrefix = tablePred.first;
+
+                // In self-referential joins, predicates on the table refer to source
+                if (isSelfReferential && tablePred.first == query.sourceNodeTableName) {
+                    tablePrefix += "_src";
+                }
+
+                qualifiedPred.column = tablePrefix + "_" + pred.column;
+                allPredicates.push_back(qualifiedPred);
+            }
         }
         edgeProjectedFwd.filter(allPredicates, pool);
 
         vector <string> projectionColumns;
         for (const auto& col : query.projectionColumns) {
-            projectionColumns.push_back(col.second);
+            string columnName;
+
+            // Check if this is an edge column or a node column
+            if (col.first == query.edgeTableName) {
+                // Edge columns are not prefixed - they're already in the schema as-is
+                columnName = col.second;
+            } else {
+                // Node columns need table-qualified names
+                string tablePrefix = col.first;
+
+                // In self-referential joins, determine if referring to source or dest
+                if (isSelfReferential) {
+                    // Projections on source table refer to destination by convention
+                    if (col.first == query.destNodeTableName) {
+                        tablePrefix += "_dest";
+                    }
+                    // If user explicitly wants source columns, they would need to use sourceNodeTableName
+                    // For now, default projection to destination
+                }
+
+                columnName = tablePrefix + "_" + col.second;
+            }
+
+            projectionColumns.push_back(columnName);
         }
 
         edgeProjectedFwd = edgeProjectedFwd.project(projectionColumns, pool);

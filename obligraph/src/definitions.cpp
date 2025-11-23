@@ -236,6 +236,25 @@ void Catalog::serializeRowData(Row& row, const vector<ColumnMeta>& columnMetas, 
                 memcpy(dataPtr, &timestamp, sizeof(int64_t));
                 break;
             }
+            case ColumnType::DATE: {
+                // For simplicity, store date string as int64 hash
+                // In real implementation, you'd parse the date format
+                int64_t date = hash<string>{}(value);
+                memcpy(dataPtr, &date, sizeof(int64_t));
+                break;
+            }
+            case ColumnType::BLOB: {
+                // Store BLOB as fixed-length binary data, similar to STRING
+                // For now, treat it as a string (base64 encoded or hex string from CSV)
+                string truncatedValue = value;
+                size_t blobSize = meta.size;  // Use the size from schema
+                if (truncatedValue.length() > blobSize) {
+                    truncatedValue = truncatedValue.substr(0, blobSize);
+                }
+                truncatedValue.resize(blobSize, '\0');
+                memcpy(dataPtr, truncatedValue.c_str(), blobSize);
+                break;
+            }
             default:
                 throw runtime_error("Unsupported column type for serialization");
         }

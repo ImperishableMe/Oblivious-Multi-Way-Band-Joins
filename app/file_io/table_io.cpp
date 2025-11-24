@@ -25,7 +25,9 @@ Table TableIO::load_csv(const std::string& filepath) {
 
     // Read first line to get headers
     if (!std::getline(file, line)) {
-        throw std::runtime_error("CSV file is empty: " + filepath);
+        // Truly empty file - return empty table with no schema
+        file.close();
+        return Table(extract_table_name(filepath), std::vector<std::string>());
     }
 
     // Parse headers from first line
@@ -76,33 +78,32 @@ void TableIO::save_csv(const Table& table, const std::string& filepath) {
         throw std::runtime_error("Cannot create CSV file: " + filepath);
     }
 
-    // Write headers
-    if (table.size() > 0) {
-        std::vector<std::string> headers = table.get_schema();
+    // Always write headers (even for empty tables)
+    std::vector<std::string> headers = table.get_schema();
 
-        // Table should always have schema set
-        if (headers.empty()) {
-            throw std::runtime_error("Table has no schema set");
-        }
+    // Table should always have schema set
+    if (headers.empty()) {
+        // Empty table with no schema - write empty file
+        file.close();
+        return;
+    }
 
-        for (size_t i = 0; i < headers.size(); ++i) {
-            if (i > 0) file << ",";
-            file << headers[i];
+    for (size_t i = 0; i < headers.size(); ++i) {
+        if (i > 0) file << ",";
+        file << headers[i];
+    }
+    file << "\n";
+
+    // Write data rows
+    for (size_t row = 0; row < table.size(); ++row) {
+        const auto& entry = table.get_entry(row);
+        bool first = true;
+        for (size_t col = 0; col < headers.size(); ++col) {
+            if (!first) file << ",";
+            file << static_cast<int64_t>(entry.attributes[col]);
+            first = false;
         }
         file << "\n";
-
-        // Write data
-        for (size_t row = 0; row < table.size(); ++row) {
-            const auto& entry = table.get_entry(row);
-            // Write only non-empty columns
-            bool first = true;
-            for (size_t col = 0; col < headers.size(); ++col) {
-                if (!first) file << ",";
-                file << static_cast<int64_t>(entry.attributes[col]);
-                first = false;
-            }
-            file << "\n";
-        }
     }
 
     file.close();
@@ -176,14 +177,14 @@ std::vector<std::string> TableIO::parse_csv_line(const std::string& line) {
     std::vector<std::string> values;
     std::stringstream ss(line);
     std::string value;
-    
+
     while (std::getline(ss, value, ',')) {
-        // Trim whitespace
-        value.erase(0, value.find_first_not_of(" \t"));
-        value.erase(value.find_last_not_of(" \t") + 1);
+        // Trim whitespace and carriage returns (handles Windows CRLF line endings)
+        value.erase(0, value.find_first_not_of(" \t\r"));
+        value.erase(value.find_last_not_of(" \t\r") + 1);
         values.push_back(value);
     }
-    
+
     return values;
 }
 

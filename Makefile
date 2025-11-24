@@ -35,6 +35,7 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/query/query_parser.cpp \
                  app/query/inequality_parser.cpp \
                  app/query/condition_merger.cpp \
+                 app/query/filter_condition.cpp \
                  app/algorithms/bottom_up_phase.cpp \
                  app/algorithms/top_down_phase.cpp \
                  app/algorithms/distribute_expand.cpp \

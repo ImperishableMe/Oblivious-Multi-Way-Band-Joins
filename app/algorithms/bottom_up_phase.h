@@ -6,6 +6,7 @@
 #include "../data_structures/data_structures.h"
 #include "../join/join_tree_node.h"
 #include "../join/join_constraint.h"
+#include "../query/filter_condition.h"
 
 /**
  * BottomUpPhase Class
@@ -33,7 +34,25 @@ public:
      */
     static void Execute(JoinTreeNodePtr root);
 
+    /**
+     * Execute bottom-up phase with filter conditions
+     * Applies filters after initialization, before computing multiplicities
+     *
+     * @param root Root of the join tree
+     * @param filters Filter conditions to apply (from WHERE clause)
+     */
+    static void Execute(JoinTreeNodePtr root, const std::vector<FilterCondition>& filters);
+
 private:
+    /**
+     * Apply filter conditions to all tables in the join tree
+     * Sets local_mult = 0 for entries that don't satisfy filters
+     * This is done obliviously (same access pattern regardless of filter result)
+     *
+     * @param node Current node in tree traversal
+     * @param filters Filter conditions to apply
+     */
+    static void ApplyFiltersToTree(JoinTreeNodePtr node, const std::vector<FilterCondition>& filters);
     /**
      * Initialize all tables with metadata columns
      * Adds metadata fields and sets original indices

@@ -5,6 +5,7 @@
 #include <vector>
 #include "../data_structures/data_structures.h"
 #include "../join/join_tree_node.h"
+#include "../query/filter_condition.h"
 
 /**
  * ObliviousJoin Class
@@ -28,13 +29,21 @@ class ObliviousJoin {
 public:
     /**
      * Execute the complete oblivious join algorithm
-     * 
+     *
      * @param root Root of the join tree with input tables
-     * @param eid SGX enclave ID for secure operations
-     * @return Final join result table (encrypted)
+     * @return Final join result table
      */
     static Table Execute(JoinTreeNodePtr root);
-    
+
+    /**
+     * Execute the complete oblivious join algorithm with filter conditions
+     *
+     * @param root Root of the join tree with input tables
+     * @param filters Filter conditions from WHERE clause (applied obliviously)
+     * @return Final join result table
+     */
+    static Table Execute(JoinTreeNodePtr root, const std::vector<FilterCondition>& filters);
+
     /**
      * Execute join with debug session
      * Same as Execute but creates a debug session for intermediate results
@@ -45,6 +54,18 @@ public:
      */
     static Table ExecuteWithDebug(JoinTreeNodePtr root,
                                    const std::string& session_name);
+
+    /**
+     * Execute join with debug session and filter conditions
+     *
+     * @param root Root of the join tree with input tables
+     * @param session_name Name for debug session
+     * @param filters Filter conditions from WHERE clause
+     * @return Final join result table
+     */
+    static Table ExecuteWithDebug(JoinTreeNodePtr root,
+                                   const std::string& session_name,
+                                   const std::vector<FilterCondition>& filters);
 
 private:
     /**

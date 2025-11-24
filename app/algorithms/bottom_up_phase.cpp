@@ -8,9 +8,19 @@
 // Debug functions are declared in debug_util.h
 
 void BottomUpPhase::Execute(JoinTreeNodePtr root) {
+    // Call overloaded version with empty filters
+    Execute(root, std::vector<FilterCondition>());
+}
+
+void BottomUpPhase::Execute(JoinTreeNodePtr root, const std::vector<FilterCondition>& filters) {
 
     // Step 1: Initialize all tables with metadata
     InitializeAllTables(root);
+
+    // Step 1.5: Apply filters (sets local_mult = 0 for filtered entries)
+    if (!filters.empty()) {
+        ApplyFiltersToTree(root, filters);
+    }
 
     // Step 2: Post-order traversal
     auto nodes = PostOrderTraversal(root);
@@ -84,6 +94,51 @@ void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node) {
     // Recursively initialize children
     for (auto& child : node->get_children()) {
         InitializeAllTables(child);
+    }
+}
+
+void BottomUpPhase::ApplyFiltersToTree(JoinTreeNodePtr node, const std::vector<FilterCondition>& filters) {
+    if (!node) return;
+
+    // Get this node's table name (which is the alias)
+    std::string table_alias = node->get_table_name();
+    Table& table = node->get_table();
+
+    // Find filters that apply to this table
+    for (const auto& filter : filters) {
+        if (filter.table_alias == table_alias) {
+            // Check if column exists in table schema
+            if (!table.has_column(filter.column_name)) {
+                std::cerr << "Warning: Column '" << filter.column_name
+                          << "' not found in table '" << table_alias
+                          << "'. Filter skipped." << std::endl;
+                continue;
+            }
+
+            size_t col_idx = table.get_column_index(filter.column_name);
+
+            // Apply filter obliviously to ALL entries
+            // Same operations performed regardless of filter result
+            for (size_t i = 0; i < table.size(); i++) {
+                Entry& entry = table[i];
+
+                // Get the attribute value for this column
+                int32_t attr_value = entry.attributes[col_idx];
+
+                // Evaluate filter: returns 1 if matches, 0 if not
+                int32_t matches = filter.evaluate(attr_value);
+
+                // Oblivious update: local_mult = matches * local_mult
+                // If matches=1, local_mult unchanged (stays 1)
+                // If matches=0, local_mult becomes 0
+                entry.local_mult = matches * entry.local_mult;
+            }
+        }
+    }
+
+    // Recursively apply to children
+    for (auto& child : node->get_children()) {
+        ApplyFiltersToTree(child, filters);
     }
 }
 

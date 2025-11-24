@@ -22,6 +22,11 @@ static size_t GetTotalTreeSize(JoinTreeNodePtr node) {
 // Forward declaration for table debugging
 
 Table ObliviousJoin::Execute(JoinTreeNodePtr root) {
+    // Call overloaded version with empty filters
+    return Execute(root, std::vector<FilterCondition>());
+}
+
+Table ObliviousJoin::Execute(JoinTreeNodePtr root, const std::vector<FilterCondition>& filters) {
     // Validate the join tree
     if (!ValidateJoinTree(root)) {
         throw std::runtime_error("Invalid join tree structure");
@@ -32,9 +37,9 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root) {
     auto start_time = Clock::now();
     auto phase_start = Clock::now();
 
-    // Phase 1: Bottom-Up - Compute local multiplicities
+    // Phase 1: Bottom-Up - Compute local multiplicities (with filters applied)
     phase_start = Clock::now();
-    BottomUpPhase::Execute(root);
+    BottomUpPhase::Execute(root, filters);
     auto bottom_up_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t bottom_up_size = GetTotalTreeSize(root);
 
@@ -78,11 +83,18 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root) {
 
 Table ObliviousJoin::ExecuteWithDebug(JoinTreeNodePtr root,
                                        const std::string& session_name) {
+    // Call overloaded version with empty filters
+    return ExecuteWithDebug(root, session_name, std::vector<FilterCondition>());
+}
+
+Table ObliviousJoin::ExecuteWithDebug(JoinTreeNodePtr root,
+                                       const std::string& session_name,
+                                       const std::vector<FilterCondition>& filters) {
     // Initialize debug session
     debug_init_session(session_name.c_str());
-    
+
     DEBUG_INFO("Starting oblivious join with debug session: %s", session_name.c_str());
-    
+
     // Dump initial tables
     auto nodes = std::vector<JoinTreeNodePtr>();
     std::function<void(JoinTreeNodePtr)> collect = [&](JoinTreeNodePtr node) {
@@ -92,19 +104,19 @@ Table ObliviousJoin::ExecuteWithDebug(JoinTreeNodePtr root,
         }
     };
     collect(root);
-    
+
     for (const auto& node : nodes) {
         std::string label = "input_" + node->get_table_name();
     }
-    
-    // Execute the join
-    Table result = Execute(root);
-    
+
+    // Execute the join with filters
+    Table result = Execute(root, filters);
+
     // Dump final result
-    
+
     // Close debug session
     debug_close_session();
-    
+
     return result;
 }
 

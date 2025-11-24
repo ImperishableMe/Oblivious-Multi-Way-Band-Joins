@@ -9,6 +9,7 @@
 #include "join/join_tree_node.h"
 #include "join/join_tree_builder.h"
 #include "query/query_parser.h"
+#include "query/filter_condition.h"
 #include "debug_util.h"
 #include "file_io/table_io.h"
 
@@ -101,8 +102,20 @@ int main(int argc, char* argv[]) {
             throw std::runtime_error("Failed to build join tree from query");
         }
 
-        // Execute oblivious join with debug output
-        Table result = ObliviousJoin::ExecuteWithDebug(join_tree, "oblivious_join");
+        // Step 5: Parse filter conditions from WHERE clause
+        std::vector<FilterCondition> filters;
+        for (const auto& filter_str : parsed_query.filter_conditions) {
+            FilterCondition filter;
+            if (FilterCondition::parse(filter_str, filter)) {
+                filters.push_back(filter);
+            } else {
+                std::cerr << "Warning: Failed to parse filter condition: '"
+                          << filter_str << "'" << std::endl;
+            }
+        }
+
+        // Execute oblivious join with debug output and filters
+        Table result = ObliviousJoin::ExecuteWithDebug(join_tree, "oblivious_join", filters);
 
         // Save result
         TableIO::save_csv(result, output_file);

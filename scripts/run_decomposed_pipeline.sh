@@ -61,6 +61,8 @@ echo ""
 echo "[3/5] Preparing intermediate data..."
 mkdir -p "$TEMP_DIR/mwbj_data"
 cp "$TEMP_DIR/hop.csv" "$TEMP_DIR/mwbj_data/"
+# Also copy txn.csv for optimized queries that use plain txn tables
+cp "$DATA_DIR/txn.csv" "$TEMP_DIR/mwbj_data/"
 
 # Show hop result stats
 HOP_ROWS=$(wc -l < "$TEMP_DIR/hop.csv")

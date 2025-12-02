@@ -126,13 +126,29 @@ namespace obligraph {
         set <string> srcColumns;
         set <string> edgeColumns;
 
-        for (const auto& col : query.projectionColumns) {
-            if (col.first == query.sourceNodeTableName) {
-                srcColumns.insert(col.second);
-            } else if (col.first == query.edgeTableName) {
-                edgeColumns.insert(col.second);
+        Table srcTable = catalog.getTable(query.sourceNodeTableName);
+        Table edgeTableFwd = catalog.getTable(query.edgeTableName + "_fwd");
+
+        // If projectionColumns is empty, include ALL columns from source and edge tables
+        if (query.projectionColumns.empty()) {
+            for (const auto& meta : srcTable.schema.columnMetas) {
+                srcColumns.insert(meta.name);
+            }
+            for (const auto& meta : edgeTableFwd.schema.columnMetas) {
+                edgeColumns.insert(meta.name);
+            }
+        } else {
+            for (const auto& col : query.projectionColumns) {
+                if (col.first == query.sourceNodeTableName ||
+                    (col.first.length() > 4 && col.first.substr(col.first.length() - 4) == "_src")) {
+                    srcColumns.insert(col.second);
+                } else if (col.first == query.edgeTableName) {
+                    edgeColumns.insert(col.second);
+                }
             }
         }
+
+        // Also include columns needed for predicates
         for (const auto& tablePred : query.tablePredicates) {
             if (tablePred.first == query.sourceNodeTableName) {
                 for (const auto& pred : tablePred.second) {
@@ -145,10 +161,7 @@ namespace obligraph {
             }
         }
 
-        Table srcTable = catalog.getTable(query.sourceNodeTableName );
         Table srcProjected = srcTable.project(vector<string>(srcColumns.begin(), srcColumns.end()), pool);
-
-        Table edgeTableFwd = catalog.getTable(query.edgeTableName + "_fwd");
         Table edgeProjectedFwd = edgeTableFwd.project(vector<string>(edgeColumns.begin(), edgeColumns.end()), pool);
 
         Table srcSide;
@@ -175,12 +188,23 @@ namespace obligraph {
         ScopedTimer timer("Building Destination Table");
         set <string> dstColumns;
 
-        for (const auto& col : query.projectionColumns) {
-           if(col.first == query.destNodeTableName) {
-                dstColumns.insert(col.second);
-           }
+        Table dstTable = catalog.getTable(query.destNodeTableName);
+
+        // If projectionColumns is empty, include ALL columns from destination table
+        if (query.projectionColumns.empty()) {
+            for (const auto& meta : dstTable.schema.columnMetas) {
+                dstColumns.insert(meta.name);
+            }
+        } else {
+            for (const auto& col : query.projectionColumns) {
+                if (col.first == query.destNodeTableName ||
+                    (col.first.length() > 5 && col.first.substr(col.first.length() - 5) == "_dest")) {
+                    dstColumns.insert(col.second);
+                }
+            }
         }
 
+        // Also include columns needed for predicates
         for (const auto& tablePred : query.tablePredicates) {
             if (tablePred.first == query.destNodeTableName) {
                 for (const auto& pred : tablePred.second) {
@@ -189,7 +213,6 @@ namespace obligraph {
             }
         }
 
-        Table dstTable = catalog.getTable(query.destNodeTableName);
         Table dstProjected = dstTable.project(vector<string>(dstColumns.begin(), dstColumns.end()), pool);
         Table edgeTableRev = catalog.getTable(query.edgeTableName + "_rev");
         Table dstSide;
@@ -273,6 +296,11 @@ namespace obligraph {
         }
         edgeProjectedFwd.filter(allPredicates, pool);
 
+        // If no projection columns specified, return all columns (skip projection)
+        if (query.projectionColumns.empty()) {
+            return edgeProjectedFwd;
+        }
+
         vector <string> projectionColumns;
         for (const auto& col : query.projectionColumns) {
             string columnName;
@@ -285,14 +313,19 @@ namespace obligraph {
                 // Node columns need table-qualified names
                 string tablePrefix = col.first;
 
-                // In self-referential joins, determine if referring to source or dest
+                // In self-referential joins, check for explicit _src or _dest suffix
                 if (isSelfReferential) {
-                    // Projections on source table refer to destination by convention
-                    if (col.first == query.destNodeTableName) {
+                    // Check if user explicitly specified source or destination
+                    if (col.first.length() > 4 && col.first.substr(col.first.length() - 4) == "_src") {
+                        // User wants source columns - use the base table name + _src
+                        tablePrefix = col.first;  // Already has _src suffix
+                    } else if (col.first.length() > 5 && col.first.substr(col.first.length() - 5) == "_dest") {
+                        // User wants dest columns - use the base table name + _dest
+                        tablePrefix = col.first;  // Already has _dest suffix
+                    } else if (col.first == query.destNodeTableName) {
+                        // Default: destination columns for backward compatibility
                         tablePrefix += "_dest";
                     }
-                    // If user explicitly wants source columns, they would need to use sourceNodeTableName
-                    // For now, default projection to destination
                 }
 
                 columnName = tablePrefix + "_" + col.second;

@@ -81,6 +81,9 @@ target_link_libraries(ldbc_queries PRIVATE core)
 add_executable(custom_dataset_queries src/custom_dataset_query.cpp)
 target_link_libraries(custom_dataset_queries PRIVATE core)
 
+# Banking one-hop executable (for query decomposition)
+add_executable(banking_onehop src/banking_onehop.cpp)
+target_link_libraries(banking_onehop PRIVATE core)
 
 # Enable testing
 enable_testing()

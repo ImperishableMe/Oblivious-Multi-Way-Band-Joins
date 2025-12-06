@@ -80,11 +80,14 @@ ORIGINAL_TIMES=()
 ORIGINAL_ROWS=""
 
 for i in $(seq 1 $NUM_RUNS); do
-    START=$(date +%s.%N)
     OUTPUT=$("$PROJECT_DIR/sgx_app" "$QUERY" "$DATA_DIR" "$TEMP_DIR/original_$i.csv" 2>&1)
-    END=$(date +%s.%N)
 
-    TIME=$(echo "$END - $START" | bc)
+    # Extract Total time from PHASE_TIMING (query execution time only, excludes I/O)
+    TIME=$(echo "$OUTPUT" | grep -oP 'PHASE_TIMING:.*Total=\K[0-9]+\.[0-9]+')
+    if [ -z "$TIME" ]; then
+        echo "Warning: Could not extract timing from output"
+        TIME="0"
+    fi
     ORIGINAL_TIMES+=($TIME)
 
     # Extract row count from first run
@@ -92,11 +95,11 @@ for i in $(seq 1 $NUM_RUNS); do
         ORIGINAL_ROWS=$(echo "$OUTPUT" | grep -oP 'Result: \K\d+' | head -1)
     fi
 
-    printf "  Run %d: %.3fs\n" $i $TIME
+    printf "  Run %d: %.6fs\n" $i $TIME
 done
 
 # Calculate average
-ORIGINAL_AVG=$(echo "${ORIGINAL_TIMES[@]}" | tr ' ' '\n' | awk '{sum+=$1} END {printf "%.3f", sum/NR}')
+ORIGINAL_AVG=$(echo "${ORIGINAL_TIMES[@]}" | tr ' ' '\n' | awk '{sum+=$1} END {printf "%.6f", sum/NR}')
 echo "  Average: ${ORIGINAL_AVG}s ($ORIGINAL_ROWS rows)"
 echo ""
 
@@ -117,11 +120,17 @@ for i in $(seq 1 $NUM_RUNS); do
     # Step 1: Convert data (NOT timed - preprocessing)
     python3 "$SCRIPT_DIR/convert_banking_to_obligraph.py" "$DATA_DIR" "$RUN_TEMP/obligraph_data" > /dev/null 2>&1
 
-    # Step 2: Run one-hop (TIMED)
-    START_ONEHOP=$(date +%s.%N)
-    "$PROJECT_DIR/obligraph/build/banking_onehop" "$RUN_TEMP/obligraph_data" "$RUN_TEMP/hop.csv" > /dev/null 2>&1
-    END_ONEHOP=$(date +%s.%N)
-    ONEHOP_TIME=$(echo "$END_ONEHOP - $START_ONEHOP" | bc)
+    # Step 2: Run one-hop (extract timing from program output)
+    ONEHOP_OUTPUT=$("$PROJECT_DIR/obligraph/build/banking_onehop" "$RUN_TEMP/obligraph_data" "$RUN_TEMP/hop.csv" 2>&1)
+
+    # Extract "One-hop execution: X ms" and convert to seconds
+    ONEHOP_MS=$(echo "$ONEHOP_OUTPUT" | grep -oP 'One-hop execution: \K[0-9]+')
+    if [ -z "$ONEHOP_MS" ]; then
+        echo "Warning: Could not extract one-hop timing"
+        ONEHOP_TIME="0"
+    else
+        ONEHOP_TIME=$(echo "scale=6; $ONEHOP_MS / 1000" | bc)
+    fi
     ONEHOP_TIMES+=($ONEHOP_TIME)
 
     # Step 3: Prepare data (NOT timed - preprocessing)
@@ -132,11 +141,15 @@ for i in $(seq 1 $NUM_RUNS); do
     # Step 4: Rewrite query (NOT timed - preprocessing)
     python3 "$SCRIPT_DIR/rewrite_chain_query.py" "$QUERY" "$RUN_TEMP/decomposed.sql" 2> /dev/null
 
-    # Step 5: Run multi-way band joins (TIMED)
-    START_MWBJ=$(date +%s.%N)
+    # Step 5: Run multi-way band joins (extract timing from program output)
     OUTPUT=$("$PROJECT_DIR/sgx_app" "$RUN_TEMP/decomposed.sql" "$RUN_TEMP/mwbj_data" "$TEMP_DIR/decomposed_$i.csv" 2>&1)
-    END_MWBJ=$(date +%s.%N)
-    MWBJ_TIME=$(echo "$END_MWBJ - $START_MWBJ" | bc)
+
+    # Extract Total time from PHASE_TIMING (query execution time only)
+    MWBJ_TIME=$(echo "$OUTPUT" | grep -oP 'PHASE_TIMING:.*Total=\K[0-9]+\.[0-9]+')
+    if [ -z "$MWBJ_TIME" ]; then
+        echo "Warning: Could not extract MWBJ timing"
+        MWBJ_TIME="0"
+    fi
     MWBJ_TIMES+=($MWBJ_TIME)
 
     # Total decomposed time
@@ -148,15 +161,15 @@ for i in $(seq 1 $NUM_RUNS); do
         DECOMPOSED_ROWS=$(echo "$OUTPUT" | grep -oP 'Result: \K\d+' | head -1)
     fi
 
-    printf "  Run %d: %.3fs (one-hop: %.3fs, mwbj: %.3fs)\n" $i $TOTAL_TIME $ONEHOP_TIME $MWBJ_TIME
+    printf "  Run %d: %.6fs (one-hop: %.6fs, mwbj: %.6fs)\n" $i $TOTAL_TIME $ONEHOP_TIME $MWBJ_TIME
 
     rm -rf "$RUN_TEMP"
 done
 
 # Calculate averages
-DECOMPOSED_AVG=$(echo "${DECOMPOSED_TIMES[@]}" | tr ' ' '\n' | awk '{sum+=$1} END {printf "%.3f", sum/NR}')
-ONEHOP_AVG=$(echo "${ONEHOP_TIMES[@]}" | tr ' ' '\n' | awk '{sum+=$1} END {printf "%.3f", sum/NR}')
-MWBJ_AVG=$(echo "${MWBJ_TIMES[@]}" | tr ' ' '\n' | awk '{sum+=$1} END {printf "%.3f", sum/NR}')
+DECOMPOSED_AVG=$(echo "${DECOMPOSED_TIMES[@]}" | tr ' ' '\n' | awk '{sum+=$1} END {printf "%.6f", sum/NR}')
+ONEHOP_AVG=$(echo "${ONEHOP_TIMES[@]}" | tr ' ' '\n' | awk '{sum+=$1} END {printf "%.6f", sum/NR}')
+MWBJ_AVG=$(echo "${MWBJ_TIMES[@]}" | tr ' ' '\n' | awk '{sum+=$1} END {printf "%.6f", sum/NR}')
 
 echo "  Average: ${DECOMPOSED_AVG}s ($DECOMPOSED_ROWS rows)"
 echo "    - One-hop:  ${ONEHOP_AVG}s"
@@ -177,13 +190,13 @@ fi
 SPEEDUP=$(echo "scale=2; $ORIGINAL_AVG / $DECOMPOSED_AVG" | bc)
 
 echo "=============================================="
-echo "  SUMMARY: $QUERY_NAME"
+echo "  SUMMARY: $QUERY_NAME (Query Execution Time)"
 echo "=============================================="
 echo ""
-printf "  %-20s %10s\n" "Approach" "Time (avg)"
-printf "  %-20s %10s\n" "--------------------" "----------"
-printf "  %-20s %9.3fs\n" "Non-Decomposed" "$ORIGINAL_AVG"
-printf "  %-20s %9.3fs\n" "Decomposed" "$DECOMPOSED_AVG"
+printf "  %-20s %14s\n" "Approach" "Time (avg)"
+printf "  %-20s %14s\n" "--------------------" "--------------"
+printf "  %-20s %13.6fs\n" "Non-Decomposed" "$ORIGINAL_AVG"
+printf "  %-20s %13.6fs\n" "Decomposed" "$DECOMPOSED_AVG"
 echo ""
 printf "  Speedup: %.2fx\n" "$SPEEDUP"
 printf "  Correct: %s\n" "$CORRECT"

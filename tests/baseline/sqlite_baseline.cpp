@@ -158,6 +158,8 @@ Table execute_sqlite_join(sqlite3* db, const std::string& join_query,
     // Rewrite query to include alias prefixes in column names
     std::string rewritten_query = rewrite_query_with_aliases(join_query, tables);
 
+    std::cout << "Executing query: " << rewritten_query << std::endl;
+
     QueryResult result;
 
     char* err_msg = nullptr;

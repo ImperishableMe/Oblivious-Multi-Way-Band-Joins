@@ -142,6 +142,54 @@ Small TPC-H datasets are included for testing:
 - `input/plaintext/data_0_01/` - Scale factor 0.01 (plaintext)
 - `input/encrypted/data_0_01/` - Scale factor 0.01 (encrypted)
 
+## Generating Account Datasets
+
+The project includes a parameterized generator for creating banking datasets of varying sizes:
+
+```bash
+# Basic usage
+python3 scripts/generate_banking_scaled.py <num_accounts> <output_dir>
+
+# Examples with different sizes
+python3 scripts/generate_banking_scaled.py 1000 input/plaintext/banking_1000
+python3 scripts/generate_banking_scaled.py 5000 input/plaintext/banking_5000
+python3 scripts/generate_banking_scaled.py 10000 input/plaintext/banking_10000
+python3 scripts/generate_banking_scaled.py 50000 input/plaintext/banking_50000
+```
+
+### Custom Seeds for Reproducibility
+
+Use the `--seed` option to generate reproducible datasets:
+
+```bash
+# Same seed produces identical data
+python3 scripts/generate_banking_scaled.py 5000 output1 --seed 12345
+python3 scripts/generate_banking_scaled.py 5000 output2 --seed 12345  # Identical to output1
+
+# Different seeds produce different data
+python3 scripts/generate_banking_scaled.py 5000 output3 --seed 99999  # Different data
+```
+
+Default seed is `42 + num_accounts` (e.g., 5042 for 5000 accounts).
+
+### Generated Tables
+
+| Table | Rows | Columns |
+|-------|------|---------|
+| owner.csv | num_accounts / 5 | ow_id, name_placeholder |
+| account.csv | num_accounts | account_id, balance, owner_id |
+| txn.csv | 5 × num_accounts | acc_from, acc_to, amount, txn_time |
+
+### Pre-generated Banking Datasets
+
+- `input/plaintext/banking/` - Default dataset
+- `input/plaintext/banking_1000/` - 1,000 accounts
+- `input/plaintext/banking_2000/` - 2,000 accounts
+- `input/plaintext/banking_5000/` - 5,000 accounts
+- `input/plaintext/banking_10000/` - 10,000 accounts
+- `input/plaintext/banking_20000/` - 20,000 accounts
+- `input/plaintext/banking_50000/` - 50,000 accounts
+
 ## Limitations
 
 - Currently supports only integer data types

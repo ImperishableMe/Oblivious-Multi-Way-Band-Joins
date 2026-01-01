@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 """
-Parameterized Banking Dataset Generator for Scaling Benchmarks
+Banking Dataset Generator for Oblivious Multi-Way Join Testing
+
+Generates realistic banking data with parameterized sizes:
+- Owner table: num_accounts / 5 owners
+- Account table: num_accounts accounts with balances and owner IDs
+- Transaction table: 5 * num_accounts transactions between accounts
+
+Uses Zipfian distribution for transaction counts to create realistic variance
+(few very active accounts, most moderately active).
 
 Usage: python3 generate_banking_scaled.py <num_accounts> <output_dir>
 
 Example:
     python3 scripts/generate_banking_scaled.py 5000 input/plaintext/banking_5000
+    python3 scripts/generate_banking_scaled.py 10000 input/plaintext/banking
 """
 
+import argparse
 import csv
 import random
-import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -77,6 +86,11 @@ def generate_accounts(num_accounts, num_owners):
         })
         accounts_per_owner[owner_id] += 1
 
+    print(f"Generated {len(accounts)} accounts")
+    print(f"Owners with accounts: {len(accounts_per_owner)}")
+    print(f"Max accounts per owner: {max(accounts_per_owner.values())}")
+    print(f"Avg accounts per owner: {sum(accounts_per_owner.values()) / len(accounts_per_owner):.2f}")
+
     return accounts
 
 
@@ -84,6 +98,7 @@ def generate_transactions(accounts, num_transactions):
     """Generate transaction table with Zipfian distribution."""
     transactions = []
     account_ids = [acc['account_id'] for acc in accounts]
+    txn_counts = defaultdict(int)
 
     for _ in range(num_transactions):
         acc_from = zipfian_choice(account_ids, alpha=1.5)
@@ -101,6 +116,17 @@ def generate_transactions(accounts, num_transactions):
             'amount': amount,
             'txn_time': timestamp
         })
+        txn_counts[acc_from] += 1
+
+    txn_list = sorted(txn_counts.values(), reverse=True)
+    print(f"\nGenerated {len(transactions)} transactions")
+    print(f"Accounts with outgoing transactions: {len(txn_counts)}")
+    print(f"Top 10 most active accounts: {txn_list[:10]}")
+    print(f"Median transactions per account: {txn_list[len(txn_list)//2] if txn_list else 0}")
+    print(f"Avg transactions per active account: {sum(txn_list) / len(txn_list):.2f}")
+    mean = sum(txn_list) / len(txn_list) if txn_list else 0
+    variance = sum((x - mean) ** 2 for x in txn_list) / len(txn_list) if txn_list else 0
+    print(f"Variance in transaction counts: {variance:.2f}")
 
     return transactions
 
@@ -137,40 +163,57 @@ def validate_data(accounts, transactions):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python3 generate_banking_scaled.py <num_accounts> <output_dir>")
-        print("Example: python3 scripts/generate_banking_scaled.py 5000 input/plaintext/banking_5000")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description='Banking Dataset Generator for Oblivious Multi-Way Join Testing'
+    )
+    parser.add_argument('num_accounts', type=int, help='Number of accounts to generate')
+    parser.add_argument('output_dir', type=Path, help='Output directory path')
+    parser.add_argument('--seed', type=int, default=None,
+                        help='Random seed (default: 42 + num_accounts)')
+    args = parser.parse_args()
 
-    num_accounts = int(sys.argv[1])
-    output_dir = Path(sys.argv[2])
+    num_accounts = args.num_accounts
+    output_dir = args.output_dir
 
     # Calculate dependent sizes (5:1 ratio for transactions, 1:5 ratio for owners)
     num_transactions = 5 * num_accounts
     num_owners = max(1, num_accounts // 5)
 
     # Use seed based on num_accounts for reproducibility across runs
-    random.seed(42 + num_accounts)
+    seed = args.seed if args.seed is not None else 42 + num_accounts
+    random.seed(seed)
 
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Generating banking data: {num_accounts} accounts, {num_transactions} transactions, {num_owners} owners")
+    print("=" * 60)
+    print("Banking Dataset Generator")
+    print("=" * 60)
 
     # Generate data
+    print(f"\n1. Generating {num_owners} owners...")
     owners = generate_owners(num_owners)
+
+    print(f"\n2. Generating {num_accounts} accounts...")
     accounts = generate_accounts(num_accounts, num_owners)
+
+    print(f"\n3. Generating {num_transactions} transactions...")
     transactions = generate_transactions(accounts, num_transactions)
 
     # Validate data
     validate_data(accounts, transactions)
+    print("\n✓ All data validated successfully!")
 
     # Write to CSV files
+    print("\n4. Writing CSV files...")
     write_csv(output_dir, 'owner.csv', owners, ['ow_id', 'name_placeholder'])
     write_csv(output_dir, 'account.csv', accounts, ['account_id', 'balance', 'owner_id'])
     write_csv(output_dir, 'txn.csv', transactions, ['acc_from', 'acc_to', 'amount', 'txn_time'])
 
-    print(f"Generated data in {output_dir}")
+    print("\n" + "=" * 60)
+    print("Dataset generation complete!")
+    print(f"Output directory: {output_dir.absolute()}")
+    print("=" * 60)
 
 
 if __name__ == '__main__':

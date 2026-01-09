@@ -220,35 +220,7 @@ Figure~\ref{fig:architecture} shows the high-level architecture of \system. Give
 
 \begin{figure}[t]
 \centering
-\small
-\begin{verbatim}
-   +---------------------------+
-   |   Graph Query (Cypher)    |
-   +---------------------------+
-               |
-               v
-   +---------------------------+
-   |   Query Decomposition     |  <-- Contribution 2
-   |   - Identify 1-hop patterns
-   |   - Rewrite query         |
-   +---------------------------+
-               |
-       +-------+-------+
-       |               |
-       v               v
-+-------------+  +------------------+
-|  ForwardFill|  | Oblivious        |
-|  (1-Hop)    |  | Multi-Way Join   |
-|             |  | [Prior Work]     |
-+-------------+  +------------------+
-       |               |
-       +-------+-------+
-               |
-               v
-   +---------------------------+
-   |    Oblivious Result       |
-   +---------------------------+
-\end{verbatim}
+\includegraphics[width=0.85\columnwidth]{figures/system-architecture.pdf}
 \caption{Architecture of \system. Query decomposition identifies one-hop patterns for optimization. The \onehop operator processes these patterns efficiently, while the oblivious multi-way join handles remaining complexity.}
 \label{fig:architecture}
 \end{figure}
@@ -322,14 +294,17 @@ For longer queries like a 3-hop chain:
 \texttt{WHERE a1.balance > 10000 AND a4.balance < 1000}
 \end{center}
 
-The decomposer identifies two optimizable one-hop patterns (at the endpoints where filters exist) and rewrites the query:
+The decomposer creates one hop per transaction edge, with consecutive hops sharing overlapping account nodes:
 \begin{enumerate}
-    \item $H_1$ = \onehop(\texttt{a1}, \texttt{t1}, \texttt{a2}) with filter on \texttt{a1}
-    \item $H_2$ = \onehop(\texttt{a3}, \texttt{t3}, \texttt{a4}) with filter on \texttt{a4}
-    \item Reduced query: $H_1 \bowtie \texttt{t2} \bowtie H_2$
+    \item $h_1$ = \onehop(\texttt{a1}, \texttt{t1}, \texttt{a2})
+    \item $h_2$ = \onehop(\texttt{a2}, \texttt{t2}, \texttt{a3}) --- overlaps with $h_1$ at \texttt{a2}
+    \item $h_3$ = \onehop(\texttt{a3}, \texttt{t3}, \texttt{a4}) --- overlaps with $h_2$ at \texttt{a3}
+    \item Reduced query: $h_1 \bowtie h_2 \bowtie h_3$
+    \item Join conditions: $h_1.\texttt{dest\_id} = h_2.\texttt{src\_id}$ AND $h_2.\texttt{dest\_id} = h_3.\texttt{src\_id}$
+    \item Filters distributed to hops: \texttt{a1} filter $\rightarrow$ $h_1$, \texttt{a4} filter $\rightarrow$ $h_3$
 \end{enumerate}
 
-The reduced query has only 3 tables instead of 7, significantly reducing the work for the oblivious multi-way join.
+The reduced query joins 3 hop tables instead of 7 raw tables. Each hop is an alias over a single pre-computed one-hop table, and the decomposition is independent of where filters are placed.
 
 
 %==============================================================================
@@ -534,14 +509,16 @@ Consider a 3-hop chain query:
 \texttt{WHERE a1.balance > 10000 AND a4.balance < 1000}
 \end{center}
 
-Without decomposition, this becomes a 7-way join processed entirely by the oblivious multi-way join algorithm. With decomposition, we can:
+Without decomposition, this becomes a 7-way join processed entirely by the oblivious multi-way join algorithm. With our filter-independent decomposition, we create one hop per transaction edge:
 \begin{enumerate}
-    \item Apply \onehop to $(a1, t1, a2)$ with the filter on $a1$ $\rightarrow$ produces $H_1$
-    \item Apply \onehop to $(a3, t3, a4)$ with the filter on $a4$ $\rightarrow$ produces $H_2$
-    \item Reduce the query to: $H_1 \bowtie t2 \bowtie H_2$ (only 3 tables)
+    \item $h_1$ = \onehop$(a1, t1, a2)$ --- first hop
+    \item $h_2$ = \onehop$(a2, t2, a3)$ --- overlaps with $h_1$ at $a2$
+    \item $h_3$ = \onehop$(a3, t3, a4)$ --- overlaps with $h_2$ at $a3$
+    \item Join consecutive hops: $h_1.\texttt{dest\_id} = h_2.\texttt{src\_id}$ AND $h_2.\texttt{dest\_id} = h_3.\texttt{src\_id}$
+    \item Distribute filters: $a1$ filter $\rightarrow$ $h_1.\texttt{src}$, $a4$ filter $\rightarrow$ $h_3.\texttt{dest}$
 \end{enumerate}
 
-The reduced query is faster because: (1) \onehop is more efficient than the equivalent portion of multi-way join, and (2) the remaining join has fewer tables.
+All hops are aliases over a single pre-computed one-hop table. The reduced query joins 3 hop tables instead of 7 raw tables. This decomposition is \emph{filter-independent}---the same hop structure is used regardless of where predicates appear, simplifying the algorithm and enabling uniform optimization.
 
 % %------------------------------------------------------------------------------
 % \subsection{Decomposition Problem}
@@ -622,23 +599,25 @@ The reduced query is faster because: (1) \onehop is more efficient than the equi
 Original Query (3-hop chain):
   (a1)--[t1]-->(a2)--[t2]-->(a3)--[t3]-->(a4)
 
-Triplets identified:
-  T1 = (a1, t1, a2)  
-  T2 = (a2, t2, a3)  
-  T3 = (a3, t3, a4) 
-
-Selected (non-overlapping): T1, T3
+Filter-Independent Decomposition (one hop per edge):
+  h1 = (a1)--[t1]-->(a2)
+  h2 = (a2)--[t2]-->(a3)   [overlaps with h1 at a2]
+  h3 = (a3)--[t3]-->(a4)   [overlaps with h2 at a3]
 
 After decomposition:
-  H1 = ForwardFill(a1, t1, a2)  [size = |t1|]
-  H2 = ForwardFill(a3, t3, a4)  [size = |t3|]
-  Q' = H1 --[t2]--> H2          [3-way join]
+  h1 = ForwardFill(a1, t1, a2)  [size = |txn|]
+  h2 = ForwardFill(a2, t2, a3)  [size = |txn|]
+  h3 = ForwardFill(a3, t3, a4)  [size = |txn|]
+
+Reduced query: h1 JOIN h2 JOIN h3
+  WHERE h1.dest_id = h2.src_id
+    AND h2.dest_id = h3.src_id
 \end{verbatim}
-\caption{Decomposition of a 3-hop chain query. The 7-table join becomes two \onehop operations plus a 3-table join.}
+\caption{Filter-independent decomposition of a 3-hop chain query. Every transaction edge becomes a hop, with consecutive hops sharing overlapping account nodes. All hops are aliases over a single pre-computed one-hop table.}
 \label{fig:decomposition}
 \end{figure}
 
-Figure~\ref{fig:decomposition} illustrates the decomposition of a 3-hop chain query. The original 7-table join is reduced to two \onehop operations (executed independently) plus a 3-table multi-way join.
+Figure~\ref{fig:decomposition} illustrates the filter-independent decomposition of a 3-hop chain query. Each transaction edge becomes a hop, and consecutive hops share overlapping account nodes (the destination of one hop equals the source of the next). The reduced query joins these hops on their shared account IDs.
 
 %------------------------------------------------------------------------------
 \subsection{Correctness and Optimality}
@@ -646,10 +625,10 @@ Figure~\ref{fig:decomposition} illustrates the decomposition of a 3-hop chain qu
 %------------------------------------------------------------------------------
 
 \paragraph{Correctness.}
-The decomposition is correct because \onehop computes exactly the same result as the corresponding three-way join. Replacing a triplet $(n_1, e, n_2)$ with $H = \onehop(n_1, e, n_2)$ produces semantically equivalent results.
+The decomposition is correct because each \onehop computes exactly the same result as the corresponding three-way join, and consecutive hops are joined on their shared account node. For a chain query with $k$ transaction edges, the decomposition produces $k$ hops joined on $k-1$ overlapping account nodes, which is equivalent to the original $(2k+1)$-way join.
 
-\paragraph{Optimality.}
-Finding the optimal decomposition is NP-hard in general (reducible from maximum independent set on the triplet overlap graph). Our greedy algorithm provides a 2-approximation for chain queries and works well in practice for common query patterns.
+\paragraph{Determinism.}
+Unlike greedy decomposition approaches that must choose which triplets to optimize, our filter-independent decomposition is deterministic: every transaction edge becomes exactly one hop. This simplifies the algorithm (no scoring or selection logic) and ensures consistent behavior regardless of predicate placement. The decomposition handles both chain and branch query patterns uniformly---branch nodes simply connect to multiple hops via their shared account ID.
 
 
 %==============================================================================
@@ -833,6 +812,25 @@ Speedup ranges from 1.16$\times$ to 1.89$\times$ across different scales, with a
 
 \paragraph{One-Hop Overhead.}
 The one-hop operator time scales linearly with data size: 0.01s at 1K accounts to 1.01s at 50K accounts, representing only 1--3\% of total decomposed execution time.
+
+Figure~\ref{fig:scaling} visualizes the scaling behavior for both query types. The decomposed approach (blue) consistently outperforms the non-decomposed baseline (red), with speedup annotations showing the improvement ratio at each scale.
+
+\begin{figure*}[t]
+\centering
+\begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/scaling_chain4.png}
+    (a) 4-hop chain query
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/scaling_branch.png}
+    (b) Branch query
+\end{minipage}
+\caption{Scaling performance: Non-decomposed (red) vs decomposed (blue) execution time as data size increases. Speedup annotations show the ratio at each scale.}
+\label{fig:scaling}
+\end{figure*}
 
 
 %==============================================================================

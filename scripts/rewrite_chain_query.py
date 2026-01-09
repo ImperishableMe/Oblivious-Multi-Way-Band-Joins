@@ -1,34 +1,37 @@
 #!/usr/bin/env python3
 """
-Query rewriter for chain/branch queries using optimized hop decomposition.
+Query rewriter for chain/branch queries using filter-independent hop decomposition.
 
-OPTIMIZATION PRINCIPLE:
-- Use one-hop ONLY where we need account attributes (for filtering)
-- Use plain txn tables for intermediate connections
+DECOMPOSITION PRINCIPLE:
+- Every transaction edge becomes a one-hop join
+- Consecutive hops share overlapping account nodes (dest of left = src of right)
+- All hops are aliases over a single pre-computed hop table
+- Filters are distributed to hops that contain the filtered account
 
 Example for chain4 (a1 --t1-- a2 --t2-- a3 --t3-- a4):
-  Filters: a1.owner_id=52, a4.owner_id=45
+  Decomposition (always 3 hops regardless of filters):
+    h1: a1 -> t1 -> a2
+    h2: a2 -> t2 -> a3  (overlaps: h1.dest = h2.src at a2)
+    h3: a3 -> t3 -> a4  (overlaps: h2.dest = h3.src at a3)
 
-  Naive: h1, h2, h3 (3 hops)
-  Optimized: h1, t2, h2 (2 hops + 1 txn)
-    - h1: a1→t1→a2 (provides a1's filter)
-    - t2: links a2→a3 (just the edge)
-    - h2: a3→t3→a4 (provides a4's filter)
+  Rewritten query:
+    SELECT * FROM hop AS h1, hop AS h2, hop AS h3
+    WHERE h1.account_dest_id = h2.account_src_id
+      AND h2.account_dest_id = h3.account_src_id
+      AND <filters mapped to appropriate hops>
 """
 
 import re
 import sys
-from dataclasses import dataclass, field
+from collections import defaultdict
+from dataclasses import dataclass
 from typing import List, Dict, Tuple, Set, Optional
 
 
 @dataclass
 class AccountInfo:
-    """Information about an account alias."""
+    """Information about an account alias in the query."""
     alias: str
-    has_filter: bool = False
-    filter_column: Optional[str] = None
-    filter_value: Optional[str] = None
 
 
 @dataclass
@@ -40,29 +43,35 @@ class TxnInfo:
 
 
 @dataclass
-class HopInfo:
-    """Information about a one-hop join."""
-    hop_alias: str
-    src_account: str
-    txn: str
-    dest_account: str
+class FilterInfo:
+    """Filter condition on an account."""
+    account_alias: str
+    column: str
+    operator: str
+    value: str
 
 
 @dataclass
 class QueryElement:
-    """An element in the decomposed query (either hop or txn)."""
-    element_type: str  # "hop" or "txn"
-    alias: str
-    # For hop: src_account, txn, dest_account
-    # For txn: src_account (acc_from), dest_account (acc_to)
-    src_account: str
-    dest_account: str
-    txn: Optional[str] = None  # Only for hop
+    """An element in the decomposed query (always a hop)."""
+    alias: str          # h1, h2, h3, ...
+    src_account: str    # Original account alias (e.g., "a1")
+    txn: str            # Original txn alias (e.g., "t1")
+    dest_account: str   # Original account alias (e.g., "a2")
+
+
+def _extract_number(s: str) -> int:
+    """Extract numeric suffix from alias (e.g., 't1' -> 1, 'a2' -> 2)."""
+    match = re.search(r'\d+', s)
+    return int(match.group()) if match else 0
 
 
 def parse_banking_query(sql: str) -> Tuple[List[Tuple[str, str]], List[str], List[str]]:
     """
     Parse a banking query to extract tables, join conditions, and filters.
+
+    Returns:
+        (tables, join_conditions, filter_conditions)
     """
     sql = ' '.join(sql.split())
 
@@ -133,269 +142,246 @@ def build_graph(tables: List[Tuple[str, str]], join_conditions: List[str]) -> Tu
     return txns, accounts
 
 
-def identify_filtered_accounts(accounts: Dict[str, AccountInfo], filter_conditions: List[str]) -> Set[str]:
-    """Identify which accounts have filter conditions."""
-    filtered = set()
-
-    for cond in filter_conditions:
-        match = re.match(r'(\w+)\.(\w+)\s*=\s*(.+)', cond)
-        if match:
-            account, column, value = match.groups()
-            if account in accounts:
-                accounts[account].has_filter = True
-                accounts[account].filter_column = column
-                accounts[account].filter_value = value
-                filtered.add(account)
-
-    return filtered
-
-
-def find_hop_for_account(account: str, txns: Dict[str, TxnInfo], position: str) -> Optional[Tuple[str, str, str]]:
+def parse_filters(filter_conditions: List[str], accounts: Dict[str, AccountInfo]) -> Dict[str, FilterInfo]:
     """
-    Find the hop that covers an account at the specified position.
-
-    Args:
-        account: The account alias to cover
-        txns: Map of txn alias to TxnInfo
-        position: "src" or "dest" - where the account should be in the hop
+    Parse filter conditions into FilterInfo objects.
 
     Returns:
-        (src_account, txn_alias, dest_account) or None if not found
+        Mapping from account alias to FilterInfo
     """
-    for txn_alias, txn_info in txns.items():
-        if position == "src" and txn_info.src_account == account:
-            return (txn_info.src_account, txn_alias, txn_info.dest_account)
-        elif position == "dest" and txn_info.dest_account == account:
-            return (txn_info.src_account, txn_alias, txn_info.dest_account)
-    return None
+    filters: Dict[str, FilterInfo] = {}
+
+    for cond in filter_conditions:
+        # Match: alias.column op value (e.g., a1.owner_id = 52)
+        match = re.match(r'(\w+)\.(\w+)\s*(=|<|>|<=|>=|<>|!=)\s*(.+)', cond)
+        if match:
+            alias, column, operator, value = match.groups()
+            if alias in accounts:
+                filters[alias] = FilterInfo(
+                    account_alias=alias,
+                    column=column,
+                    operator=operator,
+                    value=value.strip()
+                )
+
+    return filters
 
 
-def determine_hop_position(account: str, txns: Dict[str, TxnInfo], filtered_accounts: Set[str]) -> str:
-    """
-    Determine if a filtered account should be hop's src or dest.
-
-    Heuristic:
-    - If account is only a source (acc_from) in txns → "src"
-    - If account is only a dest (acc_to) in txns → "dest"
-    - If both, prefer the direction that doesn't overlap with another filtered account
-    """
-    is_src = any(t.src_account == account for t in txns.values())
-    is_dest = any(t.dest_account == account for t in txns.values())
-
-    if is_src and not is_dest:
-        return "src"
-    elif is_dest and not is_src:
-        return "dest"
-    else:
-        # Check if being src would overlap with another filtered account
-        for txn in txns.values():
-            if txn.src_account == account:
-                if txn.dest_account in filtered_accounts:
-                    # The dest is also filtered, so this account should be src
-                    # (the dest will be handled by another hop)
-                    return "src"
-        # Default to dest (end of chain)
-        return "dest"
-
-
-def build_optimized_decomposition(
+def build_filter_independent_decomposition(
     txns: Dict[str, TxnInfo],
-    accounts: Dict[str, AccountInfo],
-    filtered_accounts: Set[str]
+    accounts: Dict[str, AccountInfo]
 ) -> List[QueryElement]:
     """
-    Build the optimized query decomposition.
+    Build filter-independent decomposition: one hop per transaction edge.
 
-    Strategy:
-    1. For each filtered account, create a hop that covers it
-    2. Use plain txn tables to fill gaps between hops
+    Algorithm:
+    1. Build graph of account->txn connections
+    2. Find starting accounts (only appear as source, not dest)
+    3. BFS traversal from start, creating one hop per edge
+    4. For branches: shared nodes naturally connect multiple hops
+
+    Returns:
+        List of QueryElement representing hops in traversal order
     """
     elements: List[QueryElement] = []
-    used_txns: Set[str] = set()
     hop_counter = 1
+    visited_txns: Set[str] = set()
 
-    # Sort filtered accounts by their position in the chain
-    # (based on transaction order)
-    txn_order = sorted(txns.keys(), key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0)
+    # Build adjacency: account -> list of (txn, dest_account)
+    outgoing: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
 
-    # Create hops for filtered accounts, sorted by their txn position
-    hops_by_account: Dict[str, QueryElement] = {}
+    for txn_alias, txn_info in txns.items():
+        if txn_info.src_account and txn_info.dest_account:
+            outgoing[txn_info.src_account].append((txn_alias, txn_info.dest_account))
 
-    # Sort filtered accounts by their earliest txn position
-    def account_txn_position(acc: str) -> int:
-        for txn_alias in txn_order:
-            txn_info = txns[txn_alias]
-            if txn_info.src_account == acc or txn_info.dest_account == acc:
-                return int(re.search(r'\d+', txn_alias).group()) if re.search(r'\d+', txn_alias) else 0
-        return 999
+    # Find starting accounts (have outgoing but no incoming)
+    dest_accounts = {t.dest_account for t in txns.values() if t.dest_account}
+    src_accounts = {t.src_account for t in txns.values() if t.src_account}
+    starting_accounts = src_accounts - dest_accounts
 
-    sorted_filtered = sorted(filtered_accounts, key=account_txn_position)
+    # If no clear starting point (cycle or isolated), start from first txn's source
+    if not starting_accounts:
+        first_txn = min(txns.keys(), key=_extract_number)
+        starting_accounts = {txns[first_txn].src_account}
 
-    for account in sorted_filtered:
-        position = determine_hop_position(account, txns, filtered_accounts)
-        hop_tuple = find_hop_for_account(account, txns, position)
+    def traverse_from(start_account: str):
+        """BFS traversal from a starting account, creating hops."""
+        nonlocal hop_counter
+        queue = [start_account]
 
-        if hop_tuple:
-            src, txn, dest = hop_tuple
-            hop = QueryElement(
-                element_type="hop",
-                alias=f"h{hop_counter}",
-                src_account=src,
-                dest_account=dest,
-                txn=txn
-            )
-            hops_by_account[account] = hop
-            used_txns.add(txn)
-            hop_counter += 1
+        while queue:
+            current = queue.pop(0)
 
-    # Build the chain of elements by following txn order
-    account_to_element: Dict[str, Tuple[QueryElement, str]] = {}  # account -> (element, position)
+            # Sort outgoing edges by txn number for deterministic ordering
+            edges = sorted(outgoing[current], key=lambda x: _extract_number(x[0]))
 
-    for account, hop in hops_by_account.items():
-        position = "src" if hop.src_account == account else "dest"
-        account_to_element[hop.src_account] = (hop, "src")
-        account_to_element[hop.dest_account] = (hop, "dest")
+            for txn_alias, dest_account in edges:
+                if txn_alias in visited_txns:
+                    continue
 
-    # Add plain txn elements for gaps
-    for txn_alias in txn_order:
-        if txn_alias not in used_txns:
-            txn_info = txns[txn_alias]
-            txn_element = QueryElement(
-                element_type="txn",
-                alias=txn_alias,
-                src_account=txn_info.src_account,
-                dest_account=txn_info.dest_account
-            )
-            elements.append(txn_element)
-            account_to_element[txn_info.src_account] = (txn_element, "src")
-            account_to_element[txn_info.dest_account] = (txn_element, "dest")
+                visited_txns.add(txn_alias)
 
-    # Add hops to elements (sorted by txn order)
-    for hop in sorted(hops_by_account.values(), key=lambda h: int(re.search(r'\d+', h.txn).group()) if re.search(r'\d+', h.txn) else 0):
-        elements.append(hop)
+                # Create hop element
+                hop = QueryElement(
+                    alias=f"h{hop_counter}",
+                    src_account=current,
+                    txn=txn_alias,
+                    dest_account=dest_account
+                )
+                elements.append(hop)
+                hop_counter += 1
 
-    # Sort all elements by their txn order
-    def element_order(e):
-        txn = e.txn if e.element_type == "hop" else e.alias
-        match = re.search(r'\d+', txn)
-        return int(match.group()) if match else 0
+                # Continue traversal from dest
+                queue.append(dest_account)
 
-    elements.sort(key=element_order)
+    # Traverse from each starting account (handles disconnected components)
+    for start in sorted(starting_accounts, key=_extract_number):
+        traverse_from(start)
 
     return elements
 
 
-def generate_join_conditions(elements: List[QueryElement], txns: Dict[str, TxnInfo]) -> List[str]:
-    """Generate join conditions between elements."""
-    conditions = []
+def distribute_filters_to_hops(
+    elements: List[QueryElement],
+    filters: Dict[str, FilterInfo]
+) -> Dict[str, List[Tuple[str, FilterInfo]]]:
+    """
+    Distribute filter conditions to hops that contain the filtered account.
 
-    # Build account to element mapping
-    account_positions: Dict[str, List[Tuple[QueryElement, str]]] = {}
+    A filter on account 'aX' goes to the first hop where aX appears
+    as either src or dest.
+
+    Returns:
+        Mapping from hop_alias to list of (position, filter) tuples
+        where position is "src" or "dest"
+    """
+    hop_filters: Dict[str, List[Tuple[str, FilterInfo]]] = defaultdict(list)
+    assigned_filters: Set[str] = set()
 
     for elem in elements:
-        if elem.src_account not in account_positions:
-            account_positions[elem.src_account] = []
-        if elem.dest_account not in account_positions:
-            account_positions[elem.dest_account] = []
+        # Check if src_account has an unassigned filter
+        if elem.src_account in filters and elem.src_account not in assigned_filters:
+            hop_filters[elem.alias].append(("src", filters[elem.src_account]))
+            assigned_filters.add(elem.src_account)
 
-        if elem.element_type == "hop":
-            account_positions[elem.src_account].append((elem, "src"))
-            account_positions[elem.dest_account].append((elem, "dest"))
-        else:  # txn
-            account_positions[elem.src_account].append((elem, "from"))
-            account_positions[elem.dest_account].append((elem, "to"))
+        # Check if dest_account has an unassigned filter
+        if elem.dest_account in filters and elem.dest_account not in assigned_filters:
+            hop_filters[elem.alias].append(("dest", filters[elem.dest_account]))
+            assigned_filters.add(elem.dest_account)
 
-    # Generate join conditions for accounts that appear in multiple elements
+    return hop_filters
+
+
+def generate_join_conditions(elements: List[QueryElement]) -> List[str]:
+    """
+    Generate join conditions between hops.
+
+    For overlapping hops, join on shared account:
+      - h_prev.account_dest_id = h_next.account_src_id
+
+    For branch points (same account in multiple hops):
+      - Chain the references appropriately
+    """
+    conditions = []
     generated = set()
 
-    for account, positions in account_positions.items():
-        if len(positions) > 1:
-            for i in range(len(positions) - 1):
-                elem1, pos1 = positions[i]
-                elem2, pos2 = positions[i + 1]
-
-                # Generate column references
-                if elem1.element_type == "hop":
-                    col1 = f"{elem1.alias}.account_{pos1}_id"
-                else:
-                    col1 = f"{elem1.alias}.acc_{pos1}"
-
-                if elem2.element_type == "hop":
-                    col2 = f"{elem2.alias}.account_{pos2}_id"
-                else:
-                    col2 = f"{elem2.alias}.acc_{pos2}"
-
-                join_key = tuple(sorted([col1, col2]))
-                if join_key not in generated:
-                    conditions.append(f"{col1} = {col2}")
-                    generated.add(join_key)
-
-    return conditions
-
-
-def generate_filter_conditions(elements: List[QueryElement], accounts: Dict[str, AccountInfo]) -> List[str]:
-    """Generate filter conditions mapped to the new schema."""
-    conditions = []
+    # Build mapping: account -> list of (hop_alias, position)
+    account_references: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
 
     for elem in elements:
-        if elem.element_type == "hop":
-            # Check if src or dest account has filter
-            src_account = accounts.get(elem.src_account)
-            dest_account = accounts.get(elem.dest_account)
+        account_references[elem.src_account].append((elem.alias, "src"))
+        account_references[elem.dest_account].append((elem.alias, "dest"))
 
-            if src_account and src_account.has_filter:
-                col = f"{elem.alias}.account_src_{src_account.filter_column}"
-                conditions.append(f"{col} = {src_account.filter_value}")
+    # Generate equi-join for each shared account
+    for account, refs in account_references.items():
+        if len(refs) < 2:
+            continue
 
-            if dest_account and dest_account.has_filter:
-                col = f"{elem.alias}.account_dest_{dest_account.filter_column}"
-                conditions.append(f"{col} = {dest_account.filter_value}")
+        # Sort refs by hop number for deterministic output
+        refs = sorted(refs, key=lambda x: _extract_number(x[0]))
+
+        # Chain the references
+        for i in range(len(refs) - 1):
+            hop1, pos1 = refs[i]
+            hop2, pos2 = refs[i + 1]
+
+            col1 = f"{hop1}.account_{pos1}_id"
+            col2 = f"{hop2}.account_{pos2}_id"
+
+            # Avoid duplicates
+            join_key = tuple(sorted([col1, col2]))
+            if join_key not in generated:
+                conditions.append(f"{col1} = {col2}")
+                generated.add(join_key)
 
     return conditions
 
 
-def generate_optimized_query(elements: List[QueryElement], txns: Dict[str, TxnInfo], accounts: Dict[str, AccountInfo]) -> str:
+def generate_filter_conditions(
+    elements: List[QueryElement],
+    filters: Dict[str, FilterInfo]
+) -> List[str]:
+    """Generate filter conditions mapped to hop column names."""
+    conditions = []
+    hop_filters = distribute_filters_to_hops(elements, filters)
+
+    for hop_alias, filter_list in sorted(hop_filters.items(), key=lambda x: _extract_number(x[0])):
+        for position, finfo in filter_list:
+            # Map account column to hop column
+            # e.g., a1.owner_id -> h1.account_src_owner_id
+            col = f"{hop_alias}.account_{position}_{finfo.column}"
+            conditions.append(f"{col} {finfo.operator} {finfo.value}")
+
+    return conditions
+
+
+def generate_optimized_query(
+    elements: List[QueryElement],
+    filters: Dict[str, FilterInfo]
+) -> str:
     """Generate the optimized SQL query."""
 
-    # FROM clause
-    from_parts = []
-    for elem in elements:
-        if elem.element_type == "hop":
-            from_parts.append(f"hop AS {elem.alias}")
-        else:
-            from_parts.append(f"txn AS {elem.alias}")
-
+    # FROM clause: all elements are hops
+    from_parts = [f"hop AS {elem.alias}" for elem in elements]
     from_clause = "SELECT * FROM " + ", ".join(from_parts)
 
     # WHERE clause
-    join_conditions = generate_join_conditions(elements, txns)
-    filter_conditions = generate_filter_conditions(elements, accounts)
+    join_conditions = generate_join_conditions(elements)
+    filter_conditions = generate_filter_conditions(elements, filters)
 
     all_conditions = join_conditions + filter_conditions
-    where_clause = "WHERE " + "\n  AND ".join(all_conditions)
 
-    return f"{from_clause}\n{where_clause};"
+    if all_conditions:
+        where_clause = "WHERE " + "\n  AND ".join(all_conditions)
+        return f"{from_clause}\n{where_clause};"
+    else:
+        return f"{from_clause};"
 
 
 def rewrite_query(input_sql: str) -> str:
-    """Main function to rewrite a banking query with optimization."""
+    """Main function to rewrite a banking query with filter-independent decomposition."""
+    # Step 1: Parse the query
     tables, join_conditions, filter_conditions = parse_banking_query(input_sql)
+
+    # Step 2: Build the graph
     txns, accounts = build_graph(tables, join_conditions)
-    filtered_accounts = identify_filtered_accounts(accounts, filter_conditions)
 
-    print(f"Accounts with filters: {filtered_accounts}", file=sys.stderr)
+    # Step 3: Parse filters
+    filters = parse_filters(filter_conditions, accounts)
 
-    elements = build_optimized_decomposition(txns, accounts, filtered_accounts)
+    # Step 4: Build filter-independent decomposition
+    elements = build_filter_independent_decomposition(txns, accounts)
 
-    print(f"Decomposition ({len([e for e in elements if e.element_type == 'hop'])} hops, "
-          f"{len([e for e in elements if e.element_type == 'txn'])} txns):", file=sys.stderr)
+    # Debug output
+    print(f"Decomposition ({len(elements)} hops):", file=sys.stderr)
     for elem in elements:
-        if elem.element_type == "hop":
-            print(f"  {elem.alias}: {elem.src_account} -> {elem.txn} -> {elem.dest_account} (hop)", file=sys.stderr)
-        else:
-            print(f"  {elem.alias}: {elem.src_account} -> {elem.dest_account} (txn)", file=sys.stderr)
+        print(f"  {elem.alias}: {elem.src_account} -> {elem.txn} -> {elem.dest_account}", file=sys.stderr)
 
-    return generate_optimized_query(elements, txns, accounts)
+    if filters:
+        print(f"Filters: {list(filters.keys())}", file=sys.stderr)
+
+    # Step 5: Generate the optimized query
+    return generate_optimized_query(elements, filters)
 
 
 def main():

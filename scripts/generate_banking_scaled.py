@@ -18,6 +18,7 @@ Example:
 """
 
 import argparse
+import bisect
 import csv
 import random
 from collections import defaultdict
@@ -39,8 +40,30 @@ MAX_TIMESTAMP = 365000
 SENTINEL = -10000
 
 
+class ZipfianSampler:
+    """Pre-computed Zipfian distribution for fast O(log n) sampling."""
+
+    def __init__(self, items, alpha=1.5):
+        self.items = items
+        n = len(items)
+        # Pre-compute cumulative weights
+        weights = [1.0 / pow(i + 1, alpha) for i in range(n)]
+        self.cumulative = []
+        total = 0.0
+        for w in weights:
+            total += w
+            self.cumulative.append(total)
+        self.total_weight = total
+
+    def sample(self):
+        """Sample an item using binary search - O(log n)."""
+        rand_val = random.uniform(0, self.total_weight)
+        idx = bisect.bisect_left(self.cumulative, rand_val)
+        return self.items[min(idx, len(self.items) - 1)]
+
+
 def zipfian_choice(items, alpha=1.5):
-    """Select an item using Zipfian distribution."""
+    """Select an item using Zipfian distribution (legacy, O(n) - use ZipfianSampler for repeated calls)."""
     n = len(items)
     weights = [1.0 / pow(i + 1, alpha) for i in range(n)]
     total_weight = sum(weights)
@@ -65,7 +88,7 @@ def generate_owners(num_owners):
     return owners
 
 
-def generate_accounts(num_accounts, num_owners):
+def generate_accounts(num_accounts, num_owners, quiet=False):
     """Generate account table with realistic distribution."""
     accounts = []
     accounts_per_owner = defaultdict(int)
@@ -86,15 +109,16 @@ def generate_accounts(num_accounts, num_owners):
         })
         accounts_per_owner[owner_id] += 1
 
-    print(f"Generated {len(accounts)} accounts")
-    print(f"Owners with accounts: {len(accounts_per_owner)}")
-    print(f"Max accounts per owner: {max(accounts_per_owner.values())}")
-    print(f"Avg accounts per owner: {sum(accounts_per_owner.values()) / len(accounts_per_owner):.2f}")
+    if not quiet:
+        print(f"Generated {len(accounts)} accounts")
+        print(f"Owners with accounts: {len(accounts_per_owner)}")
+        print(f"Max accounts per owner: {max(accounts_per_owner.values())}")
+        print(f"Avg accounts per owner: {sum(accounts_per_owner.values()) / len(accounts_per_owner):.2f}")
 
     return accounts
 
 
-def generate_transactions(accounts, num_transactions):
+def generate_transactions(accounts, num_transactions, quiet=False):
     """Generate transaction table with Zipfian distribution."""
     transactions = []
     account_ids = [acc['account_id'] for acc in accounts]
@@ -118,15 +142,16 @@ def generate_transactions(accounts, num_transactions):
         })
         txn_counts[acc_from] += 1
 
-    txn_list = sorted(txn_counts.values(), reverse=True)
-    print(f"\nGenerated {len(transactions)} transactions")
-    print(f"Accounts with outgoing transactions: {len(txn_counts)}")
-    print(f"Top 10 most active accounts: {txn_list[:10]}")
-    print(f"Median transactions per account: {txn_list[len(txn_list)//2] if txn_list else 0}")
-    print(f"Avg transactions per active account: {sum(txn_list) / len(txn_list):.2f}")
-    mean = sum(txn_list) / len(txn_list) if txn_list else 0
-    variance = sum((x - mean) ** 2 for x in txn_list) / len(txn_list) if txn_list else 0
-    print(f"Variance in transaction counts: {variance:.2f}")
+    if not quiet:
+        txn_list = sorted(txn_counts.values(), reverse=True)
+        print(f"\nGenerated {len(transactions)} transactions")
+        print(f"Accounts with outgoing transactions: {len(txn_counts)}")
+        print(f"Top 10 most active accounts: {txn_list[:10]}")
+        print(f"Median transactions per account: {txn_list[len(txn_list)//2] if txn_list else 0}")
+        print(f"Avg transactions per active account: {sum(txn_list) / len(txn_list):.2f}")
+        mean = sum(txn_list) / len(txn_list) if txn_list else 0
+        variance = sum((x - mean) ** 2 for x in txn_list) / len(txn_list) if txn_list else 0
+        print(f"Variance in transaction counts: {variance:.2f}")
 
     return transactions
 
@@ -143,6 +168,50 @@ def write_csv(output_dir, filename, data, fieldnames):
         # Add sentinel row
         sentinel_row = {field: SENTINEL for field in fieldnames}
         writer.writerow(sentinel_row)
+
+
+def generate_transactions_streaming(account_ids, num_transactions, output_dir, batch_size=1_000_000, quiet=False):
+    """Generate transactions in streaming mode to reduce memory usage."""
+    filepath = output_dir / 'txn.csv'
+    fieldnames = ['acc_from', 'acc_to', 'amount', 'txn_time']
+
+    # Pre-compute Zipfian distribution for O(log n) sampling
+    sampler = ZipfianSampler(account_ids, alpha=1.5)
+
+    with open(filepath, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        written = 0
+        while written < num_transactions:
+            batch_count = min(batch_size, num_transactions - written)
+
+            for _ in range(batch_count):
+                acc_from = sampler.sample()
+                acc_to = acc_from
+                while acc_to == acc_from:
+                    acc_to = random.choice(account_ids)
+
+                amount = random.randint(MIN_AMOUNT, MAX_AMOUNT)
+                timestamp = random.randint(MIN_TIMESTAMP, MAX_TIMESTAMP)
+
+                writer.writerow({
+                    'acc_from': acc_from,
+                    'acc_to': acc_to,
+                    'amount': amount,
+                    'txn_time': timestamp
+                })
+
+            written += batch_count
+            if not quiet:
+                print(f"  Written {written:,}/{num_transactions:,} transactions ({100*written//num_transactions}%)")
+
+        # Add sentinel row
+        sentinel_row = {field: SENTINEL for field in fieldnames}
+        writer.writerow(sentinel_row)
+
+    if not quiet:
+        print(f"Generated {num_transactions:,} transactions (streaming mode)")
 
 
 def validate_data(accounts, transactions):
@@ -170,10 +239,16 @@ def main():
     parser.add_argument('output_dir', type=Path, help='Output directory path')
     parser.add_argument('--seed', type=int, default=None,
                         help='Random seed (default: 42 + num_accounts)')
+    parser.add_argument('--streaming', action='store_true',
+                        help='Use streaming mode for memory-efficient generation of large datasets')
+    parser.add_argument('--quiet', '-q', action='store_true',
+                        help='Suppress detailed output (for parallel execution)')
     args = parser.parse_args()
 
     num_accounts = args.num_accounts
     output_dir = args.output_dir
+    streaming = args.streaming
+    quiet = args.quiet
 
     # Calculate dependent sizes (5:1 ratio for transactions, 1:5 ratio for owners)
     num_transactions = 5 * num_accounts
@@ -186,34 +261,50 @@ def main():
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print("=" * 60)
-    print("Banking Dataset Generator")
-    print("=" * 60)
+    if not quiet:
+        print("=" * 60)
+        print("Banking Dataset Generator")
+        print("=" * 60)
 
     # Generate data
-    print(f"\n1. Generating {num_owners} owners...")
+    if not quiet:
+        print(f"\n1. Generating {num_owners:,} owners...")
     owners = generate_owners(num_owners)
 
-    print(f"\n2. Generating {num_accounts} accounts...")
-    accounts = generate_accounts(num_accounts, num_owners)
+    if not quiet:
+        print(f"\n2. Generating {num_accounts:,} accounts...")
+    accounts = generate_accounts(num_accounts, num_owners, quiet=quiet)
 
-    print(f"\n3. Generating {num_transactions} transactions...")
-    transactions = generate_transactions(accounts, num_transactions)
-
-    # Validate data
-    validate_data(accounts, transactions)
-    print("\n✓ All data validated successfully!")
-
-    # Write to CSV files
-    print("\n4. Writing CSV files...")
+    # Write owner and account files first
+    if not quiet:
+        print("\n3. Writing owner and account CSV files...")
     write_csv(output_dir, 'owner.csv', owners, ['ow_id', 'name_placeholder'])
     write_csv(output_dir, 'account.csv', accounts, ['account_id', 'balance', 'owner_id'])
-    write_csv(output_dir, 'txn.csv', transactions, ['acc_from', 'acc_to', 'amount', 'txn_time'])
 
-    print("\n" + "=" * 60)
-    print("Dataset generation complete!")
-    print(f"Output directory: {output_dir.absolute()}")
-    print("=" * 60)
+    # Generate transactions (streaming or in-memory)
+    if not quiet:
+        print(f"\n4. Generating {num_transactions:,} transactions...")
+
+    account_ids = [acc['account_id'] for acc in accounts]
+
+    if streaming:
+        # Streaming mode: write directly to file
+        generate_transactions_streaming(account_ids, num_transactions, output_dir, quiet=quiet)
+    else:
+        # In-memory mode: generate all then write
+        transactions = generate_transactions(accounts, num_transactions, quiet=quiet)
+        validate_data(accounts, transactions)
+        if not quiet:
+            print("\n✓ All data validated successfully!")
+        write_csv(output_dir, 'txn.csv', transactions, ['acc_from', 'acc_to', 'amount', 'txn_time'])
+
+    if not quiet:
+        print("\n" + "=" * 60)
+        print("Dataset generation complete!")
+        print(f"Output directory: {output_dir.absolute()}")
+        print("=" * 60)
+    else:
+        print(f"Generated: {output_dir} ({num_accounts:,} accounts, {num_transactions:,} txns)")
 
 
 if __name__ == '__main__':

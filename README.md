@@ -144,10 +144,11 @@ Small TPC-H datasets are included for testing:
 
 ## Generating Account Datasets
 
-The project includes a parameterized generator for creating banking datasets of varying sizes:
+The project includes a parameterized generator for creating banking datasets of varying sizes.
+
+### Basic Usage
 
 ```bash
-# Basic usage
 python3 scripts/generate_banking_scaled.py <num_accounts> <output_dir>
 
 # Examples with different sizes
@@ -157,9 +158,44 @@ python3 scripts/generate_banking_scaled.py 10000 input/plaintext/banking_10000
 python3 scripts/generate_banking_scaled.py 50000 input/plaintext/banking_50000
 ```
 
-### Custom Seeds for Reproducibility
+### Generating Large Datasets (1M+ accounts)
 
-Use the `--seed` option to generate reproducible datasets:
+For large datasets, use `--streaming` mode to reduce memory usage:
+
+```bash
+# Generate 1 million accounts (~250 MB output)
+python3 scripts/generate_banking_scaled.py 1000000 input/plaintext/banking_scaled/banking_1M --streaming
+
+# Generate 2 million accounts (~500 MB output)
+python3 scripts/generate_banking_scaled.py 2000000 input/plaintext/banking_scaled/banking_2M --streaming
+
+# Generate 5 million accounts (~1.25 GB output)
+python3 scripts/generate_banking_scaled.py 5000000 input/plaintext/banking_scaled/banking_5M --streaming
+
+# Generate 10 million accounts (~2.5 GB output)
+python3 scripts/generate_banking_scaled.py 10000000 input/plaintext/banking_scaled/banking_10M --streaming
+```
+
+### Batch Generation (Parallel)
+
+Generate multiple datasets in parallel using the batch script:
+
+```bash
+# Generate all 4 large datasets (1M, 2M, 5M, 10M) with 4 parallel workers
+python3 scripts/generate_banking_batch.py --output-base input/plaintext/banking_scaled --workers 4
+```
+
+### Command-Line Options
+
+| Option | Description |
+|--------|-------------|
+| `<num_accounts>` | Number of accounts to generate (required) |
+| `<output_dir>` | Output directory path (required) |
+| `--seed <int>` | Random seed for reproducibility (default: 42 + num_accounts) |
+| `--streaming` | Use streaming mode for large datasets (writes directly to disk) |
+| `--quiet`, `-q` | Suppress detailed output (useful for parallel execution) |
+
+### Custom Seeds for Reproducibility
 
 ```bash
 # Same seed produces identical data
@@ -170,8 +206,6 @@ python3 scripts/generate_banking_scaled.py 5000 output2 --seed 12345  # Identica
 python3 scripts/generate_banking_scaled.py 5000 output3 --seed 99999  # Different data
 ```
 
-Default seed is `42 + num_accounts` (e.g., 5042 for 5000 accounts).
-
 ### Generated Tables
 
 | Table | Rows | Columns |
@@ -180,15 +214,20 @@ Default seed is `42 + num_accounts` (e.g., 5042 for 5000 accounts).
 | account.csv | num_accounts | account_id, balance, owner_id |
 | txn.csv | 5 × num_accounts | acc_from, acc_to, amount, txn_time |
 
+### Dataset Size Reference
+
+| Accounts | Owners | Transactions | Approx. Size |
+|----------|--------|--------------|--------------|
+| 1,000 | 200 | 5,000 | ~250 KB |
+| 10,000 | 2,000 | 50,000 | ~2.5 MB |
+| 100,000 | 20,000 | 500,000 | ~25 MB |
+| 1,000,000 | 200,000 | 5,000,000 | ~250 MB |
+| 10,000,000 | 2,000,000 | 50,000,000 | ~2.5 GB |
+
 ### Pre-generated Banking Datasets
 
-- `input/plaintext/banking/` - Default dataset
-- `input/plaintext/banking_1000/` - 1,000 accounts
-- `input/plaintext/banking_2000/` - 2,000 accounts
-- `input/plaintext/banking_5000/` - 5,000 accounts
-- `input/plaintext/banking_10000/` - 10,000 accounts
-- `input/plaintext/banking_20000/` - 20,000 accounts
-- `input/plaintext/banking_50000/` - 50,000 accounts
+- `input/plaintext/banking/` - Default dataset (10,000 accounts)
+- `input/plaintext/banking_small/` - Small test dataset (100 accounts)
 
 ## Limitations
 

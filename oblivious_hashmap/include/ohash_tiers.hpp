@@ -274,7 +274,7 @@ namespace ORAM
             for (KeyType i = 1; i < tmp.size(); i++)
             {
                 ++cnt;
-                CMOV(tmp[i].first == prev_first, cnt, KeyType(1));
+                CMOV(tmp[i].first != prev_first, cnt, KeyType(1));
                 // cnt = oblivious_select(KeyType(1),
                 //                        cnt + 1,
                 //                        tmp[i].first == prev_first);

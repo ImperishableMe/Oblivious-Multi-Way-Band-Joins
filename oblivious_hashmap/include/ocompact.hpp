@@ -417,7 +417,7 @@ namespace ORAM
                           size_t Z,
                           uint32_t seed = std::random_device{}())
     {
-        static std::mt19937 gen(seed);
+        thread_local static std::mt19937 gen(seed);
         omp_set_num_threads(omp_get_max_threads());
         assert(std::has_single_bit(n));
         assert(std::has_single_bit(Z));

@@ -8,12 +8,13 @@
 #include <vector>
 
 /**
- * ShuffleManager - Manages recursive oblivious shuffling for arbitrary-sized vectors
- * 
- * For small vectors (≤ MAX_BATCH_SIZE): Uses 2-way Waksman shuffle directly
- * For large vectors (> MAX_BATCH_SIZE): Uses k-way recursive decomposition
- * 
- * Similar design to MergeSortManager with ocall-based data transfer
+ * ShuffleManager - Manages oblivious shuffling for arbitrary-sized vectors
+ *
+ * Uses OrShuffle algorithm based on OrCompact with random marking.
+ * OrShuffle handles arbitrary sizes (no power-of-2 requirement).
+ *
+ * For small vectors (≤ MAX_BATCH_SIZE): Uses OrShuffle directly
+ * For large vectors (> MAX_BATCH_SIZE): Uses OrShuffle with k-way decomposition
  */
 class ShuffleManager {
 private:

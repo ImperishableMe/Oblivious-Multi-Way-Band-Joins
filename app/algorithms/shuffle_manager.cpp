@@ -1,6 +1,6 @@
 #include "shuffle_manager.h"
 #include "debug_util.h"
-#include "../core_logic/algorithms/oblivious_waksman.h"
+#include "or_shuffle.hpp"
 #include <algorithm>
 
 // Static member initialization
@@ -63,27 +63,26 @@ void ShuffleManager::recursive_shuffle(std::vector<Entry>& entries) {
 
 void ShuffleManager::shuffle_small(std::vector<Entry>& entries) {
     size_t n = entries.size();
-    
+
     DEBUG_INFO("Small shuffle: n=%zu", n);
-    
+
     // No padding here - already done in shuffle()
-    
+
     // Convert to entry_t array
     std::vector<entry_t> c_entries;
     c_entries.reserve(n);
     for (const auto& e : entries) {
         c_entries.push_back(e.to_entry_t());
     }
-    
-    // Call 2-way Waksman shuffle
-    // Call oblivious Waksman shuffle directly
-    int result = oblivious_2way_waksman(c_entries.data(), n);
+
+    // Call OrShuffle (handles arbitrary sizes, no power-of-2 requirement)
+    int result = OrShuffle::or_shuffle(c_entries.data(), n);
 
     if (result != 0) {
-        DEBUG_ERROR("Waksman shuffle failed: result=%d", result);
+        DEBUG_ERROR("OrShuffle failed: result=%d", result);
         return;
     }
-    
+
     // Convert back all entries (including padding)
     entries.clear();
     for (size_t i = 0; i < n; i++) {
@@ -91,7 +90,7 @@ void ShuffleManager::shuffle_small(std::vector<Entry>& entries) {
         e.from_entry_t(c_entries[i]);
         entries.push_back(e);
     }
-    
+
     DEBUG_INFO("Small shuffle complete: %zu entries", n);
 }
 
@@ -121,14 +120,13 @@ void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
         c_entries.push_back(e.to_entry_t());
     }
     
-    // For TDX: k-way shuffle not yet ported - use simpler approach
-    // Just shuffle the whole array at once if it fits
-    DEBUG_INFO("Using simplified shuffle for large vector (size=%zu)", n);
+    // Use OrShuffle for large vectors (handles arbitrary sizes)
+    DEBUG_INFO("Using OrShuffle for large vector (size=%zu)", n);
 
-    int result = oblivious_2way_waksman(c_entries.data(), n);
+    int result = OrShuffle::or_shuffle(c_entries.data(), n);
 
     if (result != 0) {
-        DEBUG_ERROR("K-way shuffle failed: result=%d", result);
+        DEBUG_ERROR("OrShuffle failed: result=%d", result);
         clear_current();
         return;
     }

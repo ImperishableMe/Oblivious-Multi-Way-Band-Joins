@@ -47,19 +47,18 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/core_logic_callbacks.cpp
 
 # C source files from core_logic (merged from enclave)
+# Note: oblivious_waksman.c and k_way_shuffle.c removed - replaced by OrShuffle (C++ header-only)
 App_C_Files := app/core_logic/algorithms/min_heap.c \
                app/core_logic/algorithms/heap_sort.c \
                app/core_logic/algorithms/k_way_merge.c \
-               app/core_logic/algorithms/k_way_shuffle.c \
-               app/core_logic/algorithms/oblivious_waksman.c \
                app/core_logic/operations/comparators.c \
                app/core_logic/operations/merge_comparators.c \
                app/core_logic/operations/window_functions.c \
                app/core_logic/operations/transform_functions.c \
                app/core_logic/operations/distribute_functions.c
 
-# Include paths
-App_Include_Paths := -Icommon -Iapp -Iapp/core_logic
+# Include paths (including oblivious_hashmap for OrShuffle)
+App_Include_Paths := -Icommon -Iapp -Iapp/core_logic -Ioblivious_hashmap/include
 
 # Debug level setting
 ifndef DEBUG_LEVEL
@@ -67,8 +66,9 @@ ifndef DEBUG_LEVEL
 endif
 
 # Compiler flags
+# C++20 and AVX2 required for oblivious_hashmap library (OrShuffle)
 App_Compile_CFlags := $(COMMON_FLAGS) -fPIC $(App_Include_Paths) -DDEBUG_LEVEL=$(DEBUG_LEVEL)
-App_Compile_CXXFlags := $(App_Compile_CFlags) -std=c++11
+App_Compile_CXXFlags := $(App_Compile_CFlags) -std=c++20 -mavx2 -fopenmp
 
 # Add SLIM_ENTRY flag if specified
 ifeq ($(SLIM_ENTRY), 1)
@@ -76,8 +76,8 @@ ifeq ($(SLIM_ENTRY), 1)
     App_Compile_CXXFlags += -DSLIM_ENTRY
 endif
 
-# Link flags (just pthread, no SGX libraries)
-App_Link_Flags := -lpthread
+# Link flags (pthread, TBB for parallel execution, OpenMP for ocompact)
+App_Link_Flags := -lpthread -ltbb -fopenmp
 
 # All object files
 App_Objects := $(App_Cpp_Files:.cpp=.o) $(App_C_Files:.c=.o)
@@ -126,8 +126,6 @@ Test_Join_Objects := tests/integration/test_join.o
 Test_Join_Batch_Objects := tests/integration/test_join_batch.o
 Sqlite_Baseline_Objects := tests/baseline/sqlite_baseline.o
 Test_Merge_Sort_Objects := tests/unit/test_merge_sort.o
-Test_Waksman_Objects := tests/unit/test_waksman_shuffle.o
-Test_Waksman_Dist_Objects := tests/unit/test_waksman_distribution.o
 Test_Shuffle_Manager_Objects := tests/unit/test_shuffle_manager.o
 Benchmark_Sorting_Objects := tests/performance/benchmark_sorting.o
 
@@ -154,14 +152,6 @@ sqlite_baseline: $(Sqlite_Baseline_Objects) $(Test_Common_Objects) app/query/que
 	@echo "LINK =>  $@"
 
 test_merge_sort: $(Test_Merge_Sort_Objects) $(Test_Common_Objects)
-	@$(CXX) $^ -o $@ $(App_Link_Flags)
-	@echo "LINK =>  $@"
-
-test_waksman_shuffle: $(Test_Waksman_Objects) $(Test_Common_Objects)
-	@$(CXX) $^ -o $@ $(App_Link_Flags)
-	@echo "LINK =>  $@"
-
-test_waksman_distribution: $(Test_Waksman_Dist_Objects) $(Test_Common_Objects)
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 
@@ -194,8 +184,16 @@ tests/performance/%.o: tests/performance/%.cpp
 	@$(CXX) $(Test_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
+# Shuffle benchmark (compares OrShuffle vs Waksman)
+Benchmark_Shuffle_Objects := tests/performance/benchmark_shuffle.o
+Benchmark_Shuffle_Deps := app/core_logic/algorithms/oblivious_waksman.o
+
+benchmark_shuffle: $(Benchmark_Shuffle_Objects) $(Benchmark_Shuffle_Deps)
+	@$(CXX) $^ -o $@ $(App_Link_Flags)
+	@echo "LINK =>  $@"
+
 # Build all tests
-tests: test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksman_distribution test_shuffle_manager
+tests: test_join sqlite_baseline test_merge_sort test_shuffle_manager
 	@echo "All tests built successfully"
 
 ######## Clean ########
@@ -203,6 +201,6 @@ tests: test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksm
 clean:
 	@rm -f $(App_Name)
 	@rm -f $(App_Objects)
-	@rm -f test_join sqlite_baseline test_merge_sort test_waksman_shuffle test_waksman_distribution test_shuffle_manager test_join_batch benchmark_sorting
-	@rm -f $(Test_Join_Objects) $(Sqlite_Baseline_Objects) $(Test_Merge_Sort_Objects) $(Test_Waksman_Objects) $(Test_Waksman_Dist_Objects) $(Test_Shuffle_Manager_Objects) $(Test_Join_Batch_Objects) $(Benchmark_Sorting_Objects)
+	@rm -f test_join sqlite_baseline test_merge_sort test_shuffle_manager test_join_batch benchmark_sorting
+	@rm -f $(Test_Join_Objects) $(Sqlite_Baseline_Objects) $(Test_Merge_Sort_Objects) $(Test_Shuffle_Manager_Objects) $(Test_Join_Batch_Objects) $(Benchmark_Sorting_Objects)
 	@rm -f app/core_logic/**/*.o

@@ -5,6 +5,7 @@
 #include <thread>
 #include <cassert>
 #include <bit>
+#include <cstring>
 
 #include "xxhash.h"
 #include "definitions.h"
@@ -13,86 +14,76 @@
 #include "timer.h"
 #include "config.h"
 
+// ObliviousBin headers
+#include "ohash_bin.hpp"
+#include "hash_planner.hpp"
+
 using namespace std;
 
 namespace obligraph {
-    // triple32 hash function: https://github.com/skeeto/hash-prospector
-    // exact bias: 0.020888578919738908
-    inline uint32_t triple32(uint32_t x) {
-        x ^= x >> 17;
-        x *= 0xed5ad4bb;
-        x ^= x >> 11;
-        x *= 0xac4c1b51;
-        x ^= x >> 15;
-        x *= 0x31848bab;
-        x ^= x >> 14;
-        return x;
-    }
+    // Block size for ObliviousBin: key_t (8 bytes) + Row payload
+    // The Block template stores: id (key_t) + value[BlockSize - sizeof(key_t)]
+    // We need value to hold a Row, so BlockSize = sizeof(key_t) + sizeof(Row)
+    constexpr size_t ROW_BLOCK_SIZE = sizeof(key_t) + sizeof(Row);
+    using RowBlock = ORAM::Block<key_t, ROW_BLOCK_SIZE>;
 
-    inline key_t hash_key(key_t key, int bucket_size) {
-        // Ensure bucket_size is a power of two
-        // auto hash = XXH64(&key, sizeof(key), 0); 
-        // auto hash = XXH32(&key, sizeof(key), 0); 
-        auto hash = triple32(key);
-        return hash & (bucket_size - 1);
-    }
+    // Dummy marker: MSB set indicates a dummy block
+    constexpr key_t DUMMY_KEY_MSB = 1ULL << 63;
 
     void build_and_probe(Table &buildT, Table &probeT, ThreadPool &pool) {
-        ScopedTimer timer("Build and Probe");
+        ScopedTimer timer("Build and Probe (ObliviousBin)");
 
         int n_build = buildT.rowCount;
         int n_probe = probeT.rowCount;
-        
-        // TODO: fix the bucket_size
-        int bucket_size = max(2.0, n_probe * 0.8);
-        bucket_size = bit_floor(static_cast<uint64_t>(bucket_size));
-        
 
-        vector <int> next(n_build, 0), bucket(bucket_size, 0);
+        // Pad to next power of 2 (required by ObliviousBin)
+        size_t n = std::max(static_cast<size_t>(n_build), static_cast<size_t>(n_probe));
+        n = std::bit_ceil(n);
 
-        // build the hashmap first
-        // It is not parallelized yet
+        // Create blocks from build table
+        std::vector<RowBlock> blocks(n);
+
         for (int i = 0; i < n_build; i++) {
-            int idx = hash_key(buildT.rows[i].key.first, bucket_size);
-            next[i] = bucket[idx];
-            bucket[idx] = i + 1; // Store 1-based index
+            // Clear MSB from key (MSB is reserved for dummy marking in ObliviousBin)
+            key_t key = buildT.rows[i].key.first & ~DUMMY_KEY_MSB;
+            blocks[i].id = key;
+            std::memcpy(blocks[i].value, &buildT.rows[i], sizeof(Row));
         }
 
+        // Fill remaining with dummy blocks (MSB set in id)
+        for (size_t i = n_build; i < n; i++) {
+            blocks[i].id = static_cast<key_t>(i) | DUMMY_KEY_MSB;
+        }
+
+        // Build ObliviousBin (fully oblivious)
+        // Algorithm selection is automatic based on n:
+        //   - n < 128: OLinearScan (simple linear scan)
+        //   - n >= 128: Benchmarks OHashBucket, OCuckooHash, OTwoTierHash
+        //               and selects fastest (cached in hash_map.bin{BlockSize})
+        ORAM::ObliviousBin<key_t, ROW_BLOCK_SIZE> obin(n);
+        obin.build(blocks.data());
+
+        // Probe phase (oblivious lookups)
         Row dummyRow;
         dummyRow.isDummy = true;
-        // now probe the probe table, we can do it parallelly
-        auto thread_chunk = [&] (int start, int end) {
-            for (int i = start; i < end; i++) {
-                key_t srcId = probeT.rows[i].key.first;
-                auto idx = hash_key(srcId, bucket_size);
 
-                int match = 0;
-                bool dummy = probeT.rows[i].isDummy;
-                for (int hit = bucket[idx]; hit != 0; hit = next[hit - 1]) {
-                    // Probe the build table
-                    match = ObliviousChoose(buildT.rows[hit - 1].key.first == srcId, hit - 1, match);
-                }
-                probeT.rows[i] = ObliviousChoose(dummy, dummyRow, buildT.rows[match]);
-            }
-        };
+        for (int i = 0; i < n_probe; i++) {
+            // Clear MSB from probe key (MSB is reserved for dummy marking in ObliviousBin)
+            key_t srcId = probeT.rows[i].key.first & ~DUMMY_KEY_MSB;
+            bool dummy = probeT.rows[i].isDummy;
 
-        int num_threads = obligraph::number_of_threads.load();
-        std::vector <std::future<void>> futures;
+            RowBlock result = obin[srcId];
 
-        for (int i = 0; i < num_threads; i++) {
-            auto chunks = obligraph::get_cutoffs_for_thread(i, probeT.rowCount, num_threads);
-            if (chunks.first == chunks.second) continue; // no work for this thread
-            if (i == num_threads - 1) {
-                // Last thread takes any remaining rows
-                thread_chunk(chunks.first, chunks.second);
-            }
-            else {
-                futures.push_back(pool.submit(thread_chunk, chunks.first, chunks.second));
-            }
-        }
+            Row matchedRow;
+            std::memcpy(&matchedRow, result.value, sizeof(Row));
 
-        for (auto& fut : futures) {
-            fut.get();
+            // Use ObliviousChoose for final selection
+            // If probe row is dummy OR result block is dummy, use dummyRow
+            probeT.rows[i] = ObliviousChoose(
+                dummy || result.dummy(),
+                dummyRow,
+                matchedRow
+            );
         }
     }
 
@@ -102,9 +93,9 @@ namespace obligraph {
 
         for (size_t i = 0; i < table.rows.size(); ++i) {
             key_t currentKey = table.rows[i].key.first;
-            // TODO: use cpp style random-ness instead?
-            dummy = random();
-            table.rows[i].key.first = ObliviousChoose(lastKey == currentKey, dummy, currentKey); 
+            // Generate dummy key without MSB set (MSB reserved for ObliviousBin dummy marking)
+            dummy = static_cast<key_t>(random()) & ~DUMMY_KEY_MSB;
+            table.rows[i].key.first = ObliviousChoose(lastKey == currentKey, dummy, currentKey);
             table.rows[i].isDummy = (lastKey == currentKey);
             lastKey = currentKey;
         }

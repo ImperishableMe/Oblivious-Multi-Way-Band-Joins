@@ -22,6 +22,9 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 # Find Python3 (needed for data generation script)
 find_package(Python3 REQUIRED)
 
+# Add oblivious_hashmap as a subdirectory
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../oblivious_hashmap ${CMAKE_BINARY_DIR}/oblivious_hashmap)
+
 # Set up FetchContent for dependencies
 include(FetchContent)
 
@@ -67,7 +70,10 @@ target_compile_definitions(core PRIVATE XXH_INLINE_ALL)
 
 target_include_directories(core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../oblivious_hashmap/include
 )
+
+target_link_libraries(core PUBLIC ObliviousHashmapLib)
 
 # Driver executable
 add_executable(driver src/driver.cpp)

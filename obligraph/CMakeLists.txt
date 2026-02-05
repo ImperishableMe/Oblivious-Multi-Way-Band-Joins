@@ -22,6 +22,13 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 # Find Python3 (needed for data generation script)
 find_package(Python3 REQUIRED)
 
+# Required dependencies for oblivious_hashmap
+find_package(TBB REQUIRED)
+find_package(OpenMP)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+find_package(NLopt REQUIRED)
+
 # Set up FetchContent for dependencies
 include(FetchContent)
 
@@ -54,6 +61,9 @@ add_custom_target(generate_test_data
 # include core and definitions
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+# include oblivious_hashmap for ObliviousMap
+include_directories(${CMAKE_SOURCE_DIR}/../oblivious_hashmap/include)
+
 add_library(core
     src/definitions.cpp
     src/operators.cpp
@@ -61,6 +71,11 @@ add_library(core
     src/par_obl_primitives.cpp
     src/config.cpp
     src/schema_parser.cpp
+    # oblivious_hashmap source files (for ObliviousMap support)
+    ${CMAKE_SOURCE_DIR}/../oblivious_hashmap/src/depthCounter.cpp
+    ${CMAKE_SOURCE_DIR}/../oblivious_hashmap/src/timer.cpp
+    ${CMAKE_SOURCE_DIR}/../oblivious_hashmap/src/prp.cpp
+    ${CMAKE_SOURCE_DIR}/../oblivious_hashmap/src/oblivious_operations.cpp
 )
 
 target_compile_definitions(core PRIVATE XXH_INLINE_ALL)
@@ -68,6 +83,17 @@ target_compile_definitions(core PRIVATE XXH_INLINE_ALL)
 target_include_directories(core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+# Link oblivious_hashmap dependencies to core
+target_link_libraries(core PUBLIC
+    TBB::tbb
+    Threads::Threads
+    crypto
+    nlopt
+)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(core PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 # Driver executable
 add_executable(driver src/driver.cpp)

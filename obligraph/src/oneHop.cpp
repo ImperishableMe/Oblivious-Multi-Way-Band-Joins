@@ -13,6 +13,9 @@
 #include "timer.h"
 #include "config.h"
 
+// Oblivious hashmap for data-oblivious build_and_probe
+#include "omap.hpp"
+
 using namespace std;
 
 namespace obligraph {
@@ -38,61 +41,36 @@ namespace obligraph {
     }
 
     void build_and_probe(Table &buildT, Table &probeT, ThreadPool &pool) {
-        ScopedTimer timer("Build and Probe");
+        ScopedTimer timer("Build and Probe (Oblivious)");
 
         int n_build = buildT.rowCount;
         int n_probe = probeT.rowCount;
-        
-        // TODO: fix the bucket_size
-        int bucket_size = max(2.0, n_probe * 0.8);
-        bucket_size = bit_floor(static_cast<uint64_t>(bucket_size));
-        
 
-        vector <int> next(n_build, 0), bucket(bucket_size, 0);
+        // Create oblivious map with key_t (uint64_t) as key type and Row as value type
+        ORAM::ObliviousMap<key_t, Row> omap;
 
-        // build the hashmap first
-        // It is not parallelized yet
+        // Build phase: insert all build rows into the oblivious map
+        // The key is the row's primary key (key.first)
         for (int i = 0; i < n_build; i++) {
-            int idx = hash_key(buildT.rows[i].key.first, bucket_size);
-            next[i] = bucket[idx];
-            bucket[idx] = i + 1; // Store 1-based index
+            omap.insert(buildT.rows[i].key.first, buildT.rows[i]);
         }
 
         Row dummyRow;
         dummyRow.isDummy = true;
-        // now probe the probe table, we can do it parallelly
-        auto thread_chunk = [&] (int start, int end) {
-            for (int i = start; i < end; i++) {
-                key_t srcId = probeT.rows[i].key.first;
-                auto idx = hash_key(srcId, bucket_size);
 
-                int match = 0;
-                bool dummy = probeT.rows[i].isDummy;
-                for (int hit = bucket[idx]; hit != 0; hit = next[hit - 1]) {
-                    // Probe the build table
-                    match = ObliviousChoose(buildT.rows[hit - 1].key.first == srcId, hit - 1, match);
-                }
-                probeT.rows[i] = ObliviousChoose(dummy, dummyRow, buildT.rows[match]);
-            }
-        };
+        // Probe phase: lookup each key in the oblivious map
+        // Note: Sequential probing is required because ObliviousMap modifies internal
+        // state during lookups (buffer management). This is safe because the deduplication
+        // pattern ensures each key is probed only once.
+        for (int i = 0; i < n_probe; i++) {
+            key_t srcId = probeT.rows[i].key.first;
+            bool dummy = probeT.rows[i].isDummy;
 
-        int num_threads = obligraph::number_of_threads.load();
-        std::vector <std::future<void>> futures;
+            // Oblivious lookup - returns reference to matched row
+            Row& matchedRow = omap[srcId];
 
-        for (int i = 0; i < num_threads; i++) {
-            auto chunks = obligraph::get_cutoffs_for_thread(i, probeT.rowCount, num_threads);
-            if (chunks.first == chunks.second) continue; // no work for this thread
-            if (i == num_threads - 1) {
-                // Last thread takes any remaining rows
-                thread_chunk(chunks.first, chunks.second);
-            }
-            else {
-                futures.push_back(pool.submit(thread_chunk, chunks.first, chunks.second));
-            }
-        }
-
-        for (auto& fut : futures) {
-            fut.get();
+            // Obliviously choose between dummy row and matched row
+            probeT.rows[i] = ObliviousChoose(dummy, dummyRow, matchedRow);
         }
     }
 

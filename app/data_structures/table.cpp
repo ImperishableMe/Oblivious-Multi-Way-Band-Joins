@@ -540,12 +540,8 @@ size_t Table::calculate_shuffle_padding(size_t n) {
 }
 
 bool Table::is_valid_shuffle_size(size_t n) {
-    // Check if n = 2^a * k^b
-    while (n > MAX_BATCH_SIZE && n % MERGE_SORT_K == 0) {
-        n /= MERGE_SORT_K;
-    }
-    // Should be power of 2 and <= MAX_BATCH_SIZE
-    return n <= MAX_BATCH_SIZE && (n & (n - 1)) == 0;
+    // OrShuffle handles arbitrary sizes - any size >= 1 is valid
+    return n >= 1;
 }
 
 void Table::shuffle_merge_sort(OpEcall op_type) {

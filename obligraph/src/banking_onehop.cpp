@@ -1,13 +1,11 @@
 /**
  * banking_onehop.cpp
  *
- * Driver program to run one-hop join on banking dataset (account -> txn -> account)
- * with filter on source account's owner_id.
+ * Driver program to run one-hop join on banking dataset (account -> txn -> account).
  *
- * Usage: ./banking_onehop <data_dir> <output_csv> [src_owner_id]
+ * Usage: ./banking_onehop <data_dir> <output_csv>
  *   data_dir: Directory containing account.csv and txn.csv (comma-delimited)
  *   output_csv: Output file path for the hop result table
- *   src_owner_id: (optional) Filter source accounts by owner_id
  */
 
 #include <iostream>
@@ -180,25 +178,19 @@ void writeTableToCSV(const Table& table, const string& filePath) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 3 || argc > 4) {
-        cerr << "Usage: " << argv[0] << " <data_dir> <output_csv> [src_owner_id]" << endl;
+    if (argc != 3) {
+        cerr << "Usage: " << argv[0] << " <data_dir> <output_csv>" << endl;
         cerr << "  data_dir: Directory with account.csv and txn.csv" << endl;
         cerr << "  output_csv: Output file path for hop result" << endl;
-        cerr << "  src_owner_id: (optional) Filter source accounts by owner_id" << endl;
         return 1;
     }
 
     string dataDir = argv[1];
     string outputPath = argv[2];
 
-    // Optional owner_id filter for source accounts
-    bool hasSrcFilter = (argc >= 4);
-    int32_t srcOwnerId = hasSrcFilter ? stoi(argv[3]) : 0;
-
     try {
-        // Set thread count
-        // Note: Using 1 thread due to a bug in parallel_o_compact with multi-threading
-        obligraph::number_of_threads.store(1);
+        // Set thread count to all available hardware threads
+        obligraph::number_of_threads.store(std::thread::hardware_concurrency());
         cout << "Using " << obligraph::number_of_threads.load() << " threads" << endl;
 
         auto startTotal = chrono::high_resolution_clock::now();
@@ -235,38 +227,16 @@ int main(int argc, char* argv[]) {
 
         cout << "Imported " << catalog.tables.size() << " tables" << endl;
 
-        // Build predicates for source filter
+        // No filtering — return all one-hop results
         vector<pair<string, vector<Predicate>>> tablePredicates;
 
-        if (hasSrcFilter) {
-            Predicate srcFilter;
-            srcFilter.column = "owner_id";
-            srcFilter.op = Predicate::Cmp::EQ;
-            srcFilter.constant = srcOwnerId;
-            // Use base table name - oneHop internally adds "_src" suffix for self-joins
-            tablePredicates.push_back({"account", {srcFilter}});
-            cout << "Filtering source accounts: owner_id == " << srcOwnerId << endl;
-        }
-
-        // Define projection columns (both source and destination info)
-        vector<pair<string, string>> projectionColumns = {
-            {"account_src", "account_id"},
-            {"account_src", "balance"},
-            {"account_src", "owner_id"},
-            {"txn", "amount"},
-            {"txn", "txn_time"},
-            {"account_dest", "account_id"},
-            {"account_dest", "balance"},
-            {"account_dest", "owner_id"}
-        };
-
         // Create one-hop query for self-referential join: account -> txn -> account
+        // Empty projectionColumns = select all columns
         OneHopQuery query(
             "account",          // source node table
             "txn",              // edge table
             "account",          // destination node table
-            tablePredicates,    // filter on source owner_id
-            projectionColumns   // projection columns
+            tablePredicates     // no filters
         );
 
         // Execute one-hop

@@ -18,7 +18,7 @@ using namespace std;
 
 namespace obligraph {
 constexpr int STRING_LENGTH_CUT_OFF = 64; // All strings are assumed to be of 64 bytes, anything larger will be truncated
-constexpr size_t ROW_DATA_MAX_SIZE = 1024; // Maximum size for row data in bytes
+constexpr size_t ROW_DATA_MAX_SIZE = 64; // Maximum size for row data in bytes
 
 
 using key_t = uint64_t;  // Type for primary keys

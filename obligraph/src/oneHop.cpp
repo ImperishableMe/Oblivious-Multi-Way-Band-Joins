@@ -33,6 +33,10 @@ namespace obligraph {
     void build_and_probe(Table &buildT, Table &probeT, ThreadPool &pool) {
         ScopedTimer timer("Build and Probe (ObliviousBin)");
 
+        std::cout << "[INFO] Row size: " << sizeof(Row)
+                  << " bytes, RowBlock size: " << ROW_BLOCK_SIZE
+                  << " bytes" << std::endl;
+
         int n_build = buildT.rowCount;
         int n_probe = probeT.rowCount;
 
@@ -61,29 +65,35 @@ namespace obligraph {
         //   - n >= 128: Benchmarks OHashBucket, OCuckooHash, OTwoTierHash
         //               and selects fastest (cached in hash_map.bin{BlockSize})
         ORAM::ObliviousBin<key_t, ROW_BLOCK_SIZE> obin(n);
-        obin.build(blocks.data());
+        {
+            ScopedTimer buildTimer("ObliviousBin Build");
+            obin.build(blocks.data());
+        }
 
         // Probe phase (oblivious lookups)
-        Row dummyRow;
-        dummyRow.isDummy = true;
+        {
+            ScopedTimer probeTimer("ObliviousBin Probe");
+            Row dummyRow;
+            dummyRow.isDummy = true;
 
-        for (int i = 0; i < n_probe; i++) {
-            // Clear MSB from probe key (MSB is reserved for dummy marking in ObliviousBin)
-            key_t srcId = probeT.rows[i].key.first & ~DUMMY_KEY_MSB;
-            bool dummy = probeT.rows[i].isDummy;
+            for (int i = 0; i < n_probe; i++) {
+                // Clear MSB from probe key (MSB is reserved for dummy marking in ObliviousBin)
+                key_t srcId = probeT.rows[i].key.first & ~DUMMY_KEY_MSB;
+                bool dummy = probeT.rows[i].isDummy;
 
-            RowBlock result = obin[srcId];
+                RowBlock result = obin[srcId];
 
-            Row matchedRow;
-            std::memcpy(&matchedRow, result.value, sizeof(Row));
+                Row matchedRow;
+                std::memcpy(&matchedRow, result.value, sizeof(Row));
 
-            // Use ObliviousChoose for final selection
-            // If probe row is dummy OR result block is dummy, use dummyRow
-            probeT.rows[i] = ObliviousChoose(
-                dummy || result.dummy(),
-                dummyRow,
-                matchedRow
-            );
+                // Use ObliviousChoose for final selection
+                // If probe row is dummy OR result block is dummy, use dummyRow
+                probeT.rows[i] = ObliviousChoose(
+                    dummy || result.dummy(),
+                    dummyRow,
+                    matchedRow
+                );
+            }
         }
     }
 

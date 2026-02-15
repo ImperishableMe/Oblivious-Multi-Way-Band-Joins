@@ -8,7 +8,7 @@
 #include <cstring>
 
 #include "xxhash.h"
-#include "definitions.h"
+#include "node_index.h"
 #include "obl_primitives.h"
 #include "obl_building_blocks.h"
 #include "timer.h"
@@ -21,93 +21,56 @@
 using namespace std;
 
 namespace obligraph {
-    // triple32 hash function: https://github.com/skeeto/hash-prospector
-    // exact bias: 0.020888578919738908
-    inline uint32_t triple32(uint32_t x) {
-        x ^= x >> 17;
-        x *= 0xed5ad4bb;
-        x ^= x >> 11;
-        x *= 0xac4c1b51;
-        x ^= x >> 15;
-        x *= 0x31848bab;
-        x ^= x >> 14;
-        return x;
-    }
-
-    // Block size for ObliviousBin: key_t (8 bytes) + Row payload
-    // The Block template stores: id (key_t) + value[BlockSize - sizeof(key_t)]
-    // We need value to hold a Row, so BlockSize = sizeof(key_t) + sizeof(Row)
-    constexpr size_t ROW_BLOCK_SIZE = sizeof(key_t) + sizeof(Row);
-    using RowBlock = ORAM::Block<key_t, ROW_BLOCK_SIZE>;
-
-    // Dummy marker: MSB set indicates a dummy block
-    constexpr key_t DUMMY_KEY_MSB = 1ULL << 63;
-
-    void build_and_probe(Table &buildT, Table &probeT, ThreadPool &pool) {
-        ScopedTimer timer("Build and Probe (ObliviousBin)");
+    std::unique_ptr<NodeIndex> buildNodeIndex(const Table& table) {
+        ScopedTimer timer("buildNodeIndex");
 
         std::cout << "[INFO] Row size: " << sizeof(Row)
                   << " bytes, RowBlock size: " << ROW_BLOCK_SIZE
                   << " bytes" << std::endl;
 
-        int n_build = buildT.rowCount;
-        int n_probe = probeT.rowCount;
-
-        // Pad to next power of 2 (required by ObliviousBin)
-        size_t n = std::max(static_cast<size_t>(n_build), static_cast<size_t>(n_probe));
-        n = std::bit_ceil(n);
-
-        // Create blocks from build table
+        size_t n = std::bit_ceil(static_cast<size_t>(table.rowCount));
         std::vector<RowBlock> blocks(n);
 
-        for (int i = 0; i < n_build; i++) {
-            // Clear MSB from key (MSB is reserved for dummy marking in ObliviousBin)
-            key_t key = triple32(buildT.rows[i].key.first) & ~DUMMY_KEY_MSB;
-            blocks[i].id = key;
-            std::memcpy(blocks[i].value, &buildT.rows[i], sizeof(Row));
+        for (size_t i = 0; i < table.rowCount; i++) {
+            blocks[i].id = triple32(table.rows[i].key.first) & ~DUMMY_KEY_MSB;
+            std::memcpy(blocks[i].value, &table.rows[i], sizeof(Row));
         }
-
-        // Fill remaining with dummy blocks (MSB set in id)
-        for (size_t i = n_build; i < n; i++) {
+        for (size_t i = table.rowCount; i < n; i++) {
             blocks[i].id = static_cast<key_t>(i) | DUMMY_KEY_MSB;
         }
 
-        // Build ObliviousBin (fully oblivious)
-        // Algorithm selection is automatic based on n:
-        //   - n < 128: OLinearScan (simple linear scan)
-        //   - n >= 128: Benchmarks OHashBucket, OCuckooHash, OTwoTierHash
-        //               and selects fastest (cached in hash_map.bin{BlockSize})
-        ORAM::ObliviousBin<key_t, ROW_BLOCK_SIZE> obin(n);
-        {
-            ScopedTimer buildTimer("ObliviousBin Build");
-            obin.build(blocks.data());
+        auto index = std::make_unique<NodeIndex>(n);
+        index->build(blocks.data());
+        return index;
+    }
+
+    void probe_with_index(NodeIndex& obin, Table& probeT) {
+        ScopedTimer timer("Probe with Pre-built Index");
+
+        Row dummyRow;
+        dummyRow.isDummy = true;
+
+        for (size_t i = 0; i < probeT.rowCount; i++) {
+            key_t srcId = triple32(probeT.rows[i].key.first) & ~DUMMY_KEY_MSB;
+            bool dummy = probeT.rows[i].isDummy;
+
+            RowBlock result = obin[srcId];
+
+            Row matchedRow;
+            std::memcpy(&matchedRow, result.value, sizeof(Row));
+
+            probeT.rows[i] = ObliviousChoose(
+                dummy || result.dummy(),
+                dummyRow,
+                matchedRow
+            );
         }
+    }
 
-        // Probe phase (oblivious lookups)
-        {
-            ScopedTimer probeTimer("ObliviousBin Probe");
-            Row dummyRow;
-            dummyRow.isDummy = true;
-
-            for (int i = 0; i < n_probe; i++) {
-                // Clear MSB from probe key (MSB is reserved for dummy marking in ObliviousBin)
-                key_t srcId = triple32(probeT.rows[i].key.first) & ~DUMMY_KEY_MSB;
-                bool dummy = probeT.rows[i].isDummy;
-
-                RowBlock result = obin[srcId];
-
-                Row matchedRow;
-                std::memcpy(&matchedRow, result.value, sizeof(Row));
-
-                // Use ObliviousChoose for final selection
-                // If probe row is dummy OR result block is dummy, use dummyRow
-                probeT.rows[i] = ObliviousChoose(
-                    dummy || result.dummy(),
-                    dummyRow,
-                    matchedRow
-                );
-            }
-        }
+    void build_and_probe(Table &buildT, Table &probeT, ThreadPool& /*pool*/) {
+        ScopedTimer timer("Build and Probe (ObliviousBin)");
+        auto index = buildNodeIndex(buildT);
+        probe_with_index(*index, probeT);
     }
 
     void deduplicateRows(Table& table) {
@@ -134,7 +97,8 @@ namespace obligraph {
         }
     }
 
-    Table buildSourceAndEdgeTables(Catalog& catalog, const OneHopQuery& query, ThreadPool &pool) {
+    Table buildSourceAndEdgeTables(Catalog& catalog, const OneHopQuery& query,
+                                    ThreadPool &pool, NodeIndex* srcIndex = nullptr) {
         ScopedTimer timer("Building Source and Edge Tables");
 
         set <string> srcColumns;
@@ -181,12 +145,17 @@ namespace obligraph {
         Table srcSide;
         srcSide.init(srcProjected);
         srcSide.rows.reserve(edgeProjectedFwd.rowCount);
-        for (int i = 0; i < edgeProjectedFwd.rowCount; i++) {
+        for (size_t i = 0; i < edgeProjectedFwd.rowCount; i++) {
             srcSide.addRow(Row());
             srcSide.rows[i].key = edgeProjectedFwd.rows[i].key; // Copy keys from edge table
         }
         deduplicateRows(srcSide);
-        build_and_probe(srcProjected, srcSide, pool);
+
+        if (srcIndex)
+            probe_with_index(*srcIndex, srcSide);
+        else
+            build_and_probe(srcProjected, srcSide, pool);
+
         reduplicateRows(srcSide);
 
         // For self-referential joins, use "_src" suffix to distinguish from destination
@@ -198,7 +167,8 @@ namespace obligraph {
         return edgeProjectedFwd;
     }
 
-    Table buildDestinationTable(Catalog& catalog, const OneHopQuery& query, ThreadPool& pool) {
+    Table buildDestinationTable(Catalog& catalog, const OneHopQuery& query,
+                                ThreadPool& pool, NodeIndex* dstIndex = nullptr) {
         ScopedTimer timer("Building Destination Table");
         set <string> dstColumns;
 
@@ -234,14 +204,17 @@ namespace obligraph {
             ScopedTimer timer("Building Destination Side Table");
             dstSide.init(dstProjected);
             dstSide.rows.reserve(edgeTableRev.rowCount);
-            for (int i = 0; i < edgeTableRev.rowCount; i++) {
+            for (size_t i = 0; i < edgeTableRev.rowCount; i++) {
                 dstSide.addRow(Row());
                 dstSide.rows[i].key = edgeTableRev.rows[i].key; // Copy keys from edge table
             }
             deduplicateRows(dstSide);
         }
 
-        build_and_probe(dstProjected, dstSide, pool);
+        if (dstIndex)
+            probe_with_index(*dstIndex, dstSide);
+        else
+            build_and_probe(dstProjected, dstSide, pool);
         {
             ScopedTimer timerRedup("Reduplicating Destination Rows");
             reduplicateRows(dstSide);
@@ -277,9 +250,9 @@ namespace obligraph {
     Table oneHop(Catalog& catalog, OneHopQuery& query, ThreadPool& pool) {
         // Execute the two function calls in parallel
         auto futureFwd = std::async(std::launch::async, buildSourceAndEdgeTables,
-                                  std::ref(catalog), std::ref(query), std::ref(pool));
+                                  std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
         auto futureRev = std::async(std::launch::async, buildDestinationTable,
-                                  std::ref(catalog), std::ref(query), std::ref(pool));
+                                  std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
         //
         //// Wait for both results
         Table edgeProjectedFwd = futureFwd.get();
@@ -345,6 +318,71 @@ namespace obligraph {
                 columnName = tablePrefix + "_" + col.second;
             }
 
+            projectionColumns.push_back(columnName);
+        }
+
+        edgeProjectedFwd = edgeProjectedFwd.project(projectionColumns, pool);
+        return edgeProjectedFwd;
+    }
+
+    Table oneHop(Catalog& catalog, OneHopQuery& query, ThreadPool& pool,
+                 std::unique_ptr<NodeIndex> srcIndex,
+                 std::unique_ptr<NodeIndex> dstIndex) {
+        // Release ownership — raw pointers needed for std::async (no move-capture in C++14-style)
+        NodeIndex* srcPtr = srcIndex.release();
+        NodeIndex* dstPtr = dstIndex.release();
+
+        auto futureFwd = std::async(std::launch::async, buildSourceAndEdgeTables,
+                                    std::ref(catalog), std::ref(query), std::ref(pool), srcPtr);
+        auto futureRev = std::async(std::launch::async, buildDestinationTable,
+                                    std::ref(catalog), std::ref(query), std::ref(pool), dstPtr);
+
+        Table edgeProjectedFwd = futureFwd.get();
+        delete srcPtr;
+        Table edgeProjectedRev = futureRev.get();
+        delete dstPtr;
+
+        edgeProjectedFwd.unionWith(edgeProjectedRev, pool);
+
+        // --- Same filter/project logic as the original oneHop ---
+        bool isSelfReferential = (query.sourceNodeTableName == query.destNodeTableName);
+
+        vector<Predicate> allPredicates;
+        for (const auto& tablePred : query.tablePredicates) {
+            for (const auto& pred : tablePred.second) {
+                Predicate qualifiedPred = pred;
+                string tablePrefix = tablePred.first;
+                if (isSelfReferential && tablePred.first == query.sourceNodeTableName) {
+                    tablePrefix += "_src";
+                }
+                qualifiedPred.column = tablePrefix + "_" + pred.column;
+                allPredicates.push_back(qualifiedPred);
+            }
+        }
+        edgeProjectedFwd.filter(allPredicates, pool);
+
+        if (query.projectionColumns.empty()) {
+            return edgeProjectedFwd;
+        }
+
+        vector<string> projectionColumns;
+        for (const auto& col : query.projectionColumns) {
+            string columnName;
+            if (col.first == query.edgeTableName) {
+                columnName = col.second;
+            } else {
+                string tablePrefix = col.first;
+                if (isSelfReferential) {
+                    if (col.first.length() > 4 && col.first.substr(col.first.length() - 4) == "_src") {
+                        tablePrefix = col.first;
+                    } else if (col.first.length() > 5 && col.first.substr(col.first.length() - 5) == "_dest") {
+                        tablePrefix = col.first;
+                    } else if (col.first == query.destNodeTableName) {
+                        tablePrefix += "_dest";
+                    }
+                }
+                columnName = tablePrefix + "_" + col.second;
+            }
             projectionColumns.push_back(columnName);
         }
 

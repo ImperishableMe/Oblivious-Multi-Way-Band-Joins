@@ -15,6 +15,7 @@
 #include <filesystem>
 
 #include "definitions.h"
+#include "node_index.h"
 #include "timer.h"
 #include "config.h"
 
@@ -239,16 +240,27 @@ int main(int argc, char* argv[]) {
             tablePredicates     // no filters
         );
 
-        // Execute one-hop
+        // Execute one-hop with offline index build
         cout << "Executing one-hop join..." << endl;
         ThreadPool pool(obligraph::number_of_threads.load());
 
+        // --- Offline build phase (timed separately) ---
+        auto startBuild = chrono::high_resolution_clock::now();
+        Table& accountTable = catalog.getTable("account");
+        auto nodeIndex = buildNodeIndex(accountTable);       // Build ONCE
+        auto srcIndex = std::make_unique<NodeIndex>(*nodeIndex);  // Deep copy (probing is destructive)
+        auto dstIndex = std::move(nodeIndex);
+        auto endBuild = chrono::high_resolution_clock::now();
+        auto buildMs = chrono::duration_cast<chrono::milliseconds>(endBuild - startBuild).count();
+        cout << "Index build (offline) completed in " << buildMs << " ms" << endl;
+
+        // --- Online probe phase (timed separately) ---
         auto startOneHop = chrono::high_resolution_clock::now();
-        Table result = oneHop(catalog, query, pool);
+        Table result = oneHop(catalog, query, pool, std::move(srcIndex), std::move(dstIndex));
         auto endOneHop = chrono::high_resolution_clock::now();
 
         auto oneHopMs = chrono::duration_cast<chrono::milliseconds>(endOneHop - startOneHop).count();
-        cout << "One-hop completed in " << oneHopMs << " ms" << endl;
+        cout << "One-hop probe (online) completed in " << oneHopMs << " ms" << endl;
         cout << "Result: " << result.rowCount << " rows, "
              << result.schema.columnMetas.size() << " columns" << endl;
 
@@ -271,8 +283,9 @@ int main(int argc, char* argv[]) {
         auto totalMs = chrono::duration_cast<chrono::milliseconds>(endTotal - startTotal).count();
 
         cout << "\n=== TIMING ===" << endl;
-        cout << "One-hop execution: " << oneHopMs << " ms" << endl;
-        cout << "Total (with I/O):  " << totalMs << " ms" << endl;
+        cout << "Index build (offline):  " << buildMs << " ms" << endl;
+        cout << "One-hop probe (online): " << oneHopMs << " ms" << endl;
+        cout << "Total (with I/O):       " << totalMs << " ms" << endl;
 
     } catch (const exception& e) {
         cerr << "Error: " << e.what() << endl;

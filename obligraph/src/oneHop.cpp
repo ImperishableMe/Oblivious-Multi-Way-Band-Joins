@@ -21,6 +21,19 @@
 using namespace std;
 
 namespace obligraph {
+    // triple32 hash function: https://github.com/skeeto/hash-prospector
+    // exact bias: 0.020888578919738908
+    inline uint32_t triple32(uint32_t x) {
+        x ^= x >> 17;
+        x *= 0xed5ad4bb;
+        x ^= x >> 11;
+        x *= 0xac4c1b51;
+        x ^= x >> 15;
+        x *= 0x31848bab;
+        x ^= x >> 14;
+        return x;
+    }
+
     // Block size for ObliviousBin: key_t (8 bytes) + Row payload
     // The Block template stores: id (key_t) + value[BlockSize - sizeof(key_t)]
     // We need value to hold a Row, so BlockSize = sizeof(key_t) + sizeof(Row)
@@ -49,7 +62,7 @@ namespace obligraph {
 
         for (int i = 0; i < n_build; i++) {
             // Clear MSB from key (MSB is reserved for dummy marking in ObliviousBin)
-            key_t key = buildT.rows[i].key.first & ~DUMMY_KEY_MSB;
+            key_t key = triple32(buildT.rows[i].key.first) & ~DUMMY_KEY_MSB;
             blocks[i].id = key;
             std::memcpy(blocks[i].value, &buildT.rows[i], sizeof(Row));
         }
@@ -78,7 +91,7 @@ namespace obligraph {
 
             for (int i = 0; i < n_probe; i++) {
                 // Clear MSB from probe key (MSB is reserved for dummy marking in ObliviousBin)
-                key_t srcId = probeT.rows[i].key.first & ~DUMMY_KEY_MSB;
+                key_t srcId = triple32(probeT.rows[i].key.first) & ~DUMMY_KEY_MSB;
                 bool dummy = probeT.rows[i].isDummy;
 
                 RowBlock result = obin[srcId];

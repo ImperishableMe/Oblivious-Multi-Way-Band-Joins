@@ -2,7 +2,6 @@
 #define SHUFFLE_MANAGER_H
 
 #include "../data_structures/table.h"
-#include "../data_structures/entry.h"
 #include "../../common/constants.h"
 #include "../../common/enclave_types.h"
 #include <vector>

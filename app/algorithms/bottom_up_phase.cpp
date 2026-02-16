@@ -79,11 +79,7 @@ void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node) {
     Table& table = node->get_table();
     if (table.size() > 0) {
         // Set first entry's index to 0 using direct operation
-        {
-            entry_t e = table[0].to_entry_t();
-            transform_set_index_op(&e, 0);
-            table[0].from_entry_t(e);
-        }
+        transform_set_index_op(&table[0], 0);
 
         // Use linear_pass window function to set consecutive indices
         if (table.size() > 1) {

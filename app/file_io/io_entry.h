@@ -4,7 +4,9 @@
 #include <vector>
 #include <string>
 #include <cstdint>
-#include "../data_structures/entry.h"
+#include <cstring>
+#include "../../common/enclave_types.h"
+#include "../../common/entry_utils.h"
 
 /**
  * IO_Entry - A lightweight entry type for I/O operations only
@@ -37,36 +39,15 @@ public:
     
     Entry to_entry() const {
         Entry entry;
+        memset(&entry, 0, sizeof(entry_t));
 
         // Copy data to fixed arrays
         size_t copy_count = std::min(attributes.size(), (size_t)MAX_ATTRIBUTES);
         for (size_t i = 0; i < copy_count; i++) {
             entry.attributes[i] = attributes[i];
-            // Note: column_names are no longer stored in Entry
-        }
-
-        // Clear remaining array elements
-        for (size_t i = copy_count; i < MAX_ATTRIBUTES; i++) {
-            entry.attributes[i] = 0;
         }
 
         entry.join_attr = join_attr;
-
-        // Initialize metadata fields to 0
-        entry.field_type = 0;
-        entry.equality_type = 0;
-        entry.original_index = 0;
-        entry.local_mult = 0;
-        entry.final_mult = 0;
-        entry.foreign_sum = 0;
-        entry.local_cumsum = 0;
-        entry.local_interval = 0;
-        entry.foreign_interval = 0;
-        entry.local_weight = 0;
-        entry.copy_index = 0;
-        entry.alignment_key = 0;
-        entry.dst_idx = 0;
-        entry.index = 0;
 
         return entry;
     }

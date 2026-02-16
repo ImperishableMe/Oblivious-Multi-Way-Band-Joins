@@ -2,6 +2,7 @@
 #include "debug_util.h"
 #include "../core_logic/algorithms/oblivious_waksman.h"
 #include <algorithm>
+#include <cstring>
 
 // Static member initialization
 ShuffleManager* ShuffleManager::current_instance = nullptr;
@@ -63,69 +64,29 @@ void ShuffleManager::recursive_shuffle(std::vector<Entry>& entries) {
 
 void ShuffleManager::shuffle_small(std::vector<Entry>& entries) {
     size_t n = entries.size();
-    
+
     DEBUG_INFO("Small shuffle: n=%zu", n);
-    
-    // No padding here - already done in shuffle()
-    
-    // Convert to entry_t array
-    std::vector<entry_t> c_entries;
-    c_entries.reserve(n);
-    for (const auto& e : entries) {
-        c_entries.push_back(e.to_entry_t());
-    }
-    
-    // Call 2-way Waksman shuffle
-    // Call oblivious Waksman shuffle directly
-    int result = oblivious_2way_waksman(c_entries.data(), n);
+
+    // Shuffle directly on the vector data (no conversion needed)
+    int result = oblivious_2way_waksman(entries.data(), n);
 
     if (result != 0) {
         DEBUG_ERROR("Waksman shuffle failed: result=%d", result);
         return;
     }
-    
-    // Convert back all entries (including padding)
-    entries.clear();
-    for (size_t i = 0; i < n; i++) {
-        Entry e;
-        e.from_entry_t(c_entries[i]);
-        entries.push_back(e);
-    }
-    
+
     DEBUG_INFO("Small shuffle complete: %zu entries", n);
 }
 
 void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
     size_t n = entries.size();
-    const size_t k = MERGE_SORT_K;  // Use same K as merge sort (8)
-    
-    // No padding here - already done in shuffle()
-    // n should already be a valid size (2^a * k^b)
-    
-    DEBUG_INFO("Large shuffle: n=%zu, k=%zu", n, k);
-    
-    // Phase 1: K-way decomposition
-    set_as_current();
-    
-    // Initialize groups
-    groups.clear();
-    groups.resize(k);
-    for (auto& group : groups) {
-        group.reserve(n / k);
-    }
-    
-    // Convert to entry_t and call decompose
-    std::vector<entry_t> c_entries;
-    c_entries.reserve(n);
-    for (const auto& e : entries) {
-        c_entries.push_back(e.to_entry_t());
-    }
-    
-    // For TDX: k-way shuffle not yet ported - use simpler approach
-    // Just shuffle the whole array at once if it fits
-    DEBUG_INFO("Using simplified shuffle for large vector (size=%zu)", n);
 
-    int result = oblivious_2way_waksman(c_entries.data(), n);
+    DEBUG_INFO("Large shuffle: n=%zu", n);
+
+    // Shuffle directly on the vector data (no conversion needed)
+    set_as_current();
+
+    int result = oblivious_2way_waksman(entries.data(), n);
 
     if (result != 0) {
         DEBUG_ERROR("K-way shuffle failed: result=%d", result);
@@ -133,16 +94,8 @@ void ShuffleManager::shuffle_large(std::vector<Entry>& entries) {
         return;
     }
 
-    // Convert back to entries
-    entries.clear();
-    for (size_t i = 0; i < n; i++) {
-        Entry e;
-        e.from_entry_t(c_entries[i]);
-        entries.push_back(e);
-    }
-    
     clear_current();
-    
+
     DEBUG_INFO("Large shuffle complete: %zu entries", n);
 }
 
@@ -155,12 +108,9 @@ void ShuffleManager::handle_flush_to_group(int group_idx, entry_t* buffer, size_
         return;
     }
     
-    // Append buffer contents to the specified group
-    for (size_t i = 0; i < buffer_size; i++) {
-        Entry e;
-        e.from_entry_t(buffer[i]);
-        current_instance->groups[group_idx].push_back(e);
-    }
+    // Append buffer contents to the specified group (direct copy, no conversion)
+    auto& group = current_instance->groups[group_idx];
+    group.insert(group.end(), buffer, buffer + buffer_size);
     
     DEBUG_TRACE("Flushed %zu entries to group %d (total=%zu)", 
                 buffer_size, group_idx, current_instance->groups[group_idx].size());
@@ -179,10 +129,8 @@ void ShuffleManager::handle_refill_from_group(int group_idx, entry_t* buffer,
     size_t available = group.size() - pos;
     size_t to_fill = std::min(buffer_size, available);
     
-    // Fill buffer from current position in group
-    for (size_t i = 0; i < to_fill; i++) {
-        buffer[i] = group[pos + i].to_entry_t();
-    }
+    // Fill buffer from current position in group (direct copy, no conversion)
+    memcpy(buffer, &group[pos], to_fill * sizeof(entry_t));
     
     pos += to_fill;
     *actual_filled = to_fill;
@@ -197,12 +145,9 @@ void ShuffleManager::handle_flush_output(entry_t* buffer, size_t buffer_size) {
         return;
     }
     
-    // Append buffer contents to output
-    for (size_t i = 0; i < buffer_size; i++) {
-        Entry e;
-        e.from_entry_t(buffer[i]);
-        current_instance->output_entries.push_back(e);
-    }
+    // Append buffer contents to output (direct copy, no conversion)
+    auto& output = current_instance->output_entries;
+    output.insert(output.end(), buffer, buffer + buffer_size);
     
     DEBUG_TRACE("Flushed %zu entries to output (total=%zu)", 
                 buffer_size, current_instance->output_entries.size());

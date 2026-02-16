@@ -44,7 +44,6 @@
  */
 
 // Include all data structure headers
-#include "entry.h"
 #include "table.h"
 #include "../join/join_condition.h"
 

@@ -3,7 +3,8 @@
 
 #include <string>
 #include <utility>
-#include "../data_structures/entry.h"
+#include "../../common/enclave_types.h"
+#include "../../common/entry_utils.h"
 #include "../../common/types_common.h"
 
 /**

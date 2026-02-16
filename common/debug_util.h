@@ -186,9 +186,10 @@ static inline const char* debug_level_str(uint32_t level) {
 #ifndef ENCLAVE_BUILD
 #ifdef __cplusplus
 
+#include "enclave_types.h"
+
 // Forward declarations
 class Table;
-class Entry;
 class JoinTreeNode;
 typedef std::shared_ptr<JoinTreeNode> JoinTreeNodePtr;
 
@@ -220,7 +221,7 @@ void debug_close_session();
 // Table dumping functions
 void debug_dump_table(const Table& table, const char* label, const char* step_name, uint32_t eid,
                       const std::vector<MetadataColumn>& columns = {}, bool include_attributes = true);
-void debug_dump_entry(const Entry& entry, const char* label, uint32_t eid);
+void debug_dump_entry(const entry_t& entry, const char* label, uint32_t eid);
 void debug_dump_selected_columns(const Table& table, const char* label, const char* step_name, 
                                  uint32_t eid, const std::vector<std::string>& columns);
 void debug_dump_with_mask(const Table& table, const char* label, const char* step_name,

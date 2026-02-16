@@ -3,6 +3,7 @@
 #include "../core_logic/algorithms/min_heap.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 // External function to get comparator from OpEcall type
 extern "C" comparator_func_t get_merge_comparator(OpEcall type);
@@ -58,10 +59,8 @@ void MergeSortManager::handle_refill_buffer(int buffer_idx, entry_t* buffer,
     size_t remaining = run.size() - pos;
     size_t to_copy = std::min(buffer_size, remaining);
     
-    // Copy entries to buffer
-    for (size_t i = 0; i < to_copy; i++) {
-        buffer[i] = run[pos + i].to_entry_t();
-    }
+    // Copy entries to buffer (direct copy, no conversion needed)
+    memcpy(buffer, &run[pos], to_copy * sizeof(entry_t));
     
     pos += to_copy;
     *actual_filled = to_copy;
@@ -154,26 +153,14 @@ void MergeSortManager::sort_run_in_enclave(std::vector<Entry>& entries) {
     if (entries.empty()) {
         return;
     }
-    
+
     size_t size = entries.size();
     DEBUG_TRACE("Sorting run of %zu entries in enclave", size);
-    
-    // Convert to entry_t array
-    std::vector<entry_t> entry_array(size);
-    for (size_t i = 0; i < size; i++) {
-        entry_array[i] = entries[i].to_entry_t();
-    }
-    
-    // Call enclave to sort
-    // Call heap sort directly
+
+    // Sort directly on the vector data (no conversion needed)
     comparator_func_t compare = get_merge_comparator(comparator_type);
-    heap_sort(entry_array.data(), size, compare);
-    
-    // Convert back to Entry objects
-    for (size_t i = 0; i < size; i++) {
-        entries[i].from_entry_t(entry_array[i]);
-    }
-    
+    heap_sort(entries.data(), size, compare);
+
     DEBUG_TRACE("Run sorted successfully");
 }
 
@@ -277,8 +264,7 @@ std::vector<Entry> MergeSortManager::k_way_merge(const std::vector<size_t>& run_
     // Add first element from each run to heap
     for (size_t i = 0; i < run_indices.size(); i++) {
         if (run_positions[run_indices[i]] < runs[run_indices[i]].size()) {
-            entry_t e = runs[run_indices[i]][run_positions[run_indices[i]]].to_entry_t();
-            heap_push(&heap, &e, i);
+            heap_push(&heap, &runs[run_indices[i]][run_positions[run_indices[i]]], i);
         }
     }
 
@@ -288,16 +274,13 @@ std::vector<Entry> MergeSortManager::k_way_merge(const std::vector<size_t>& run_
         size_t run_idx;
         heap_pop(&heap, &min_entry, &run_idx);
 
-        Entry e;
-        e.from_entry_t(min_entry);
-        result.push_back(e);
+        result.push_back(min_entry);
 
         // Refill from same run
         size_t actual_run_idx = run_indices[run_idx];
         run_positions[actual_run_idx]++;
         if (run_positions[actual_run_idx] < runs[actual_run_idx].size()) {
-            entry_t next = runs[actual_run_idx][run_positions[actual_run_idx]].to_entry_t();
-            heap_push(&heap, &next, run_idx);
+            heap_push(&heap, &runs[actual_run_idx][run_positions[actual_run_idx]], run_idx);
         }
     }
 

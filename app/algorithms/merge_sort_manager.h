@@ -4,7 +4,6 @@
 #include <vector>
 #include <memory>
 #include "../data_structures/table.h"
-#include "../data_structures/entry.h"
 #include "../../common/op_types.h"
 #include "../../common/constants.h"
 

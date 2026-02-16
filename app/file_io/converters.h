@@ -8,16 +8,9 @@
 #include "../../common/enclave_types.h"
 
 // Forward declarations
-class Entry;
 class Table;
 
-// Note: Entry conversion functions moved to Entry class methods
-// Use Entry::to_entry_t() and Entry::from_entry_t() instead
-
-// Note: Table conversion functions moved to Table class methods
-// Use Table::to_entry_t_vector() and Table constructor/methods instead
-
-// NOTE: entry_t_vector_to_table has been removed - use Table::from_entry_t_vector() instead
+// Note: Entry is now a typedef for entry_t (no wrapper class)
 
 /**
  * Helper function to convert std::string to char array

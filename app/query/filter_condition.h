@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <cstdint>
 #include "../data_structures/table.h"
 

@@ -82,23 +82,6 @@ void Table::initialize_leaf_multiplicities() {
     }
 }
 
-std::vector<entry_t> Table::to_entry_t_vector() const {
-    std::vector<entry_t> result;
-    result.reserve(entries.size());
-    for (const auto& entry : entries) {
-        result.push_back(entry.to_entry_t());
-    }
-    return result;
-}
-
-void Table::from_entry_t_vector(const std::vector<entry_t>& c_entries) {
-    entries.clear();
-    entries.reserve(c_entries.size());
-    for (const auto& c_entry : c_entries) {
-        entries.emplace_back(c_entry);
-    }
-}
-
 void Table::set_table_name(const std::string& name) {
     table_name = name;
 }
@@ -305,19 +288,17 @@ Table Table::map(OpEcall op_type, int32_t* params) const {
     if (op_type == OP_ECALL_TRANSFORM_TO_START || op_type == OP_ECALL_TRANSFORM_TO_END) {
         // Two-parameter operations: deviation, equality_type
         for (const auto& entry : entries) {
-            Entry new_entry = entry;
-            entry_t e = new_entry.to_entry_t();
+            entry_t new_entry = entry;
 
             int32_t deviation = params ? params[0] : 0;
             equality_type_t equality = params ? (equality_type_t)params[1] : EQ;
 
             if (op_type == OP_ECALL_TRANSFORM_TO_START) {
-                transform_to_start_op(&e, deviation, equality);
+                transform_to_start_op(&new_entry, deviation, equality);
             } else {
-                transform_to_end_op(&e, deviation, equality);
+                transform_to_end_op(&new_entry, deviation, equality);
             }
 
-            new_entry.from_entry_t(e);
             result.add_entry(new_entry);
         }
     } else if (op_type == OP_ECALL_TRANSFORM_SET_INDEX ||
@@ -325,20 +306,18 @@ Table Table::map(OpEcall op_type, int32_t* params) const {
                op_type == OP_ECALL_INIT_METADATA_NULL) {
         // Single-parameter operations
         for (const auto& entry : entries) {
-            Entry new_entry = entry;
-            entry_t e = new_entry.to_entry_t();
+            entry_t new_entry = entry;
 
             int32_t param = params ? params[0] : 0;
 
             if (op_type == OP_ECALL_TRANSFORM_SET_INDEX) {
-                transform_set_index_op(&e, (uint32_t)param);
+                transform_set_index_op(&new_entry, (uint32_t)param);
             } else if (op_type == OP_ECALL_TRANSFORM_SET_JOIN_ATTR) {
-                transform_set_join_attr_op(&e, param);
+                transform_set_join_attr_op(&new_entry, param);
             } else {
-                transform_init_metadata_null_op(&e, (uint32_t)param);
+                transform_init_metadata_null_op(&new_entry, (uint32_t)param);
             }
 
-            new_entry.from_entry_t(e);
             result.add_entry(new_entry);
         }
     } else {
@@ -349,10 +328,8 @@ Table Table::map(OpEcall op_type, int32_t* params) const {
         }
 
         for (const auto& entry : entries) {
-            Entry new_entry = entry;
-            entry_t e = new_entry.to_entry_t();
-            func(&e);
-            new_entry.from_entry_t(e);
+            entry_t new_entry = entry;
+            func(&new_entry);
             result.add_entry(new_entry);
         }
     }
@@ -371,15 +348,9 @@ void Table::linear_pass(OpEcall op_type, int32_t* /* params */) {
         throw std::runtime_error("Unknown dual-entry operation type for linear_pass");
     }
 
-    // Window operation: process adjacent pairs
+    // Window operation: process adjacent pairs (direct pointers, zero copy)
     for (size_t i = 0; i < entries.size() - 1; i++) {
-        entry_t e1 = entries[i].to_entry_t();
-        entry_t e2 = entries[i+1].to_entry_t();
-
-        func(&e1, &e2);
-
-        entries[i].from_entry_t(e1);
-        entries[i+1].from_entry_t(e2);
+        func(&entries[i], &entries[i+1]);
     }
 
     DEBUG_TRACE("Table::linear_pass: Complete");
@@ -398,13 +369,7 @@ void Table::parallel_pass(Table& other, OpEcall op_type, int32_t* params) {
         int32_t right_attr_count = params ? params[1] : 0;
 
         for (size_t i = 0; i < entries.size(); i++) {
-            entry_t e1 = entries[i].to_entry_t();
-            entry_t e2 = other.entries[i].to_entry_t();
-
-            concat_attributes_op(&e1, &e2, left_attr_count, right_attr_count);
-
-            entries[i].from_entry_t(e1);
-            other.entries[i].from_entry_t(e2);
+            concat_attributes_op(&entries[i], &other.entries[i], left_attr_count, right_attr_count);
         }
     } else {
         dual_entry_op_fn func = get_dual_entry_op_function(op_type);
@@ -413,13 +378,7 @@ void Table::parallel_pass(Table& other, OpEcall op_type, int32_t* params) {
         }
 
         for (size_t i = 0; i < entries.size(); i++) {
-            entry_t e1 = entries[i].to_entry_t();
-            entry_t e2 = other.entries[i].to_entry_t();
-
-            func(&e1, &e2);
-
-            entries[i].from_entry_t(e1);
-            other.entries[i].from_entry_t(e2);
+            func(&entries[i], &other.entries[i]);
         }
     }
 
@@ -436,24 +395,12 @@ void Table::distribute_pass(size_t distance, OpEcall op_type, int32_t* /* params
 
     // Process pairs at given distance (right to left to avoid underflow)
     for (size_t i = entries.size() - distance; i > 0; i--) {
-        entry_t e1 = entries[i - 1].to_entry_t();
-        entry_t e2 = entries[i - 1 + distance].to_entry_t();
-
-        func(&e1, &e2);
-
-        entries[i - 1].from_entry_t(e1);
-        entries[i - 1 + distance].from_entry_t(e2);
+        func(&entries[i - 1], &entries[i - 1 + distance]);
     }
 
     // Handle i = 0 separately
     if (distance < entries.size()) {
-        entry_t e1 = entries[0].to_entry_t();
-        entry_t e2 = entries[distance].to_entry_t();
-
-        func(&e1, &e2);
-
-        entries[0].from_entry_t(e1);
-        entries[distance].from_entry_t(e2);
+        func(&entries[0], &entries[distance]);
     }
 
     DEBUG_TRACE("Table::distribute_pass: Complete");
@@ -475,9 +422,7 @@ void Table::add_padding(size_t count, OpEcall padding_op) {
         entry_t padding_entry;
         memset(&padding_entry, 0, sizeof(entry_t));
         func(&padding_entry);
-
-        Entry padding(padding_entry);
-        entries.push_back(padding);
+        entries.push_back(padding_entry);
     }
 
     DEBUG_TRACE("Table::add_padding: Complete - added %zu entries", count);

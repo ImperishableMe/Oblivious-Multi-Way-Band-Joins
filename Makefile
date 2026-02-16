@@ -25,7 +25,6 @@ endif
 App_Cpp_Files := main/sgx_join/main.cpp \
                  app/file_io/converters.cpp \
                  app/file_io/table_io.cpp \
-                 app/data_structures/entry.cpp \
                  app/data_structures/table.cpp \
                  app/join/join_condition.cpp \
                  app/join/join_constraint.cpp \
@@ -133,7 +132,6 @@ Benchmark_Sorting_Objects := tests/performance/benchmark_sorting.o
 # Common objects needed by test programs (reuse from main app)
 Test_Common_Objects := app/file_io/converters.o \
                       app/file_io/table_io.o \
-                      app/data_structures/entry.o \
                       app/data_structures/table.o \
                       app/join/join_condition.o \
                       app/join/join_attribute_setter.o \

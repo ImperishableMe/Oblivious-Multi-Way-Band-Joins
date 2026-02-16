@@ -1,15 +1,9 @@
 #include "converters.h"
-#include "../data_structures/entry.h"
 #include "../data_structures/table.h"
 #include <algorithm>
 #include <cstring>
 
-// Note: Entry conversion functions have been moved to Entry class methods
-// Use Entry::to_entry_t() and Entry::from_entry_t() instead
-
-// Note: Table::to_entry_t_vector() has been moved to Table class
-// Use Table::to_entry_t_vector() instead
-// entry_t_vector_to_table has been removed - use Table::from_entry_t_vector() instead
+// Note: Entry conversion functions removed - Entry is now a typedef for entry_t
 
 // Helper function to convert std::string to char array
 void string_to_char_array(const std::string& str, char* arr, size_t max_len) {

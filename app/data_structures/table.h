@@ -4,7 +4,8 @@
 #include <vector>
 #include <string>
 #include <functional>
-#include "entry.h"
+#include "../../common/enclave_types.h"
+#include "../../common/entry_utils.h"
 #include "../../common/op_types.h"
 
 /**
@@ -42,10 +43,6 @@ public:
     void initialize_original_indices();
     void initialize_leaf_multiplicities();
     
-    // Conversion for SGX processing
-    std::vector<entry_t> to_entry_t_vector() const;
-    void from_entry_t_vector(const std::vector<entry_t>& c_entries);
-    
     // Table metadata
     void set_table_name(const std::string& name);
     std::string get_table_name() const;
@@ -71,12 +68,8 @@ public:
     std::vector<Entry>::const_iterator begin() const;
     std::vector<Entry>::const_iterator end() const;
     
-    // Encryption status
-    enum EncryptionStatus {
-        UNENCRYPTED,  // All entries have is_encrypted = false
-        ENCRYPTED,    // All entries have is_encrypted = true
-        MIXED         // Entries have different encryption states
-    };
+    // Encryption status (TDX: always unencrypted)
+    enum EncryptionStatus { UNENCRYPTED, ENCRYPTED, MIXED };
     EncryptionStatus get_encryption_status() const;
     
     // Note: Non-batched operations have been removed in favor of batched versions

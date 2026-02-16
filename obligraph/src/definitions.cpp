@@ -484,4 +484,227 @@ void Catalog::importEdgeFromCSV(const string &filePath) {
     tables.push_back(std::move(revTable));
 }
 
+void Catalog::importNodeFromCSV(const string& filePath, char delimiter,
+                                const vector<pair<string, string>>& columnTypes,
+                                const string& primaryKeyColumn) {
+    ifstream file(filePath);
+    if (!file.is_open()) {
+        throw runtime_error("Cannot open file: " + filePath);
+    }
+
+    // Extract table name from file path (remove .csv extension)
+    string tableName = filePath;
+    size_t lastSlash = tableName.find_last_of("/\\");
+    if (lastSlash != string::npos) {
+        tableName = tableName.substr(lastSlash + 1);
+    }
+    size_t lastDot = tableName.find_last_of(".");
+    if (lastDot != string::npos) {
+        tableName = tableName.substr(0, lastDot);
+    }
+
+    string line;
+
+    // Read column names from header (first line)
+    if (!getline(file, line)) {
+        throw runtime_error("Empty file or cannot read column names");
+    }
+    vector<string> columnNames = splitString(line, delimiter);
+
+    // Validate that header columns match the provided columnTypes
+    if (columnNames.size() != columnTypes.size()) {
+        throw runtime_error("Header has " + to_string(columnNames.size()) +
+                          " columns but " + to_string(columnTypes.size()) + " types were provided");
+    }
+
+    // Create table
+    Table table;
+    table.name = tableName;
+    table.type = TableType::NODE;
+
+    // Build schema from provided columnTypes (no type row in file)
+    size_t currentOffset = 0;
+    for (size_t i = 0; i < columnNames.size(); i++) {
+        ColumnMeta meta;
+        meta.name = columnNames[i];
+        meta.type = parseColumnType(columnTypes[i].second);
+        meta.offset = currentOffset;
+
+        if (meta.type == ColumnType::STRING) {
+            meta.size = STRING_LENGTH_CUT_OFF;
+        } else {
+            meta.size = getColumnTypeSize(meta.type);
+        }
+
+        currentOffset += meta.size;
+        table.schema.columnMetas.push_back(meta);
+    }
+
+    // Find primary key column by name
+    size_t primaryKeyIndex = 0;
+    for (size_t i = 0; i < columnNames.size(); i++) {
+        if (columnNames[i] == primaryKeyColumn) {
+            primaryKeyIndex = i;
+            break;
+        }
+    }
+    if (!columnNames.empty()) {
+        table.primaryKeys.push_back(table.schema.columnMetas[primaryKeyIndex]);
+    }
+
+    // Read and store data rows
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+
+        vector<string> values = splitString(line, delimiter);
+        if (values.size() != columnNames.size()) {
+            cout << "Data row has incorrect number of fields: " << line << endl;
+            throw runtime_error("Data row has incorrect number of fields");
+        }
+
+        Row row;
+        row.size = currentOffset;
+        if (primaryKeyIndex < values.size()) {
+            key_t primaryKey = static_cast<key_t>(stoll(values[primaryKeyIndex]));
+            row.key = make_pair(primaryKey, 0);
+        }
+
+        serializeRowData(row, table.schema.columnMetas, values);
+        table.rows.push_back(std::move(row));
+        table.rowCount++;
+    }
+
+    tables.push_back(table);
+    file.close();
+}
+
+void Catalog::importEdgeFromCSV(const string& filePath, char delimiter,
+                                const vector<pair<string, string>>& columnTypes,
+                                const string& srcNodeName, const string& edgeTableName,
+                                const string& destNodeName,
+                                const string& srcIdColumn, const string& destIdColumn) {
+    ifstream file(filePath);
+    if (!file.is_open()) {
+        throw runtime_error("Cannot open file: " + filePath);
+    }
+
+    string line;
+
+    // Read column names from header (first line)
+    if (!getline(file, line)) {
+        throw runtime_error("Empty file or cannot read column names");
+    }
+    vector<string> columnNames = splitString(line, delimiter);
+
+    // Validate that header columns match the provided columnTypes
+    if (columnNames.size() != columnTypes.size()) {
+        throw runtime_error("Header has " + to_string(columnNames.size()) +
+                          " columns but " + to_string(columnTypes.size()) + " types were provided");
+    }
+
+    // Find src and dest ID column indices
+    size_t srcIdIndex = SIZE_MAX, destIdIndex = SIZE_MAX;
+    for (size_t i = 0; i < columnNames.size(); i++) {
+        if (columnNames[i] == srcIdColumn) srcIdIndex = i;
+        if (columnNames[i] == destIdColumn) destIdIndex = i;
+    }
+
+    if (srcIdIndex == SIZE_MAX) {
+        throw runtime_error("Source ID column '" + srcIdColumn + "' not found in header");
+    }
+    if (destIdIndex == SIZE_MAX) {
+        throw runtime_error("Destination ID column '" + destIdColumn + "' not found in header");
+    }
+
+    // Build schema from provided columnTypes (no type row in file)
+    size_t currentOffset = 0;
+    vector<ColumnMeta> columnMetas;
+    for (size_t i = 0; i < columnNames.size(); i++) {
+        ColumnMeta meta;
+        meta.name = columnNames[i];
+        meta.type = parseColumnType(columnTypes[i].second);
+        meta.offset = currentOffset;
+
+        if (meta.type == ColumnType::STRING) {
+            meta.size = STRING_LENGTH_CUT_OFF;
+        } else {
+            meta.size = getColumnTypeSize(meta.type);
+        }
+
+        currentOffset += meta.size;
+        columnMetas.push_back(meta);
+    }
+
+    // Read and store data rows
+    vector<Row> dataRows;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+
+        vector<string> values = splitString(line, delimiter);
+        if (values.size() != columnNames.size()) {
+            throw runtime_error("Data row has incorrect number of fields");
+        }
+
+        Row row;
+        row.size = currentOffset;
+
+        key_t srcId = static_cast<key_t>(stoll(values[srcIdIndex]));
+        key_t destId = static_cast<key_t>(stoll(values[destIdIndex]));
+        row.key = make_pair(srcId, destId);
+
+        serializeRowData(row, columnMetas, values);
+        dataRows.push_back(std::move(row));
+    }
+    file.close();
+
+    // Create forward table (sorted by srcId, then destId)
+    Table fwdTable;
+    fwdTable.name = edgeTableName + "_fwd";
+    fwdTable.type = TableType::EDGE;
+    fwdTable.schema.columnMetas = columnMetas;
+    fwdTable.primaryKeys.push_back(columnMetas[srcIdIndex]);
+    fwdTable.primaryKeys.push_back(columnMetas[destIdIndex]);
+    fwdTable.node_table_names = {srcNodeName, destNodeName};
+    fwdTable.rows = dataRows;
+    fwdTable.rowCount = dataRows.size();
+
+    sort(fwdTable.rows.begin(), fwdTable.rows.end(),
+         [](const Row& a, const Row& b) {
+            if (a.key.first == b.key.first) {
+                return a.key.second < b.key.second;
+            }
+            return a.key.first < b.key.first;
+         });
+
+    // Create reverse table (sorted by destId, then srcId)
+    Table revTable;
+    revTable.name = edgeTableName + "_rev";
+    revTable.type = TableType::EDGE;
+    revTable.schema.columnMetas = columnMetas;
+    revTable.primaryKeys.push_back(columnMetas[destIdIndex]);
+    revTable.primaryKeys.push_back(columnMetas[srcIdIndex]);
+    revTable.node_table_names = {destNodeName, srcNodeName};
+
+    vector<Row> revDataRows;
+    for (const Row& originalRow : dataRows) {
+        Row revRow = originalRow;
+        revRow.key = make_pair(originalRow.key.second, originalRow.key.first);
+        revDataRows.push_back(std::move(revRow));
+    }
+
+    revTable.rows = std::move(revDataRows);
+    revTable.rowCount = revTable.rows.size();
+
+    sort(revTable.rows.begin(), revTable.rows.end(),
+         [](const Row& a, const Row& b) {
+             if (a.key.first == b.key.first) {
+                 return a.key.second < b.key.second;
+             }
+             return a.key.first < b.key.first;
+         });
+
+    tables.push_back(std::move(fwdTable));
+    tables.push_back(std::move(revTable));
+}
+
 } // namespace obligraph

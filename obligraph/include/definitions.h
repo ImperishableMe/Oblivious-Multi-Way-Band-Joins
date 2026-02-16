@@ -205,29 +205,59 @@ struct Catalog {
         - Each data row must have the same number of fields as the column names.
     **/
     void importNodeFromCSV(const string &filePath);
-    
+
+    /**
+     * Imports a node table from a CSV file with caller-specified schema.
+     * No type row expected in the file — schema is provided programmatically.
+     * @param filePath       Path to the CSV file
+     * @param delimiter      Field delimiter (e.g., ',' or '|')
+     * @param columnTypes    Ordered list of (columnName, typeString) pairs
+     * @param primaryKeyColumn  Name of the primary key column (default: "id")
+     */
+    void importNodeFromCSV(const string& filePath, char delimiter,
+                           const vector<pair<string, string>>& columnTypes,
+                           const string& primaryKeyColumn = "id");
+
     /**
      * Imports an edge table specified in the CSV file.
      * Implementation details:
      * - The CSV filename is in format <node_table_name>_<edge_table_name>_<destination_node_name> without '.csv' extension is used as the table name. So, we can parse the table name from the file path.
      * - The CSV file uses '|' as the delimiter.
-     * - The first line contains the column names. There is no "id" column in edge tables, 
+     * - The first line contains the column names. There is no "id" column in edge tables,
      *      instead the primary keys are build with composite keys (srcId, destId).
      *      To figure out the primary keys, look for the columns that match the node table names.
      *      For example, if the edge table is between "user" and "post", the primary keys will be "userId" and "postId".
      *      However, if both the source and destination nodes are of the same type, the id names will be numbered like "user1Id", "user2Id", etc.
-     *      For example, if the edge table is between "person" and "person", the primary keys will be "person1Id" and "person2Id". 
+     *      For example, if the edge table is between "person" and "person", the primary keys will be "person1Id" and "person2Id".
      * - The second line contains the column types just like node tables.
      * - The subsequent lines contain the actual data rows.
      * - Each data row must have the same number of fields as the column names.
      * - The edge table will have two primary keys (srcId, destId) and the data will be stored in the same way as node tables.
-     * 
+     *
      *  Important: We will store two copies of the edge table:
      *     1. <edge_table_name>_fwd: for forward edges (srcId -> destId), it will sorted by srcId, and ties will be broken by destId.
      *     2. <edge_table_name>_rev: for reverse edges (destId -> srcId), it will sorted by destId, and ties will be broken by srcId.
     **/
 
     void importEdgeFromCSV(const string &filePath);
+
+    /**
+     * Imports an edge table from a CSV file with caller-specified schema and table names.
+     * No type row expected in the file — schema is provided programmatically.
+     * @param filePath        Path to the CSV file
+     * @param delimiter       Field delimiter (e.g., ',' or '|')
+     * @param columnTypes     Ordered list of (columnName, typeString) pairs
+     * @param srcNodeName     Name of the source node table
+     * @param edgeTableName   Name for the edge table
+     * @param destNodeName    Name of the destination node table
+     * @param srcIdColumn     Name of the source ID column in the CSV
+     * @param destIdColumn    Name of the destination ID column in the CSV
+     */
+    void importEdgeFromCSV(const string& filePath, char delimiter,
+                           const vector<pair<string, string>>& columnTypes,
+                           const string& srcNodeName, const string& edgeTableName,
+                           const string& destNodeName,
+                           const string& srcIdColumn, const string& destIdColumn);
 
     // Print catalog information
     void print() const {

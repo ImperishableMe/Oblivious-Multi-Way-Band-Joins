@@ -49,8 +49,8 @@ h3: a3 ══t3══> a4   (overlaps: h2.dest = h3.src at a3)
 
 ```sql
 SELECT * FROM hop AS h1, hop AS h2, hop AS h3
-WHERE h1.account_dest_id = h2.account_src_id
-  AND h2.account_dest_id = h3.account_src_id
+WHERE h1.account_dest_account_id = h2.account_src_account_id
+  AND h2.account_dest_account_id = h3.account_src_account_id
   AND h1.account_src_owner_id = 52
   AND h3.account_dest_owner_id = 45;
 ```
@@ -80,11 +80,11 @@ h6: a6 -> t6 -> a7
 
 ```sql
 SELECT * FROM hop AS h1, hop AS h2, hop AS h3, hop AS h4, hop AS h5, hop AS h6
-WHERE h1.account_dest_id = h2.account_src_id
-  AND h2.account_dest_id = h3.account_src_id
-  AND h3.account_src_id = h4.account_src_id   -- branch at a3
-  AND h3.account_dest_id = h5.account_src_id
-  AND h4.account_dest_id = h6.account_src_id
+WHERE h1.account_dest_account_id = h2.account_src_account_id
+  AND h2.account_dest_account_id = h3.account_src_account_id
+  AND h3.account_src_account_id = h4.account_src_account_id   -- branch at a3
+  AND h3.account_dest_account_id = h5.account_src_account_id
+  AND h4.account_dest_account_id = h6.account_src_account_id
   AND <filters>;
 ```
 
@@ -133,14 +133,6 @@ WHERE h1.account_dest_id = h2.account_src_id
 | `writeTableToCSV()` | `obligraph/src/banking_onehop.cpp` | 23-52 | Write hop result to CSV |
 | `main()` | `obligraph/src/banking_onehop.cpp` | 54-128 | Execute one-hop and output result |
 
-### Data Conversion
-
-| Function | File | Lines | Purpose |
-|----------|------|-------|---------|
-| `convert_account_csv()` | `scripts/convert_banking_to_obligraph.py` | 23-38 | Convert account.csv to ObliGraph format |
-| `convert_txn_csv()` | `scripts/convert_banking_to_obligraph.py` | 41-56 | Convert txn.csv to ObliGraph edge format |
-| `main()` | `scripts/convert_banking_to_obligraph.py` | 59-91 | CLI entry point for conversion |
-
 ### Pipeline Scripts
 
 | Script | File | Purpose |
@@ -161,9 +153,9 @@ WHERE h1.account_dest_id = h2.account_src_id
 The one-hop join produces a denormalized table with columns from both endpoint accounts and the edge:
 
 ```
-account_src_id, account_src_balance, account_src_owner_id,
+account_src_account_id, account_src_balance, account_src_owner_id,
 txn_amount, txn_time,
-account_dest_id, account_dest_balance, account_dest_owner_id
+account_dest_account_id, account_dest_balance, account_dest_owner_id
 ```
 
 ## Algorithm: Filter-Independent Decomposition

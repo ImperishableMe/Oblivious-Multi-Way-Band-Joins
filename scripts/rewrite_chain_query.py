@@ -16,8 +16,8 @@ Example for chain4 (a1 --t1-- a2 --t2-- a3 --t3-- a4):
 
   Rewritten query:
     SELECT * FROM hop AS h1, hop AS h2, hop AS h3
-    WHERE h1.account_dest_id = h2.account_src_id
-      AND h2.account_dest_id = h3.account_src_id
+    WHERE h1.account_dest_account_id = h2.account_src_account_id
+      AND h2.account_dest_account_id = h3.account_src_account_id
       AND <filters mapped to appropriate hops>
 """
 
@@ -277,7 +277,7 @@ def generate_join_conditions(elements: List[QueryElement]) -> List[str]:
     Generate join conditions between hops.
 
     For overlapping hops, join on shared account:
-      - h_prev.account_dest_id = h_next.account_src_id
+      - h_prev.account_dest_account_id = h_next.account_src_account_id
 
     For branch points (same account in multiple hops):
       - Chain the references appropriately
@@ -305,8 +305,8 @@ def generate_join_conditions(elements: List[QueryElement]) -> List[str]:
             hop1, pos1 = refs[i]
             hop2, pos2 = refs[i + 1]
 
-            col1 = f"{hop1}.account_{pos1}_id"
-            col2 = f"{hop2}.account_{pos2}_id"
+            col1 = f"{hop1}.account_{pos1}_account_id"
+            col2 = f"{hop2}.account_{pos2}_account_id"
 
             # Avoid duplicates
             join_key = tuple(sorted([col1, col2]))

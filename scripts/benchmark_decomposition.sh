@@ -117,14 +117,11 @@ for i in $(seq 1 $NUM_RUNS); do
     # Create fresh temp dir for this run
     RUN_TEMP=$(mktemp -d)
 
-    # Step 1: Convert data (NOT timed - preprocessing)
-    python3 "$SCRIPT_DIR/convert_banking_to_obligraph.py" "$DATA_DIR" "$RUN_TEMP/obligraph_data" > /dev/null 2>&1
+    # Step 1: Run one-hop (extract timing from program output)
+    ONEHOP_OUTPUT=$("$PROJECT_DIR/obligraph/build/banking_onehop" "$DATA_DIR" "$RUN_TEMP/hop.csv" 2>&1)
 
-    # Step 2: Run one-hop (extract timing from program output)
-    ONEHOP_OUTPUT=$("$PROJECT_DIR/obligraph/build/banking_onehop" "$RUN_TEMP/obligraph_data" "$RUN_TEMP/hop.csv" 2>&1)
-
-    # Extract "One-hop execution: X ms" and convert to seconds
-    ONEHOP_MS=$(echo "$ONEHOP_OUTPUT" | grep -oP 'One-hop execution: \K[0-9]+')
+    # Extract "One-hop probe (online) completed in X ms" and convert to seconds
+    ONEHOP_MS=$(echo "$ONEHOP_OUTPUT" | grep -oP 'One-hop probe \(online\) completed in \K[0-9]+')
     if [ -z "$ONEHOP_MS" ]; then
         echo "Warning: Could not extract one-hop timing"
         ONEHOP_TIME="0"

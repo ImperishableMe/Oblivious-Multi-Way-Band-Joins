@@ -44,18 +44,14 @@ echo "Data:  $DATA_DIR"
 echo "Output: $OUTPUT"
 echo ""
 
-# Step 1: Convert data to ObliGraph format (NOT timed)
-echo "[1/5] Converting data format..."
-python3 "$SCRIPT_DIR/convert_banking_to_obligraph.py" "$DATA_DIR" "$TEMP_DIR/obligraph_data"
-
-# Step 2: Run one-hop (extract timing from program output)
+# Step 1: Run one-hop (extract timing from program output)
 echo ""
-echo "[2/5] Running one-hop join..."
-ONEHOP_OUTPUT=$("$PROJECT_DIR/obligraph/build/banking_onehop" "$TEMP_DIR/obligraph_data" "$TEMP_DIR/hop.csv" 2>&1)
+echo "[1/4] Running one-hop join..."
+ONEHOP_OUTPUT=$("$PROJECT_DIR/obligraph/build/banking_onehop" "$DATA_DIR" "$TEMP_DIR/hop.csv" 2>&1)
 echo "$ONEHOP_OUTPUT"
 
-# Extract "One-hop execution: X ms" from output and convert to seconds
-ONEHOP_MS=$(echo "$ONEHOP_OUTPUT" | grep -oP 'One-hop execution: \K[0-9]+')
+# Extract "One-hop probe (online) completed in X ms" from output and convert to seconds
+ONEHOP_MS=$(echo "$ONEHOP_OUTPUT" | grep -oP 'One-hop probe \(online\) completed in \K[0-9]+')
 if [ -z "$ONEHOP_MS" ]; then
     echo "Warning: Could not extract one-hop timing from output"
     ONEHOP_TIME="0"
@@ -63,9 +59,9 @@ else
     ONEHOP_TIME=$(echo "scale=6; $ONEHOP_MS / 1000" | bc)
 fi
 
-# Step 3: Prepare hop result for Multi-Way Band Joins (NOT timed)
+# Step 2: Prepare hop result for Multi-Way Band Joins (NOT timed)
 echo ""
-echo "[3/5] Preparing intermediate data..."
+echo "[2/4] Preparing intermediate data..."
 mkdir -p "$TEMP_DIR/mwbj_data"
 cp "$TEMP_DIR/hop.csv" "$TEMP_DIR/mwbj_data/"
 # Also copy txn.csv for optimized queries that use plain txn tables
@@ -75,18 +71,18 @@ cp "$DATA_DIR/txn.csv" "$TEMP_DIR/mwbj_data/"
 HOP_ROWS=$(wc -l < "$TEMP_DIR/hop.csv")
 echo "Hop result: $((HOP_ROWS - 1)) rows"
 
-# Step 4: Rewrite query (NOT timed)
+# Step 3: Rewrite query (NOT timed)
 echo ""
-echo "[4/5] Rewriting query..."
+echo "[3/4] Rewriting query..."
 python3 "$SCRIPT_DIR/rewrite_chain_query.py" "$QUERY" "$TEMP_DIR/decomposed.sql" 2>&1
 
 echo "Decomposed query:"
 cat "$TEMP_DIR/decomposed.sql"
 echo ""
 
-# Step 5: Run Multi-Way Band Joins (extract timing from program output)
+# Step 4: Run Multi-Way Band Joins (extract timing from program output)
 echo ""
-echo "[5/5] Running multi-way band joins..."
+echo "[4/4] Running multi-way band joins..."
 MWBJ_OUTPUT=$("$PROJECT_DIR/sgx_app" "$TEMP_DIR/decomposed.sql" "$TEMP_DIR/mwbj_data" "$OUTPUT" 2>&1)
 echo "$MWBJ_OUTPUT"
 

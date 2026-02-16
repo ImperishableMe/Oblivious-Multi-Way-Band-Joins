@@ -7,7 +7,7 @@
 #include "app/crypto/crypto_utils.h"
 #include "enclave/untrusted/Enclave_u.h"
 #include "sgx_urts.h"
-#include "common/batch_types.h"
+#include "common/op_types.h"
 #include "common/debug_util.h"
 
 sgx_enclave_id_t global_eid = 0;

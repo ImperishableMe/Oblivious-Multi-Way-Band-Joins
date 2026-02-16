@@ -1,6 +1,6 @@
 #include "min_heap.h"
 #include "enclave_types.h"
-#include "batch_types.h"
+#include "op_types.h"
 #include "constants.h"
 #include <stdlib.h>
 #include <string.h>

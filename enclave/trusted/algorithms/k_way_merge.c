@@ -1,7 +1,7 @@
 #include "min_heap.h"
 #include "../crypto/aes_crypto.h"
 #include "../crypto/crypto_helpers.h"
-#include "../../common/batch_types.h"
+#include "../../common/op_types.h"
 #include "../../common/constants.h"
 #include "../Enclave_t.h"
 #include <stdlib.h>

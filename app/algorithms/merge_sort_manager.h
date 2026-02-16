@@ -5,7 +5,7 @@
 #include <memory>
 #include "../data_structures/table.h"
 #include "../data_structures/entry.h"
-#include "../../common/batch_types.h"
+#include "../../common/op_types.h"
 #include "../../common/constants.h"
 
 /**

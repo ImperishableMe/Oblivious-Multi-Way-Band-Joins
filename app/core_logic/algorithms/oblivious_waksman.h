@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 #include "../../../common/enclave_types.h"
-#include "../../../common/batch_types.h"
+#include "../../../common/op_types.h"
 
 #ifdef __cplusplus
 extern "C" {

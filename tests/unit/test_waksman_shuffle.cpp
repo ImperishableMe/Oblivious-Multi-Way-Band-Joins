@@ -9,7 +9,7 @@
 #include <chrono>
 
 #include "../../common/enclave_types.h"
-#include "../../common/batch_types.h"
+#include "../../common/op_types.h"
 #include "../../app/crypto/crypto_utils.h"
 #include "Enclave_u.h"
 #include "sgx_urts.h"

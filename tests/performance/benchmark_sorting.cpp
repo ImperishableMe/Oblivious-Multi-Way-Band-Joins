@@ -10,7 +10,7 @@
 // App includes
 #include "app/data_structures/data_structures.h"
 #include "app/algorithms/merge_sort_manager.h"
-#include "common/batch_types.h"
+#include "common/op_types.h"
 #include "common/debug_util.h"
 
 // Obligraph includes

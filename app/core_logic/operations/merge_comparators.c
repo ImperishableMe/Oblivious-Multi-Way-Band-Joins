@@ -1,5 +1,5 @@
 #include "enclave_types.h"
-#include "batch_types.h"
+#include "op_types.h"
 #include "comparator_convention.h"
 #include <stdint.h>
 

@@ -1,17 +1,7 @@
-#ifndef BATCH_TYPES_H
-#define BATCH_TYPES_H
+#ifndef OP_TYPES_H
+#define OP_TYPES_H
 
 #include <stdint.h>
-
-#define BATCH_NO_PARAM -1
-#define MAX_EXTRA_PARAMS 4
-#define MAX_BATCH_SIZE 2000
-
-typedef struct {
-    int32_t idx1;                           // First entry index
-    int32_t idx2;                           // Second entry index (or BATCH_NO_PARAM)
-    int32_t extra_params[MAX_EXTRA_PARAMS]; // Additional parameters
-} BatchOperation;
 
 typedef enum {
     // Comparator operations
@@ -23,7 +13,7 @@ typedef enum {
     OP_ECALL_COMPARATOR_ALIGNMENT_KEY,
     OP_ECALL_COMPARATOR_PADDING_LAST,
     OP_ECALL_COMPARATOR_DISTRIBUTE,
-    
+
     // Transform operations
     OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE,
     OP_ECALL_TRANSFORM_ADD_METADATA,
@@ -43,7 +33,7 @@ typedef enum {
     OP_ECALL_TRANSFORM_INIT_COPY_INDEX,
     OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY,
     OP_ECALL_INIT_METADATA_NULL,
-    
+
     // Window operations
     OP_ECALL_WINDOW_SET_ORIGINAL_INDEX,
     OP_ECALL_WINDOW_COMPUTE_LOCAL_SUM,
@@ -55,13 +45,13 @@ typedef enum {
     OP_ECALL_WINDOW_INCREMENT_INDEX,
     OP_ECALL_WINDOW_EXPAND_COPY,
     OP_ECALL_WINDOW_UPDATE_COPY_INDEX,
-    
+
     // Update operations
     OP_ECALL_UPDATE_TARGET_MULTIPLICITY,
     OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY,
-    
+
     // Concat operations
     OP_ECALL_CONCAT_ATTRIBUTES
 } OpEcall;
 
-#endif // BATCH_TYPES_H
+#endif // OP_TYPES_H

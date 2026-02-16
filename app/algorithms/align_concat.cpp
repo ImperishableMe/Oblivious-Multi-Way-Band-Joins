@@ -172,7 +172,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
                left_attr_count, right_attr_count);
     
     // Pass attribute counts as extra parameters
-    int32_t concat_params[MAX_EXTRA_PARAMS] = {left_attr_count, right_attr_count, 0, 0};
+    int32_t concat_params[4] = {left_attr_count, right_attr_count, 0, 0};
     
     // Use parallel_pass to concatenate attributes from aligned_child
     result.parallel_pass(aligned_child, OP_ECALL_CONCAT_ATTRIBUTES, concat_params);

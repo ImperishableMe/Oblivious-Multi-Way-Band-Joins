@@ -5,7 +5,7 @@
 #include <string>
 #include <functional>
 #include "entry.h"
-#include "../../common/batch_types.h"
+#include "../../common/op_types.h"
 
 /**
  * Table Class - Manages collections of entries for oblivious multi-way band join

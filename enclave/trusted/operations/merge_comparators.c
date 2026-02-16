@@ -1,6 +1,6 @@
 #include "../enclave_types.h"
 #include "../../../common/comparator_convention.h"
-#include "../../../common/batch_types.h"
+#include "../../../common/op_types.h"
 #include <stdint.h>
 
 /**

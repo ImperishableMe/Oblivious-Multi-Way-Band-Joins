@@ -78,7 +78,6 @@ namespace obligraph {
             for (int i = start; i < end; i++) {
                 auto &originalRow = this->rows[i];
                 Row newRow;
-                newRow.size = newRowSize;
                 newRow.key = originalRow.key;  // Preserve row key
 
                 // Copy data for each projected column
@@ -225,10 +224,7 @@ namespace obligraph {
         }
 
         // Check if the expanded row size would exceed the maximum
-        size_t currentRowSize = 0;
-        if (!this->rows.empty()) {
-            currentRowSize = this->rows[0].size;
-        }
+        size_t currentRowSize = this->rowDataSize();
         size_t newRowSize = currentRowSize + additionalSize;
         
         if (newRowSize > ROW_DATA_MAX_SIZE) {
@@ -252,12 +248,8 @@ namespace obligraph {
                 Row& thisRow = this->rows[rowIdx];
                 const Row& otherRow = other.rows[rowIdx];
 
-                // Expand the row data
-                size_t oldSize = thisRow.size;
-                thisRow.size = newRowSize;
-                
                 // Copy data for each new column from the corresponding row in the other table
-                size_t targetOffset = oldSize;
+                size_t targetOffset = currentRowSize;
                 for (const auto* newCol : newColumns) {
                     // Find the data in the other table's row
                     const char* srcPtr = otherRow.data + newCol->offset;

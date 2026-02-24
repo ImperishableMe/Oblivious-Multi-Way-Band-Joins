@@ -17,8 +17,11 @@ using namespace std;
 
 
 namespace obligraph {
-constexpr int STRING_LENGTH_CUT_OFF = 64; // All strings are assumed to be of 64 bytes, anything larger will be truncated
-constexpr size_t ROW_DATA_MAX_SIZE = 64; // Maximum size for row data in bytes
+constexpr int STRING_LENGTH_CUT_OFF = 48; // All strings are assumed to be of 48 bytes, anything larger will be truncated
+constexpr size_t ROW_DATA_MAX_SIZE = 48; // Maximum size for row data in bytes
+
+// Dummy marker: MSB set indicates a dummy row/block
+constexpr uint64_t DUMMY_KEY_MSB = 1ULL << 63;
 
 
 using key_t = uint64_t;  // Type for primary keys
@@ -111,14 +114,22 @@ struct Predicate {
 };
 
 struct Row {
-    char data[ROW_DATA_MAX_SIZE];  // Fixed-size raw data for the row
-    size_t size;  // Size of the actual data in bytes
-    PairKey key;  // Pair of primary keys for tables, for node table, the second key is 0
-    bool isDummy = false;  // Flag to indicate if this is a dummy row
+    PairKey key;                   // Pair of primary keys (most-accessed field first)
+    char data[ROW_DATA_MAX_SIZE];  // Fixed-size raw data for the row (48 bytes)
+
+    // Dummy flag is encoded in MSB of key.first
+    bool isDummy() const { return (key.first & DUMMY_KEY_MSB) != 0; }
+    void setDummy(bool d) {
+        if (d) key.first |= DUMMY_KEY_MSB;
+        else   key.first &= ~DUMMY_KEY_MSB;
+    }
+    // Return key.first with the dummy MSB cleared
+    key_t cleanKey() const { return key.first & ~DUMMY_KEY_MSB; }
 
     // Get column value by name
     ColumnValue getColumnValue(const string& columnName, const Schema& schema) const;
 };
+static_assert(sizeof(Row) == 64, "Row must be exactly 1 cache line (64 bytes)");
 
 struct Table {
     string name;  // Name of the table
@@ -141,10 +152,14 @@ struct Table {
         rowCount = 0;
     }
 
+    // Compute row data size from schema (replaces per-row Row::size field)
+    size_t rowDataSize() const {
+        if (schema.columnMetas.empty()) return 0;
+        const auto& last = schema.columnMetas.back();
+        return last.offset + last.size;
+    }
+
     void addRow(const Row& row) {
-        if (row.size > ROW_DATA_MAX_SIZE) {
-            throw runtime_error("Row size exceeds maximum allowed size");
-        }
         rows.push_back(row);
         rowCount++;
     }

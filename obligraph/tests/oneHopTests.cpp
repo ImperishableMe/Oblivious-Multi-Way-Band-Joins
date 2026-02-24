@@ -28,13 +28,13 @@ protected:
         personCsvPath = "person.csv";
         std::ofstream file(personCsvPath);
         file << "id|age|first_name|last_name\n";
-        file << "int64|int32|string|string\n";
-        file << "1|30|Alice|Johnson\n";
-        file << "2|22|Bob|Smith\n";
-        file << "3|28|Charlie|Brown\n";
-        file << "4|35|Diana|Wilson\n";
-        file << "5|40|Eve|Davis\n";
-        file << "6|24|Frank|Miller\n";
+        file << "int64|int32|int32|int32\n";
+        file << "1|30|11|21\n";    // Alice Johnson
+        file << "2|22|12|22\n";    // Bob Smith
+        file << "3|28|13|23\n";    // Charlie Brown
+        file << "4|35|14|24\n";    // Diana Wilson
+        file << "5|40|15|25\n";    // Eve Davis
+        file << "6|24|16|26\n";    // Frank Miller
         file.close();
     }
 
@@ -42,12 +42,12 @@ protected:
         orgCsvPath = "org.csv";
         std::ofstream file(orgCsvPath);
         file << "id|establishedAt|name|city_name\n";
-        file << "int64|int32|string|string\n";
-        file << "101|2010|TechCorp|waterloo\n";
-        file << "102|2015|DataSoft|toronto\n";
-        file << "103|2008|InnovateInc|waterloo\n";
-        file << "104|2020|StartupXYZ|vancouver\n";
-        file << "105|2012|BigTech|waterloo\n";
+        file << "int64|int32|int32|int32\n";
+        file << "101|2010|201|301\n";    // TechCorp, waterloo
+        file << "102|2015|202|302\n";    // DataSoft, toronto
+        file << "103|2008|203|301\n";    // InnovateInc, waterloo
+        file << "104|2020|204|303\n";    // StartupXYZ, vancouver
+        file << "105|2012|205|301\n";    // BigTech, waterloo
         file.close();
     }
 
@@ -121,7 +121,7 @@ TEST_F(OneHopTest, OneHopCypherQuery_FilterAndProject) {
     Predicate cityFilter;
     cityFilter.column = "city_name";
     cityFilter.op = Predicate::Cmp::EQ;
-    cityFilter.constant = string("waterloo");  // Use full string for exact match
+    cityFilter.constant = int32_t(301);  // waterloo = 301
     orgPredicates.push_back(cityFilter);
 
     // Combine predicates with table names (no edge predicates)
@@ -150,29 +150,30 @@ TEST_F(OneHopTest, OneHopCypherQuery_FilterAndProject) {
     EXPECT_EQ(result.schema.columnMetas[1].name, "org_name");
 
     // Expected results based on our test data:
-    // - Alice (age 30 > 25) works at TechCorp (waterloo) ✓
-    // - Charlie (age 28 > 25) works at InnovateInc (waterloo) ✓
-    // - Eve (age 40 > 25) works at BigTech (waterloo) ✓
+    // - Alice (age 30 > 25) works at TechCorp (waterloo=301) ✓
+    // - Charlie (age 28 > 25) works at InnovateInc (waterloo=301) ✓
+    // - Eve (age 40 > 25) works at BigTech (waterloo=301) ✓
     //
     // Filtered out:
     // - Bob (age 22 ≤ 25)
-    // - Diana (age 35 > 25) works at StartupXYZ (vancouver ≠ waterloo)
+    // - Diana (age 35 > 25) works at StartupXYZ (vancouver=303 ≠ 301)
     // - Frank (age 24 ≤ 25)
 
     EXPECT_EQ(result.rowCount, 3);
-    // And check that the actual names are: Alice-TechCorp, Charlie-InnovateInc, Eve-BigTech
     // Collect all result names (order may vary)
-    std::set<string> expectedFirstNames = {"Alice", "Charlie", "Eve"};
-    std::set<string> actualFirstNames;
-    std::map<string, string> expectedCompanies = {
-        {"Alice", "TechCorp"},
-        {"Charlie", "InnovateInc"},
-        {"Eve", "BigTech"}
+    // first_name IDs: Alice=11, Charlie=13, Eve=15
+    // org name IDs: TechCorp=201, InnovateInc=203, BigTech=205
+    std::set<int32_t> expectedFirstNames = {11, 13, 15};
+    std::set<int32_t> actualFirstNames;
+    std::map<int32_t, int32_t> expectedCompanies = {
+        {11, 201},   // Alice -> TechCorp
+        {13, 203},   // Charlie -> InnovateInc
+        {15, 205}    // Eve -> BigTech
     };
 
     for (size_t i = 0; i < result.rowCount; i++) {
-        auto firstName = std::get<string>(result.rows[i].getColumnValue("person_first_name", result.schema));
-        auto companyName = std::get<string>(result.rows[i].getColumnValue("org_name", result.schema));
+        auto firstName = std::get<int32_t>(result.rows[i].getColumnValue("person_first_name", result.schema));
+        auto companyName = std::get<int32_t>(result.rows[i].getColumnValue("org_name", result.schema));
         actualFirstNames.insert(firstName);
 
         if (expectedCompanies.count(firstName)) {
@@ -340,7 +341,7 @@ TEST_F(OneHopTest, OneHopCypherQuery_Select2Tuples) {
     Predicate cityFilter;
     cityFilter.column = "city_name";
     cityFilter.op = Predicate::Cmp::EQ;
-    cityFilter.constant = string("toronto");  // Use full string for exact match
+    cityFilter.constant = int32_t(302);  // toronto = 302
     orgPredicates.push_back(cityFilter);
 
     // Combine predicates with table names
@@ -370,12 +371,12 @@ TEST_F(OneHopTest, OneHopCypherQuery_Select2Tuples) {
     EXPECT_EQ(result.schema.columnMetas[0].name, "person_first_name");
     EXPECT_EQ(result.schema.columnMetas[1].name, "org_name");
 
-    // Check that we get Bob and Frank (order may vary)
-    std::set<string> expectedNames = {"Bob", "Frank"};
-    std::set<string> actualNames;
+    // Check that we get Bob=12 and Frank=16 (order may vary)
+    std::set<int32_t> expectedNames = {12, 16};
+    std::set<int32_t> actualNames;
     for (size_t i = 0; i < result.rowCount; i++) {
-        actualNames.insert(std::get<string>(result.rows[i].getColumnValue("person_first_name", result.schema)));
-        EXPECT_EQ(std::get<string>(result.rows[i].getColumnValue("org_name", result.schema)), string("DataSoft"));
+        actualNames.insert(std::get<int32_t>(result.rows[i].getColumnValue("person_first_name", result.schema)));
+        EXPECT_EQ(std::get<int32_t>(result.rows[i].getColumnValue("org_name", result.schema)), 202);  // DataSoft=202
     }
     EXPECT_EQ(actualNames, expectedNames);
 }
@@ -445,19 +446,19 @@ TEST_F(OneHopTest, OneHopCypherQuery_Select4Tuples) {
     EXPECT_EQ(result.schema.columnMetas[0].name, "person_first_name");
     EXPECT_EQ(result.schema.columnMetas[1].name, "org_name");
 
-    // Check that we get the expected 4 people
-    std::set<string> expectedNames = {"Alice", "Charlie", "Diana", "Eve"};
-    std::set<string> actualNames;
-    std::map<string, string> expectedCompanies = {
-        {"Alice", "TechCorp"},
-        {"Charlie", "InnovateInc"},
-        {"Diana", "StartupXYZ"},
-        {"Eve", "BigTech"}
+    // Check that we get the expected 4 people (Alice=11, Charlie=13, Diana=14, Eve=15)
+    std::set<int32_t> expectedNames = {11, 13, 14, 15};
+    std::set<int32_t> actualNames;
+    std::map<int32_t, int32_t> expectedCompanies = {
+        {11, 201},   // Alice -> TechCorp
+        {13, 203},   // Charlie -> InnovateInc
+        {14, 204},   // Diana -> StartupXYZ
+        {15, 205}    // Eve -> BigTech
     };
 
     for (size_t i = 0; i < result.rowCount; i++) {
-        auto firstName = std::get<string>(result.rows[i].getColumnValue("person_first_name", result.schema));
-        auto companyName = std::get<string>(result.rows[i].getColumnValue("org_name", result.schema));
+        auto firstName = std::get<int32_t>(result.rows[i].getColumnValue("person_first_name", result.schema));
+        auto companyName = std::get<int32_t>(result.rows[i].getColumnValue("org_name", result.schema));
         actualNames.insert(firstName);
 
         // Check if the company matches
@@ -468,7 +469,7 @@ TEST_F(OneHopTest, OneHopCypherQuery_Select4Tuples) {
     EXPECT_EQ(actualNames, expectedNames);
 }
 
-// Test SELECT * (empty projection) - returns all columns from all tables
+// Test multi-table projection - returns columns from all three tables
 TEST_F(OneHopTest, OneHopCypherQuery_SelectAllColumns) {
     Catalog catalog;
 
@@ -488,8 +489,15 @@ TEST_F(OneHopTest, OneHopCypherQuery_SelectAllColumns) {
         {"person", personPredicates}
     };
 
-    // Empty projection = SELECT *
-    vector<pair<string, string>> projectionColumns;
+    // Project representative columns from all three tables
+    // (SELECT * would exceed 48-byte ROW_DATA_MAX_SIZE with 3 tables)
+    vector<pair<string, string>> projectionColumns = {
+        {"person", "first_name"},
+        {"person", "age"},
+        {"org", "name"},
+        {"org", "city_name"},
+        {"worksAt", "since"}
+    };
 
     OneHopQuery query("person", "worksAt", "org",
                       tablePredicates, projectionColumns);
@@ -500,20 +508,20 @@ TEST_F(OneHopTest, OneHopCypherQuery_SelectAllColumns) {
     // Should return 1 row (Alice -> TechCorp)
     EXPECT_EQ(result.rowCount, 1);
 
-    // Schema should include columns from all tables (edge + person + org)
-    // Edge columns: personId, orgId, since
-    // Person columns: person_id, person_age, person_first_name, person_last_name
-    // Org columns: org_id, org_establishedAt, org_name, org_city_name
-    EXPECT_GE(result.schema.columnMetas.size(), 6);  // At least 6 columns
+    // Schema should include columns from all three tables
+    EXPECT_EQ(result.schema.columnMetas.size(), 5);
 
     // Verify we can access data from different tables
     // Person data
-    EXPECT_EQ(std::get<string>(result.rows[0].getColumnValue("person_first_name", result.schema)), "Alice");
+    EXPECT_EQ(std::get<int32_t>(result.rows[0].getColumnValue("person_first_name", result.schema)), 11);  // Alice
     EXPECT_EQ(std::get<int32_t>(result.rows[0].getColumnValue("person_age", result.schema)), 30);
 
     // Org data
-    EXPECT_EQ(std::get<string>(result.rows[0].getColumnValue("org_name", result.schema)), "TechCorp");
-    EXPECT_EQ(std::get<string>(result.rows[0].getColumnValue("org_city_name", result.schema)), "waterloo");
+    EXPECT_EQ(std::get<int32_t>(result.rows[0].getColumnValue("org_name", result.schema)), 201);  // TechCorp
+    EXPECT_EQ(std::get<int32_t>(result.rows[0].getColumnValue("org_city_name", result.schema)), 301);  // waterloo
+
+    // Edge data
+    EXPECT_EQ(std::get<int32_t>(result.rows[0].getColumnValue("since", result.schema)), 5);
 }
 
 // Test with multiple predicates on the same table (AND logic)
@@ -560,10 +568,10 @@ TEST_F(OneHopTest, OneHopCypherQuery_MultiplePredicatesSameTable) {
     // Should return 2 rows: Alice (30) and Charlie (28)
     EXPECT_EQ(result.rowCount, 2);
 
-    // Collect results
-    std::set<string> actualNames;
+    // Collect results (Alice=11, Charlie=13)
+    std::set<int32_t> actualNames;
     for (size_t i = 0; i < result.rowCount; i++) {
-        auto firstName = std::get<string>(result.rows[i].getColumnValue("person_first_name", result.schema));
+        auto firstName = std::get<int32_t>(result.rows[i].getColumnValue("person_first_name", result.schema));
         auto age = std::get<int32_t>(result.rows[i].getColumnValue("person_age", result.schema));
         actualNames.insert(firstName);
 
@@ -572,6 +580,6 @@ TEST_F(OneHopTest, OneHopCypherQuery_MultiplePredicatesSameTable) {
         EXPECT_LT(age, 35);
     }
 
-    std::set<string> expectedNames = {"Alice", "Charlie"};
+    std::set<int32_t> expectedNames = {11, 13};
     EXPECT_EQ(actualNames, expectedNames);
 }

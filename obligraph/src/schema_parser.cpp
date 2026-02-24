@@ -296,7 +296,6 @@ void loadTableFromCSV(Catalog& catalog, const TableDefinition& tableDef, const s
 
         // Create row and serialize data
         Row row;
-        row.size = offset;  // Total size from schema building
         memset(row.data, 0, ROW_DATA_MAX_SIZE);
 
         // Store key values (for edges: srcId, destId)

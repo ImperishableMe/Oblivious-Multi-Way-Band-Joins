@@ -13,10 +13,10 @@ protected:
         testCsvPath = "test_comment.csv";
         std::ofstream file(testCsvPath);
         file << "id|content|hasCreator\n";
-        file << "int64|string|int64\n";
-        file << "555|This is a reply to the first post.|1099\n";
-        file << "666|John replies to Mary's post.|933\n";
-        file << "777|A quick comment on the third post.|1099\n";
+        file << "int64|int32|int64\n";
+        file << "555|42|1099\n";
+        file << "666|43|933\n";
+        file << "777|44|1099\n";
         file.close();
     }
 
@@ -52,7 +52,7 @@ TEST_F(CatalogTest, ImportNodeFromCSV_BasicFunctionality) {
     EXPECT_EQ(schema.columnMetas[0].type, ColumnType::INT64);
     
     EXPECT_EQ(schema.columnMetas[1].name, "content");
-    EXPECT_EQ(schema.columnMetas[1].type, ColumnType::STRING);
+    EXPECT_EQ(schema.columnMetas[1].type, ColumnType::INT32);
     
     EXPECT_EQ(schema.columnMetas[2].name, "hasCreator");
     EXPECT_EQ(schema.columnMetas[2].type, ColumnType::INT64);
@@ -96,15 +96,13 @@ TEST_F(CatalogTest, ImportNodeFromCSV_DataValidation) {
     // Verify that rows were created (check row count and data)
     // Each row should contain:
     // - int64 (8 bytes) for id
-    // - string (2 bytes fixed) for content
+    // - int32 (4 bytes) for content
     // - int64 (8 bytes) for hasCreator
-    
-    // Should have 3 rows, each with fixed size
-    size_t expectedRowSize = 8 + 2 + 8; // 18 bytes per row
+
+    // Should have 3 rows, each with schema-derived data size
+    size_t expectedRowSize = 8 + 4 + 8; // 20 bytes per row
     EXPECT_EQ(table.rows.size(), 3);
-    if (!table.rows.empty()) {
-        EXPECT_EQ(table.rows[0].size, expectedRowSize);
-    }
+    EXPECT_EQ(table.rowDataSize(), expectedRowSize);
 }
 
 TEST_F(CatalogTest, ParseColumnType_AllTypes) {
@@ -142,9 +140,9 @@ TEST_F(CatalogTest, GetColumnValue_BasicFunctionality) {
     EXPECT_EQ(std::get<int64_t>(idValue), 555);
     
     auto contentValue = row.getColumnValue("content", table.schema);
-    EXPECT_TRUE(std::holds_alternative<std::string>(contentValue));
-    EXPECT_EQ(std::get<std::string>(contentValue), "Th"); // Truncated to 2 chars
-    
+    EXPECT_TRUE(std::holds_alternative<int32_t>(contentValue));
+    EXPECT_EQ(std::get<int32_t>(contentValue), 42);
+
     auto creatorValue = row.getColumnValue("hasCreator", table.schema);
     EXPECT_TRUE(std::holds_alternative<int64_t>(creatorValue));
     EXPECT_EQ(std::get<int64_t>(creatorValue), 1099);
@@ -164,11 +162,10 @@ TEST_F(CatalogTest, GetColumnValue_AllTypes) {
     EXPECT_TRUE(std::holds_alternative<int64_t>(idValue));
     EXPECT_EQ(std::get<int64_t>(idValue), 555);
     
-    // Test getting STRING column (content) - should be truncated to 2 chars
+    // Test getting INT32 column (content)
     auto contentValue = firstRow.getColumnValue("content", table.schema);
-    EXPECT_TRUE(std::holds_alternative<std::string>(contentValue));
-    std::string content = std::get<std::string>(contentValue);
-    EXPECT_EQ(content, "Th"); // Truncated to STRING_LENGTH_CUT_OFF (2 chars)
+    EXPECT_TRUE(std::holds_alternative<int32_t>(contentValue));
+    EXPECT_EQ(std::get<int32_t>(contentValue), 42);
     
     // Test getting INT64 column (hasCreator) from second row
     auto creatorValue = secondRow.getColumnValue("hasCreator", table.schema);
@@ -211,12 +208,12 @@ TEST_F(CatalogTest, ProjectTable_BasicFunctionality) {
     EXPECT_EQ(projectedTable.schema.columnMetas[1].name, "hasCreator");
     
     // Verify column types are preserved
-    EXPECT_EQ(projectedTable.schema.columnMetas[0].type, ColumnType::STRING);
+    EXPECT_EQ(projectedTable.schema.columnMetas[0].type, ColumnType::INT32);
     EXPECT_EQ(projectedTable.schema.columnMetas[1].type, ColumnType::INT64);
-    
+
     // Verify column offsets are correctly updated for projected schema
     EXPECT_EQ(projectedTable.schema.columnMetas[0].offset, 0);  // content starts at 0
-    EXPECT_EQ(projectedTable.schema.columnMetas[1].offset, 2);  // hasCreator after content (2 bytes)
+    EXPECT_EQ(projectedTable.schema.columnMetas[1].offset, 4);  // hasCreator after content (4 bytes)
 
     // Verify primary keys are preserved
     EXPECT_EQ(projectedTable.primaryKeys.size(), originalTable.primaryKeys.size());
@@ -225,9 +222,9 @@ TEST_F(CatalogTest, ProjectTable_BasicFunctionality) {
     const Row& projectedRow = projectedTable.rows[0];
     auto contentValue = projectedRow.getColumnValue("content", projectedTable.schema);
     auto creatorValue = projectedRow.getColumnValue("hasCreator", projectedTable.schema);
-    
-    EXPECT_TRUE(std::holds_alternative<std::string>(contentValue));
-    EXPECT_EQ(std::get<std::string>(contentValue), "Th");
+
+    EXPECT_TRUE(std::holds_alternative<int32_t>(contentValue));
+    EXPECT_EQ(std::get<int32_t>(contentValue), 42);
     
     EXPECT_TRUE(std::holds_alternative<int64_t>(creatorValue));
     EXPECT_EQ(std::get<int64_t>(creatorValue), 1099);
@@ -249,7 +246,7 @@ TEST_F(CatalogTest, ProjectTable_SingleColumn) {
     // Verify projected table has requested column
     EXPECT_EQ(projectedTable.schema.columnMetas.size(), 1);
     EXPECT_EQ(projectedTable.schema.columnMetas[0].name, "content");
-    EXPECT_EQ(projectedTable.schema.columnMetas[0].type, ColumnType::STRING);
+    EXPECT_EQ(projectedTable.schema.columnMetas[0].type, ColumnType::INT32);
     
     // Verify column offsets are correctly updated for projected schema
     EXPECT_EQ(projectedTable.schema.columnMetas[0].offset, 0);  // content after id (8 bytes)
@@ -577,9 +574,9 @@ TEST_F(EdgeCatalogTest, ImportEdgeFromCSV_SchemaValidation) {
     EXPECT_EQ(schema.columnMetas[2].size, 8);
     EXPECT_EQ(schema.columnMetas[2].offset, 9);
     
-    // Verify total row size
+    // Verify total row data size (from schema)
     size_t expectedRowSize = 1 + 8 + 8; // 17 bytes
-    EXPECT_EQ(fwdTable->rows[0].size, expectedRowSize);
+    EXPECT_EQ(fwdTable->rowDataSize(), expectedRowSize);
 }
 
 TEST_F(EdgeCatalogTest, ImportEdgeFromCSV_ErrorHandling) {

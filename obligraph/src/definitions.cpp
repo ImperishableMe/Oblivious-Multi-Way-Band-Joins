@@ -157,7 +157,6 @@ void Catalog::importNodeFromCSV(const string &filePath) {
 
         // Create row
         Row row;
-        row.size = currentOffset; // Total size of all columns
         // Set primary key (for node tables, second key is 0)
         if (primaryKeyIndex < values.size()) {
             key_t primaryKey = static_cast<key_t>(stoll(values[primaryKeyIndex])); // Use the identified primary key column
@@ -187,11 +186,15 @@ vector<string> Catalog::splitString(const string& str, char delimiter) {
 }
 
 void Catalog::serializeRowData(Row& row, const vector<ColumnMeta>& columnMetas, const vector<string>& values) {
-    // Validate that the row size doesn't exceed maximum
-    if (row.size > ROW_DATA_MAX_SIZE) {
-        throw runtime_error("Row data size (" + to_string(row.size) + " bytes) exceeds maximum allowed size (" + to_string(ROW_DATA_MAX_SIZE) + " bytes)");
+    // Validate schema size once (not per-row)
+    if (!columnMetas.empty()) {
+        const auto& last = columnMetas.back();
+        size_t schemaSize = last.offset + last.size;
+        if (schemaSize > ROW_DATA_MAX_SIZE) {
+            throw runtime_error("Schema data size (" + to_string(schemaSize) + " bytes) exceeds maximum allowed size (" + to_string(ROW_DATA_MAX_SIZE) + " bytes)");
+        }
     }
-    
+
     for (size_t i = 0; i < values.size(); i++) {
         const ColumnMeta& meta = columnMetas[i];
         const string& value = values[i];
@@ -415,8 +418,7 @@ void Catalog::importEdgeFromCSV(const string &filePath) {
 
         // Create row
         Row row;
-        row.size = currentOffset;
-        
+
         // Set composite primary key (srcId, destId)
         key_t srcId = static_cast<key_t>(stoll(values[srcIdIndex]));
         key_t destId = static_cast<key_t>(stoll(values[destIdIndex]));
@@ -563,7 +565,6 @@ void Catalog::importNodeFromCSV(const string& filePath, char delimiter,
         }
 
         Row row;
-        row.size = currentOffset;
         if (primaryKeyIndex < values.size()) {
             key_t primaryKey = static_cast<key_t>(stoll(values[primaryKeyIndex]));
             row.key = make_pair(primaryKey, 0);
@@ -646,7 +647,6 @@ void Catalog::importEdgeFromCSV(const string& filePath, char delimiter,
         }
 
         Row row;
-        row.size = currentOffset;
 
         key_t srcId = static_cast<key_t>(stoll(values[srcIdIndex]));
         key_t destId = static_cast<key_t>(stoll(values[destIdIndex]));

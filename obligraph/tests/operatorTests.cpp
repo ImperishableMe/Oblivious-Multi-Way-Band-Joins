@@ -13,12 +13,12 @@ protected:
         testCsvPath = "test_operator_data.csv";
         std::ofstream file(testCsvPath);
         file << "id|name|age|salary|active\n";
-        file << "int64|string|int32|double|boolean\n";
-        file << "1|Alice|25|50000.0|true\n";
-        file << "2|Bob|30|60000.0|false\n";
-        file << "3|Charlie|35|75000.0|true\n";
-        file << "4|Diana|28|55000.0|true\n";
-        file << "5|Eve|40|80000.0|false\n";
+        file << "int64|int32|int32|double|boolean\n";
+        file << "1|100|25|50000.0|true\n";
+        file << "2|200|30|60000.0|false\n";
+        file << "3|300|35|75000.0|true\n";
+        file << "4|400|28|55000.0|true\n";
+        file << "5|500|40|80000.0|false\n";
         file.close();
     }
 
@@ -104,29 +104,29 @@ TEST_F(OperatorTest, FilterAndProject_BasicFunctionality) {
     EXPECT_EQ(finalTable.schema.columnMetas[1].name, "salary");
     
     // Verify column types are preserved
-    EXPECT_EQ(finalTable.schema.columnMetas[0].type, ColumnType::STRING);
+    EXPECT_EQ(finalTable.schema.columnMetas[0].type, ColumnType::INT32);
     EXPECT_EQ(finalTable.schema.columnMetas[1].type, ColumnType::DOUBLE);
-    
+
     // Verify data integrity in final table
     for (size_t i = 0; i < finalTable.rows.size(); i++) {
         auto nameValue = finalTable.rows[i].getColumnValue("name", finalTable.schema);
         auto salaryValue = finalTable.rows[i].getColumnValue("salary", finalTable.schema);
 
-        EXPECT_TRUE(std::holds_alternative<string>(nameValue));
+        EXPECT_TRUE(std::holds_alternative<int32_t>(nameValue));
         EXPECT_TRUE(std::holds_alternative<double>(salaryValue));
-        
-        string name = std::get<string>(nameValue);
+
+        int32_t name = std::get<int32_t>(nameValue);
         double salary = std::get<double>(salaryValue);
-        
+
         // Verify the name and salary match expected values for active employees
         if (i == 0) {
-            EXPECT_EQ(name, "Al");
+            EXPECT_EQ(name, 100);    // Alice
             EXPECT_EQ(salary, 50000.0);
         } else if (i == 1) {
-            EXPECT_EQ(name, "Ch");
+            EXPECT_EQ(name, 300);    // Charlie
             EXPECT_EQ(salary, 75000.0);
         } else if (i == 2) {
-            EXPECT_EQ(name, "Di");
+            EXPECT_EQ(name, 400);    // Diana
             EXPECT_EQ(salary, 55000.0);
         }
     }
@@ -172,22 +172,22 @@ TEST_F(OperatorTest, FilterNumericPredicate_GreaterThan) {
     EXPECT_EQ(finalTable.schema.columnMetas.size(), 2); // name + age
     
     // Check specific values
-    vector<pair<string, int32_t>> expectedResults = {{"Ch", 35}, {"Ev", 40}};
-    vector<pair<string, int32_t>> actualResults;
-    
+    vector<pair<int32_t, int32_t>> expectedResults = {{300, 35}, {500, 40}};
+    vector<pair<int32_t, int32_t>> actualResults;
+
     for (const auto& row : finalTable.rows) {
         auto nameValue = row.getColumnValue("name", finalTable.schema);
         auto ageValue = row.getColumnValue("age", finalTable.schema);
-        
-        string name = std::get<string>(nameValue);
+
+        int32_t name = std::get<int32_t>(nameValue);
         int32_t age = std::get<int32_t>(ageValue);
         actualResults.push_back({name, age});
     }
-    
+
     // Sort both vectors for comparison
     sort(expectedResults.begin(), expectedResults.end());
     sort(actualResults.begin(), actualResults.end());
-    
+
     EXPECT_EQ(actualResults, expectedResults);
 }
 
@@ -231,18 +231,18 @@ TEST_F(OperatorTest, FilterSalaryAndProject_ComplexPipeline) {
     EXPECT_EQ(finalTable.schema.columnMetas.size(), 1); // name only
     EXPECT_EQ(finalTable.schema.columnMetas[0].name, "name");
     
-    // Check that we have the right names
-    vector<string> expectedNames = {"Bo", "Ch", "Ev"};
-    vector<string> actualNames;
-    
+    // Check that we have the right names (as int32 IDs)
+    vector<int32_t> expectedNames = {200, 300, 500};
+    vector<int32_t> actualNames;
+
     for (const auto& row : finalTable.rows) {
         auto nameValue = row.getColumnValue("name", finalTable.schema);
-        actualNames.push_back(std::get<string>(nameValue));
+        actualNames.push_back(std::get<int32_t>(nameValue));
     }
-    
+
     sort(expectedNames.begin(), expectedNames.end());
     sort(actualNames.begin(), actualNames.end());
-    
+
     EXPECT_EQ(actualNames, expectedNames);
 }
 
@@ -284,13 +284,13 @@ TEST_F(OperatorTest, UnionOperator_DisjointSchemas) {
     // Test union of two tables with completely different schemas
     Catalog catalog;
     
-    // Create first table with employee data  
+    // Create first table with employee data
     std::string firstCsvPath = "test_union_first.csv";
     std::ofstream file1(firstCsvPath);
     file1 << "emp_id|name\n";
-    file1 << "int64|string\n";
-    file1 << "1|Alice\n";
-    file1 << "2|Bob\n";
+    file1 << "int64|int32\n";
+    file1 << "1|100\n";
+    file1 << "2|200\n";
     file1.close();
     
     // Create second table with salary data (same number of rows)
@@ -348,18 +348,18 @@ TEST_F(OperatorTest, UnionOperator_OverlappingSchemas) {
     std::string firstCsvPath = "test_union_overlap1.csv";
     std::ofstream file1(firstCsvPath);
     file1 << "id|name|age\n";
-    file1 << "int64|string|int32\n";
-    file1 << "1|Alice|25\n";
-    file1 << "2|Bob|30\n";
+    file1 << "int64|int32|int32\n";
+    file1 << "1|100|25\n";
+    file1 << "2|200|30\n";
     file1.close();
-    
+
     // Create second table with overlapping columns (id and name) and new column (salary)
     std::string secondCsvPath = "test_union_overlap2.csv";
     std::ofstream file2(secondCsvPath);
     file2 << "id|name|salary\n";
-    file2 << "int64|string|double\n";
-    file2 << "1|Different_Alice|50000.0\n";
-    file2 << "2|Different_Bob|60000.0\n";
+    file2 << "int64|int32|double\n";
+    file2 << "1|900|50000.0\n";
+    file2 << "2|901|60000.0\n";
     file2.close();
     
     // Import both tables
@@ -370,7 +370,7 @@ TEST_F(OperatorTest, UnionOperator_OverlappingSchemas) {
     const Table& secondTable = catalog.tables[1];
     
     // Store original values from first table to verify they're preserved
-    ColumnValue originalName1 = firstTable.rows[0].getColumnValue("name", firstTable.schema);
+    ColumnValue originalName1 = firstTable.rows[0].getColumnValue("name", firstTable.schema);  // 100
     ColumnValue originalAge1 = firstTable.rows[0].getColumnValue("age", firstTable.schema);
     
     // Perform union operation
@@ -391,7 +391,7 @@ TEST_F(OperatorTest, UnionOperator_OverlappingSchemas) {
     ColumnValue preservedName1 = firstTable.rows[0].getColumnValue("name", firstTable.schema);
     ColumnValue preservedAge1 = firstTable.rows[0].getColumnValue("age", firstTable.schema);
     
-    EXPECT_EQ(std::get<std::string>(preservedName1), std::get<std::string>(originalName1));
+    EXPECT_EQ(std::get<int32_t>(preservedName1), std::get<int32_t>(originalName1));
     EXPECT_EQ(std::get<int32_t>(preservedAge1), std::get<int32_t>(originalAge1));
     
     // Verify new column (salary) is added from second table
@@ -411,18 +411,18 @@ TEST_F(OperatorTest, UnionOperator_SameSchemas) {
     std::string firstCsvPath = "test_union_same1.csv";
     std::ofstream file1(firstCsvPath);
     file1 << "id|name|age\n";
-    file1 << "int64|string|int32\n";
-    file1 << "1|Alice|25\n";
-    file1 << "2|Bob|30\n";
+    file1 << "int64|int32|int32\n";
+    file1 << "1|100|25\n";
+    file1 << "2|200|30\n";
     file1.close();
-    
+
     // Create second table with identical schema but different data
     std::string secondCsvPath = "test_union_same2.csv";
     std::ofstream file2(secondCsvPath);
     file2 << "id|name|age\n";
-    file2 << "int64|string|int32\n";
-    file2 << "1|Different_Alice|99\n";
-    file2 << "2|Different_Bob|99\n";
+    file2 << "int64|int32|int32\n";
+    file2 << "1|900|99\n";
+    file2 << "2|901|99\n";
     file2.close();
     
     // Import both tables
@@ -433,8 +433,8 @@ TEST_F(OperatorTest, UnionOperator_SameSchemas) {
     const Table& secondTable = catalog.tables[1];
     
     // Store original values to verify they're preserved
-    ColumnValue originalName1 = firstTable.rows[0].getColumnValue("name", firstTable.schema);
-    ColumnValue originalAge1 = firstTable.rows[0].getColumnValue("age", firstTable.schema);
+    ColumnValue originalName1 = firstTable.rows[0].getColumnValue("name", firstTable.schema);  // 100
+    ColumnValue originalAge1 = firstTable.rows[0].getColumnValue("age", firstTable.schema);    // 25
     
     // Perform union operation
     firstTable.unionWith(secondTable, pool);
@@ -446,7 +446,7 @@ TEST_F(OperatorTest, UnionOperator_SameSchemas) {
     ColumnValue preservedName1 = firstTable.rows[0].getColumnValue("name", firstTable.schema);
     ColumnValue preservedAge1 = firstTable.rows[0].getColumnValue("age", firstTable.schema);
     
-    EXPECT_EQ(std::get<std::string>(preservedName1), "Al");
+    EXPECT_EQ(std::get<int32_t>(preservedName1), 100);
     EXPECT_EQ(std::get<int32_t>(preservedAge1), 25);
     
     // Clean up
@@ -469,7 +469,7 @@ TEST_F(OperatorTest, UnionOperator_EmptyTables) {
     
     // Add some column metadata to make it interesting
     ColumnMeta col1 = {"id", ColumnType::INT64, sizeof(int64_t), 0};
-    ColumnMeta col2 = {"data", ColumnType::STRING, 0, sizeof(int64_t)};
+    ColumnMeta col2 = {"data", ColumnType::INT32, sizeof(int32_t), sizeof(int64_t)};
     
     table1.schema.columnMetas = {col1};
     table2.schema.columnMetas = {col2};

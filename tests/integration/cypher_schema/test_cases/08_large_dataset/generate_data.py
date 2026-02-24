@@ -4,9 +4,10 @@
 import random
 
 # Generate User.csv with 10,000 rows
+# Schema: User(id INT64, name INT32, PRIMARY KEY (id))
 with open('User.csv', 'w') as f:
     for i in range(1, 10001):
-        f.write(f"{i},User{i}\n")
+        f.write(f"{i},{i}\n")
 
 # Generate Follows.csv with 50,000 rows
 with open('Follows.csv', 'w') as f:

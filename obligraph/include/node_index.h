@@ -14,8 +14,7 @@ namespace obligraph {
     constexpr size_t ROW_BLOCK_SIZE = sizeof(key_t) + sizeof(Row);
     using RowBlock = ORAM::Block<key_t, ROW_BLOCK_SIZE>;
 
-    // Dummy marker: MSB set indicates a dummy block
-    constexpr key_t DUMMY_KEY_MSB = 1ULL << 63;
+    // DUMMY_KEY_MSB is defined in definitions.h
 
     // Pre-built oblivious hash index over a node table
     using NodeIndex = ORAM::ObliviousBin<key_t, ROW_BLOCK_SIZE>;

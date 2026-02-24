@@ -1,2 +1,2 @@
-Alice
-Charlie
+10
+30

@@ -48,11 +48,11 @@ namespace obligraph {
         ScopedTimer timer("Probe with Pre-built Index");
 
         Row dummyRow;
-        dummyRow.isDummy = true;
+        dummyRow.setDummy(true);
 
         for (size_t i = 0; i < probeT.rowCount; i++) {
             key_t srcId = triple32(probeT.rows[i].key.first) & ~DUMMY_KEY_MSB;
-            bool dummy = probeT.rows[i].isDummy;
+            bool dummy = probeT.rows[i].isDummy();
 
             RowBlock result = obin[srcId];
 
@@ -82,7 +82,7 @@ namespace obligraph {
             // Generate dummy key without MSB set (MSB reserved for ObliviousBin dummy marking)
             dummy = static_cast<key_t>(random()) & ~DUMMY_KEY_MSB;
             table.rows[i].key.first = ObliviousChoose(lastKey == currentKey, dummy, currentKey);
-            table.rows[i].isDummy = (lastKey == currentKey);
+            table.rows[i].setDummy(lastKey == currentKey);
             lastKey = currentKey;
         }
     }
@@ -91,7 +91,7 @@ namespace obligraph {
         Row lastRow;
         for (size_t i = 0; i < table.rows.size(); ++i) {
             auto secKey = table.rows[i].key.second;
-            table.rows[i] = ObliviousChoose(table.rows[i].isDummy, lastRow, table.rows[i]);
+            table.rows[i] = ObliviousChoose(table.rows[i].isDummy(), lastRow, table.rows[i]);
             table.rows[i].key.second = secKey; // Restore the second key
             lastRow = table.rows[i];
         }

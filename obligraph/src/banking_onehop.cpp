@@ -36,7 +36,7 @@ void writeTableToCSV(const Table& table, const string& filePath) {
 
     // Write data rows
     for (const auto& row : table.rows) {
-        if (row.isDummy) continue;  // Skip dummy rows
+        if (row.isDummy()) continue;  // Skip dummy rows
 
         for (size_t i = 0; i < table.schema.columnMetas.size(); i++) {
             ColumnValue val = row.getColumnValue(

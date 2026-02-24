@@ -2,7 +2,7 @@
 """
 Batch Banking Dataset Generator
 
-Generates 4 banking datasets in parallel at scales: 1M, 2M, 5M, and 10M accounts.
+Generates 6 banking datasets in parallel at scales: 10K, 50K, 100K, 200K, 500K, and 1M accounts.
 
 Usage:
     python3 scripts/generate_banking_batch.py --output-base input/plaintext/banking_scaled
@@ -18,10 +18,12 @@ from pathlib import Path
 
 # Dataset configurations: (num_accounts, directory_suffix)
 DATASETS = [
+    (10_000,    "10K"),
+    (50_000,    "50K"),
+    (100_000,   "100K"),
+    (200_000,   "200K"),
+    (500_000,   "500K"),
     (1_000_000, "1M"),
-    (2_000_000, "2M"),
-    (5_000_000, "5M"),
-    (10_000_000, "10M"),
 ]
 
 

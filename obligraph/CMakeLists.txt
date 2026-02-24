@@ -12,9 +12,9 @@ add_compile_definitions(USE_AVX2)
 # add compile definitions for debugging
 add_compile_definitions(OBL_DEBUG)
 
-# For profiling, disable optimization to get better profiling output. For release build, still use -O3
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+# For profiling/debug, disable optimization. For release build, use -O3
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")

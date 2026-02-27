@@ -21,7 +21,7 @@
 using namespace std;
 
 namespace obligraph {
-    std::unique_ptr<NodeIndex> buildNodeIndex(const Table& table) {
+    std::unique_ptr<NodeIndex> buildNodeIndex(const Table& table, size_t op_num) {
         ScopedTimer timer("buildNodeIndex");
 
         std::cout << "[INFO] Row size: " << sizeof(Row)
@@ -39,7 +39,7 @@ namespace obligraph {
             blocks[i].id = static_cast<key_t>(i) | DUMMY_KEY_MSB;
         }
 
-        auto index = std::make_unique<NodeIndex>(n);
+        auto index = std::make_unique<NodeIndex>(n, op_num);
         index->build(blocks.data());
         return index;
     }
@@ -69,7 +69,7 @@ namespace obligraph {
 
     void build_and_probe(Table &buildT, Table &probeT, ThreadPool& /*pool*/) {
         ScopedTimer timer("Build and Probe (ObliviousBin)");
-        auto index = buildNodeIndex(buildT);
+        auto index = buildNodeIndex(buildT, probeT.rowCount);
         probe_with_index(*index, probeT);
     }
 

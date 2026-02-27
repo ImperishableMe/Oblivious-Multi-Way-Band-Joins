@@ -93,6 +93,7 @@ namespace ORAM
         if (hash_map.find({n, op_num, delta_inv_log2}) != hash_map.end())
         {
             auto [type, _, __] = hash_map[{n, op_num, delta_inv_log2}];
+            std::cout << "hash strategy: " << type << " (n=" << n << ", op_num=" << op_num << ", block=" << BlockSize << ")" << std::endl;
             if (type == "linear")
                 return new OLinearScan<KeyType, BlockSize>(n);
             if (type == "cuckoo")

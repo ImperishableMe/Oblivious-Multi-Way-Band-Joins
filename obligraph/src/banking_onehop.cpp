@@ -108,7 +108,8 @@ int main(int argc, char* argv[]) {
         // --- Offline build phase (timed separately) ---
         auto startBuild = chrono::high_resolution_clock::now();
         Table& accountTable = catalog.getTable("account");
-        auto nodeIndex = buildNodeIndex(accountTable);       // Build ONCE
+        size_t edgeCount = catalog.getTable("txn_fwd").rowCount;
+        auto nodeIndex = buildNodeIndex(accountTable, edgeCount);
         auto srcIndex = std::make_unique<NodeIndex>(*nodeIndex);  // Deep copy (probing is destructive)
         auto dstIndex = std::move(nodeIndex);
         auto endBuild = chrono::high_resolution_clock::now();

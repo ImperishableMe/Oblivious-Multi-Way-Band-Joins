@@ -34,7 +34,7 @@ namespace obligraph {
 
     // Build an ObliviousBin index from a node table (offline build phase).
     // Returns a unique_ptr because ObliviousBin has no move constructor.
-    std::unique_ptr<NodeIndex> buildNodeIndex(const Table& table);
+    std::unique_ptr<NodeIndex> buildNodeIndex(const Table& table, size_t op_num = 1);
 
     // oneHop overload that accepts pre-built indexes for probe-only execution.
     // Both indexes are consumed (probing is destructive).

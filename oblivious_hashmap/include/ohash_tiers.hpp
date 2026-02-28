@@ -7,6 +7,7 @@
 
 #include "timer.hpp"
 #include <fstream>
+#include <atomic>
 
 static long getMemoryUsage()
 {
@@ -23,7 +24,7 @@ namespace ORAM
     {
     private:
         const KeyType n;
-        KeyType dummy_access_ctr;
+        std::atomic<KeyType> dummy_access_ctr;
         bool _empty;
 
         KeyType bin_size;
@@ -126,7 +127,7 @@ namespace ORAM
             // Timer t;
             // for small hash tables with only one bin,
             // we can directly build the cuckoo hash table
-            dummy_access_ctr = 0;
+            dummy_access_ctr.store(0, std::memory_order_relaxed);
             _empty = false;
             extracted_data.clear();
             if (this->bin_num == 1)
@@ -203,7 +204,8 @@ namespace ORAM
 
         virtual Block<KeyType, BlockSize> operator[](KeyType key)
         {
-            CMOV(key == KeyType(-1), key, --dummy_access_ctr);
+            KeyType local_ctr = dummy_access_ctr.fetch_sub(1, std::memory_order_relaxed) - 1;
+            CMOV(key == KeyType(-1), key, local_ctr);
             if (bin_num > 1)
             {
                 auto ret = overflow_bin[key];
@@ -214,9 +216,9 @@ namespace ORAM
                 }
                 else
                 {
-                    --dummy_access_ctr;
-                    KeyType bin_id = prf(dummy_access_ctr);
-                    major_bins[bin_id][dummy_access_ctr];
+                    KeyType dummy_key = dummy_access_ctr.fetch_sub(1, std::memory_order_relaxed) - 1;
+                    KeyType bin_id = prf(dummy_key);
+                    major_bins[bin_id][dummy_key];
                 }
                 return ret;
             }
@@ -345,7 +347,7 @@ namespace ORAM
         virtual OHashBase<KeyType, BlockSize> *clone()
         {
             auto ret = new OTwoTierHash<KeyType, BlockSize>(this->n, this->delta_inv_log2, this->epsilon_inv);
-            ret->dummy_access_ctr = this->dummy_access_ctr;
+            ret->dummy_access_ctr.store(this->dummy_access_ctr.load(std::memory_order_relaxed), std::memory_order_relaxed);
             ret->_empty = this->_empty;
             ret->bin_size = this->bin_size;
             ret->delta_inv_log2 = this->delta_inv_log2;

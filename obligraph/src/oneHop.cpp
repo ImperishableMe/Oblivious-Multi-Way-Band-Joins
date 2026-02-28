@@ -44,33 +44,52 @@ namespace obligraph {
         return index;
     }
 
-    void probe_with_index(NodeIndex& obin, Table& probeT) {
+    void probe_with_index(NodeIndex& obin, Table& probeT, ThreadPool& pool) {
         ScopedTimer timer("Probe with Pre-built Index");
 
-        Row dummyRow;
-        dummyRow.setDummy(true);
+        auto thread_chunk = [&](int start, int end) {
+            Row dummyRow;
+            dummyRow.setDummy(true);
 
-        for (size_t i = 0; i < probeT.rowCount; i++) {
-            key_t srcId = triple32(probeT.rows[i].key.first) & ~DUMMY_KEY_MSB;
-            bool dummy = probeT.rows[i].isDummy();
+            for (int i = start; i < end; i++) {
+                key_t srcId = triple32(probeT.rows[i].key.first) & ~DUMMY_KEY_MSB;
+                bool dummy = probeT.rows[i].isDummy();
 
-            RowBlock result = obin[srcId];
+                RowBlock result = obin[srcId];
 
-            Row matchedRow;
-            std::memcpy(&matchedRow, result.value, sizeof(Row));
+                Row matchedRow;
+                std::memcpy(&matchedRow, result.value, sizeof(Row));
 
-            probeT.rows[i] = ObliviousChoose(
-                dummy || result.dummy(),
-                dummyRow,
-                matchedRow
-            );
+                probeT.rows[i] = ObliviousChoose(
+                    dummy || result.dummy(),
+                    dummyRow,
+                    matchedRow
+                );
+            }
+        };
+
+        int num_threads = obligraph::number_of_threads.load();
+        std::vector<std::future<void>> futures;
+
+        for (int i = 0; i < num_threads; i++) {
+            auto chunks = obligraph::get_cutoffs_for_thread(i, probeT.rowCount, num_threads);
+            if (chunks.first == chunks.second) continue;
+            if (i == num_threads - 1) {
+                thread_chunk(chunks.first, chunks.second);
+            } else {
+                futures.push_back(pool.submit(thread_chunk, chunks.first, chunks.second));
+            }
+        }
+
+        for (auto& fut : futures) {
+            fut.get();
         }
     }
 
-    void build_and_probe(Table &buildT, Table &probeT, ThreadPool& /*pool*/) {
+    void build_and_probe(Table &buildT, Table &probeT, ThreadPool& pool) {
         ScopedTimer timer("Build and Probe (ObliviousBin)");
         auto index = buildNodeIndex(buildT, probeT.rowCount);
-        probe_with_index(*index, probeT);
+        probe_with_index(*index, probeT, pool);
     }
 
     void deduplicateRows(Table& table) {
@@ -152,7 +171,7 @@ namespace obligraph {
         deduplicateRows(srcSide);
 
         if (srcIndex)
-            probe_with_index(*srcIndex, srcSide);
+            probe_with_index(*srcIndex, srcSide, pool);
         else
             build_and_probe(srcProjected, srcSide, pool);
 
@@ -212,7 +231,7 @@ namespace obligraph {
         }
 
         if (dstIndex)
-            probe_with_index(*dstIndex, dstSide);
+            probe_with_index(*dstIndex, dstSide, pool);
         else
             build_and_probe(dstProjected, dstSide, pool);
         {

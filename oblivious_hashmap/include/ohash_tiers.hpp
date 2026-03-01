@@ -7,7 +7,7 @@
 
 #include "timer.hpp"
 #include <fstream>
-#include <atomic>
+
 
 static long getMemoryUsage()
 {
@@ -24,7 +24,6 @@ namespace ORAM
     {
     private:
         const KeyType n;
-        std::atomic<KeyType> dummy_access_ctr;
         bool _empty;
 
         KeyType bin_size;
@@ -58,6 +57,15 @@ namespace ORAM
         }
 
     public:
+        static KeyType& tl_dummy_ctr() {
+            static thread_local KeyType ctr = 0;
+            return ctr;
+        }
+
+        static void init_dummy_range(KeyType start) {
+            tl_dummy_ctr() = start;
+        }
+
         static std::tuple<KeyType, double> compute_epsilon_inv(
             Block<KeyType, BlockSize> *data,
             const KeyType n,
@@ -127,7 +135,6 @@ namespace ORAM
             // Timer t;
             // for small hash tables with only one bin,
             // we can directly build the cuckoo hash table
-            dummy_access_ctr.store(0, std::memory_order_relaxed);
             _empty = false;
             extracted_data.clear();
             if (this->bin_num == 1)
@@ -204,7 +211,7 @@ namespace ORAM
 
         virtual Block<KeyType, BlockSize> operator[](KeyType key)
         {
-            KeyType local_ctr = dummy_access_ctr.fetch_sub(1, std::memory_order_relaxed) - 1;
+            KeyType local_ctr = --tl_dummy_ctr();
             CMOV(key == KeyType(-1), key, local_ctr);
             if (bin_num > 1)
             {
@@ -216,7 +223,7 @@ namespace ORAM
                 }
                 else
                 {
-                    KeyType dummy_key = dummy_access_ctr.fetch_sub(1, std::memory_order_relaxed) - 1;
+                    KeyType dummy_key = --tl_dummy_ctr();
                     KeyType bin_id = prf(dummy_key);
                     major_bins[bin_id][dummy_key];
                 }
@@ -347,7 +354,6 @@ namespace ORAM
         virtual OHashBase<KeyType, BlockSize> *clone()
         {
             auto ret = new OTwoTierHash<KeyType, BlockSize>(this->n, this->delta_inv_log2, this->epsilon_inv);
-            ret->dummy_access_ctr.store(this->dummy_access_ctr.load(std::memory_order_relaxed), std::memory_order_relaxed);
             ret->_empty = this->_empty;
             ret->bin_size = this->bin_size;
             ret->delta_inv_log2 = this->delta_inv_log2;

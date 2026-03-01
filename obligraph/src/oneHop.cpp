@@ -17,6 +17,7 @@
 // ObliviousBin headers
 #include "ohash_bin.hpp"
 #include "hash_planner.hpp"
+#include "ohash_tiers.hpp"
 
 using namespace std;
 
@@ -47,7 +48,14 @@ namespace obligraph {
     void probe_with_index(NodeIndex& obin, Table& probeT, ThreadPool& pool) {
         ScopedTimer timer("Probe with Pre-built Index");
 
-        auto thread_chunk = [&](int start, int end) {
+        // Each thread needs at most 2 dummy keys per probe row
+        key_t d = 2 * probeT.rowCount;
+
+        auto thread_chunk = [&](int thread_id, int start, int end) {
+            // Assign this thread's disjoint dummy key range: [-(thread_id*d+1), ...]
+            using TwoTier = ORAM::OTwoTierHash<key_t, ROW_BLOCK_SIZE>;
+            TwoTier::init_dummy_range(key_t(0) - key_t(1) - key_t(thread_id) * d);
+
             Row dummyRow;
             dummyRow.setDummy(true);
 
@@ -75,9 +83,9 @@ namespace obligraph {
             auto chunks = obligraph::get_cutoffs_for_thread(i, probeT.rowCount, num_threads);
             if (chunks.first == chunks.second) continue;
             if (i == num_threads - 1) {
-                thread_chunk(chunks.first, chunks.second);
+                thread_chunk(i, chunks.first, chunks.second);
             } else {
-                futures.push_back(pool.submit(thread_chunk, chunks.first, chunks.second));
+                futures.push_back(pool.submit(thread_chunk, i, chunks.first, chunks.second));
             }
         }
 

@@ -239,6 +239,8 @@ def main():
     parser.add_argument('output_dir', type=Path, help='Output directory path')
     parser.add_argument('--seed', type=int, default=None,
                         help='Random seed (default: 42 + num_accounts)')
+    parser.add_argument('--txn-ratio', type=int, default=5,
+                        help='Transaction-to-account ratio (default: 5)')
     parser.add_argument('--streaming', action='store_true',
                         help='Use streaming mode for memory-efficient generation of large datasets')
     parser.add_argument('--quiet', '-q', action='store_true',
@@ -247,12 +249,14 @@ def main():
 
     num_accounts = args.num_accounts
     output_dir = args.output_dir
-    streaming = args.streaming
     quiet = args.quiet
 
-    # Calculate dependent sizes (5:1 ratio for transactions, 1:5 ratio for owners)
-    num_transactions = 5 * num_accounts
+    # Calculate dependent sizes
+    num_transactions = args.txn_ratio * num_accounts
     num_owners = max(1, num_accounts // 5)
+
+    # Auto-enable streaming for large datasets
+    streaming = args.streaming or (num_transactions > 100_000)
 
     # Use seed based on num_accounts for reproducibility across runs
     seed = args.seed if args.seed is not None else 42 + num_accounts

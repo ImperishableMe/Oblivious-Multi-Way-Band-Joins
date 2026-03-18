@@ -119,17 +119,26 @@ def generate_accounts(num_accounts, num_owners, quiet=False):
 
 
 def generate_transactions(accounts, num_transactions, quiet=False):
-    """Generate transaction table with Zipfian distribution."""
+    """Generate transaction table with Zipfian distribution and unique (acc_from, acc_to) pairs."""
     transactions = []
     account_ids = [acc['account_id'] for acc in accounts]
     txn_counts = defaultdict(int)
+    seen_pairs = set()
+    exhausted_sources = set()
 
     for _ in range(num_transactions):
         acc_from = zipfian_choice(account_ids, alpha=1.5)
+        while acc_from in exhausted_sources:
+            acc_from = zipfian_choice(account_ids, alpha=1.5)
 
         acc_to = acc_from
-        while acc_to == acc_from:
+        while acc_to == acc_from or (acc_from, acc_to) in seen_pairs:
             acc_to = random.choice(account_ids)
+
+        seen_pairs.add((acc_from, acc_to))
+        txn_counts[acc_from] += 1
+        if txn_counts[acc_from] >= len(account_ids) - 1:
+            exhausted_sources.add(acc_from)
 
         amount = random.randint(MIN_AMOUNT, MAX_AMOUNT)
         timestamp = random.randint(MIN_TIMESTAMP, MAX_TIMESTAMP)
@@ -140,7 +149,6 @@ def generate_transactions(accounts, num_transactions, quiet=False):
             'amount': amount,
             'txn_time': timestamp
         })
-        txn_counts[acc_from] += 1
 
     if not quiet:
         txn_list = sorted(txn_counts.values(), reverse=True)
@@ -171,12 +179,16 @@ def write_csv(output_dir, filename, data, fieldnames):
 
 
 def generate_transactions_streaming(account_ids, num_transactions, output_dir, batch_size=1_000_000, quiet=False):
-    """Generate transactions in streaming mode to reduce memory usage."""
+    """Generate transactions in streaming mode with unique (acc_from, acc_to) pairs."""
     filepath = output_dir / 'txn.csv'
     fieldnames = ['acc_from', 'acc_to', 'amount', 'txn_time']
 
     # Pre-compute Zipfian distribution for O(log n) sampling
     sampler = ZipfianSampler(account_ids, alpha=1.5)
+    seen_pairs = set()
+    source_counts = defaultdict(int)
+    num_accounts = len(account_ids)
+    exhausted_sources = set()
 
     with open(filepath, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -188,9 +200,17 @@ def generate_transactions_streaming(account_ids, num_transactions, output_dir, b
 
             for _ in range(batch_count):
                 acc_from = sampler.sample()
+                while acc_from in exhausted_sources:
+                    acc_from = sampler.sample()
+
                 acc_to = acc_from
-                while acc_to == acc_from:
+                while acc_to == acc_from or (acc_from, acc_to) in seen_pairs:
                     acc_to = random.choice(account_ids)
+
+                seen_pairs.add((acc_from, acc_to))
+                source_counts[acc_from] += 1
+                if source_counts[acc_from] >= num_accounts - 1:
+                    exhausted_sources.add(acc_from)
 
                 amount = random.randint(MIN_AMOUNT, MAX_AMOUNT)
                 timestamp = random.randint(MIN_TIMESTAMP, MAX_TIMESTAMP)
@@ -254,6 +274,14 @@ def main():
     # Calculate dependent sizes
     num_transactions = args.txn_ratio * num_accounts
     num_owners = max(1, num_accounts // 5)
+
+    # Feasibility check: can't have more unique (from, to) pairs than num_accounts*(num_accounts-1)
+    max_unique_pairs = num_accounts * (num_accounts - 1)
+    if num_transactions > max_unique_pairs:
+        print(f"ERROR: num_transactions ({num_transactions:,}) exceeds maximum unique "
+              f"(acc_from, acc_to) pairs ({max_unique_pairs:,}) for {num_accounts:,} accounts.")
+        print("Reduce --txn-ratio or increase num_accounts.")
+        raise SystemExit(1)
 
     # Auto-enable streaming for large datasets
     streaming = args.streaming or (num_transactions > 100_000)

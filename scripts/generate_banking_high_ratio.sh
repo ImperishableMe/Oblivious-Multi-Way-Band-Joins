@@ -12,13 +12,28 @@ GENERATOR="$SCRIPT_DIR/generate_banking_scaled.py"
 OUT_BASE="$PROJECT_ROOT/input/plaintext/banking_high_ratio"
 TXN_RATIO=1000
 
-declare -A SCALES
-SCALES[100K]=100
-SCALES[200K]=200
-SCALES[500K]=500
-SCALES[1M]=1000
+# Account counts chosen so that:
+# 1. num_accounts*(num_accounts-1) > num_transactions (unique pair feasibility)
+# 2. num_transactions % num_accounts == 0 (exact txn-ratio)
+# 3. Fill factor ~40-50% for fast rejection-free generation
+declare -A ACCOUNTS
+ACCOUNTS[100K]=500
+ACCOUNTS[200K]=625
+ACCOUNTS[500K]=1000
+ACCOUNTS[1M]=1600
+ACCOUNTS[5M]=3125
+ACCOUNTS[10M]=5000
 
-ORDERED_KEYS=("100K" "200K" "500K" "1M")
+# Transaction counts (the defining feature of each dataset)
+declare -A TXNS
+TXNS[100K]=100000
+TXNS[200K]=200000
+TXNS[500K]=500000
+TXNS[1M]=1000000
+TXNS[5M]=5000000
+TXNS[10M]=10000000
+
+ORDERED_KEYS=("100K" "200K" "500K" "1M" "5M" "10M")
 
 echo "========================================"
 echo " Banking High-Ratio Dataset Generator"
@@ -28,12 +43,13 @@ echo "========================================"
 echo ""
 
 for key in "${ORDERED_KEYS[@]}"; do
-    num_accounts=${SCALES[$key]}
-    num_txn=$((num_accounts * TXN_RATIO))
+    num_accounts=${ACCOUNTS[$key]}
+    num_txn=${TXNS[$key]}
+    txn_ratio=$((num_txn / num_accounts))
     out_dir="$OUT_BASE/banking_${key}_txn"
 
-    echo "--- Generating ${key} transactions (${num_accounts} accounts x ${TXN_RATIO}) ---"
-    python3 "$GENERATOR" "$num_accounts" "$out_dir" --txn-ratio "$TXN_RATIO" --quiet
+    echo "--- Generating ${key} transactions (${num_accounts} accounts, ratio ${txn_ratio}) ---"
+    python3 "$GENERATOR" "$num_accounts" "$out_dir" --txn-ratio "$txn_ratio" --quiet
 
     # Verify row counts (header + data rows + sentinel = expected + 2)
     expected_acct=$((num_accounts + 2))

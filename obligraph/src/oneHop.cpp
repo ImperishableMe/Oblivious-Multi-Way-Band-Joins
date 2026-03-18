@@ -51,7 +51,18 @@ namespace obligraph {
         // Each thread needs at most 2 dummy keys per probe row
         key_t d = 2 * probeT.rowCount;
 
+        struct ThreadTiming {
+            int thread_id;
+            int rows;
+            double ms;
+        };
+        // Use half the threads since src and dst probes run concurrently
+        int num_threads = std::max(1, obligraph::number_of_threads.load() / 2);
+        std::vector<ThreadTiming> timings(num_threads);
+
         auto thread_chunk = [&](int thread_id, int start, int end) {
+            auto t0 = std::chrono::high_resolution_clock::now();
+
             // Assign this thread's disjoint dummy key range: [-(thread_id*d+1), ...]
             using TwoTier = ORAM::OTwoTierHash<key_t, ROW_BLOCK_SIZE>;
             TwoTier::init_dummy_range(key_t(0) - key_t(1) - key_t(thread_id) * d);
@@ -74,9 +85,12 @@ namespace obligraph {
                     matchedRow
                 );
             }
+
+            auto t1 = std::chrono::high_resolution_clock::now();
+            timings[thread_id] = {thread_id, end - start,
+                std::chrono::duration<double, std::milli>(t1 - t0).count()};
         };
 
-        int num_threads = obligraph::number_of_threads.load();
         std::vector<std::future<void>> futures;
 
         for (int i = 0; i < num_threads; i++) {
@@ -91,6 +105,18 @@ namespace obligraph {
 
         for (auto& fut : futures) {
             fut.get();
+        }
+
+        // Print per-thread timing
+        std::cout << "[PROBE] Per-thread timing (" << num_threads << " threads, "
+                  << probeT.rowCount << " rows):" << std::endl;
+        for (int i = 0; i < num_threads; i++) {
+            if (timings[i].rows == 0) continue;
+            std::cout << "  thread " << timings[i].thread_id
+                      << ": " << timings[i].ms << " ms"
+                      << " (" << timings[i].rows << " rows, "
+                      << (timings[i].rows / (timings[i].ms / 1000.0)) << " rows/s)"
+                      << std::endl;
         }
     }
 
@@ -280,13 +306,9 @@ namespace obligraph {
                                   std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
         auto futureRev = std::async(std::launch::async, buildDestinationTable,
                                   std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
-        //
-        //// Wait for both results
+
         Table edgeProjectedFwd = futureFwd.get();
         Table edgeProjectedRev = futureRev.get();
-
-        // Table edgeProjectedFwd = buildSourceAndEdgeTables(catalog, query);
-        // Table edgeProjectedRev = buildDestinationTable(catalog, query, pool);
         edgeProjectedFwd.unionWith(edgeProjectedRev, pool);
 
         // Detect self-referential join

@@ -65,7 +65,8 @@ int main(int argc, char* argv[]) {
 
     try {
         // Set thread count to all available hardware threads
-        obligraph::number_of_threads.store(std::thread::hardware_concurrency());
+        int nthreads = std::thread::hardware_concurrency();
+        obligraph::number_of_threads.store(nthreads);
         cout << "Using " << obligraph::number_of_threads.load() << " threads" << endl;
 
         auto startTotal = chrono::high_resolution_clock::now();

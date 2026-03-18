@@ -48,18 +48,29 @@ def generate_dataset(output_dir):
             writer.writerow([i, balance, owner_id])
         writer.writerow([SENTINEL, SENTINEL, SENTINEL])
 
-    # Generate transactions
+    # Feasibility check
+    max_unique_pairs = NUM_ACCOUNTS * (NUM_ACCOUNTS - 1)
+    if NUM_TRANSACTIONS > max_unique_pairs:
+        print(f"ERROR: NUM_TRANSACTIONS ({NUM_TRANSACTIONS}) exceeds maximum unique "
+              f"(acc_from, acc_to) pairs ({max_unique_pairs}) for {NUM_ACCOUNTS} accounts.")
+        return
+
+    # Generate transactions with unique (acc_from, acc_to) pairs
     print(f"Generating {NUM_TRANSACTIONS} transactions...")
     txn_file = os.path.join(output_dir, "txn.csv")
+    seen_pairs = set()
     with open(txn_file, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['acc_from', 'acc_to', 'amount', 'txn_time'])
         for _ in range(NUM_TRANSACTIONS):
             acc_from = random.randint(1, NUM_ACCOUNTS)
             acc_to = random.randint(1, NUM_ACCOUNTS)
-            # Ensure acc_from != acc_to
-            while acc_to == acc_from:
+            while acc_to == acc_from or (acc_from, acc_to) in seen_pairs:
+                acc_from = random.randint(1, NUM_ACCOUNTS)
                 acc_to = random.randint(1, NUM_ACCOUNTS)
+                while acc_to == acc_from:
+                    acc_to = random.randint(1, NUM_ACCOUNTS)
+            seen_pairs.add((acc_from, acc_to))
             amount = random.randint(100, 100_000)
             txn_time = random.randint(1, 500_000)
             writer.writerow([acc_from, acc_to, amount, txn_time])

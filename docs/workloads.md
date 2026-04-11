@@ -24,6 +24,105 @@ NebulaDB needs 3 diverse workloads for a SIGMOD/VLDB evaluation: a financial gra
 
 **Files to modify**: `scripts/generate_banking_scaled.py` (if needed)
 
+### Query Suite (Banking)
+
+#### Category A: k-hop Chain Queries (5 queries)
+
+- **`banking_1hop.sql`** — 1-hop: direct transactions from a filtered account (3 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t, account AS a2
+  WHERE a1.account_id = t.acc_from AND a2.account_id = t.acc_to
+    AND a1.balance > 10000;
+  ```
+- **`banking_2hop.sql`** — 2-hop chain (5 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2, txn AS t2, account AS a3
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a1.owner_id = 52 AND a3.owner_id = 45;
+  ```
+- **`banking_3hop.sql`** — 3-hop chain (7 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2, txn AS t2, account AS a3, txn AS t3, account AS a4
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a3.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a1.owner_id = 52 AND a4.owner_id = 45;
+  ```
+- **`banking_4hop.sql`** — 4-hop chain (9 tables, exists as `banking_chain4_filtered.sql`)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2, txn AS t2, account AS a3, txn AS t3, account AS a4, txn AS t4, account AS a5
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a3.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a4.account_id = t4.acc_from AND a5.account_id = t4.acc_to
+    AND a1.owner_id = 52 AND a5.owner_id = 45;
+  ```
+- **`banking_5hop.sql`** — 5-hop chain (11 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2, txn AS t2, account AS a3, txn AS t3, account AS a4, txn AS t4, account AS a5, txn AS t5, account AS a6
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a3.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a4.account_id = t4.acc_from AND a5.account_id = t4.acc_to
+    AND a5.account_id = t5.acc_from AND a6.account_id = t5.acc_to
+    AND a1.owner_id = 52 AND a6.owner_id = 45;
+  ```
+
+#### Category B: Star Query — Smurfing Detection (1 query)
+
+Detects the "smurfing" money laundering pattern: a single high-balance account distributing funds to 4 separate recipients simultaneously.
+
+```
+             (a3)
+              ^
+              |
+            [t2]
+              |
+(a2) <--[t1]-- (a1) --[t3]--> (a4)
+              |
+            [t4]
+              |
+              v
+             (a5)
+```
+
+**Decomposition**: 9-way MWJ → 4 ForwardFill hops + 4-way reduced MWJ. Each branch `(a1)→[ti]→(ai)` is an independent hop. ForwardFill is computed once on `(account, txn, account)` and reused as 4 aliases. The reduced MWJ joins on the shared source `a1.account_id`.
+
+- **`banking_star4.sql`** — 4-branch star (9 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2,
+               txn AS t2, account AS a3,
+               txn AS t3, account AS a4,
+               txn AS t4, account AS a5
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a1.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a1.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a1.account_id = t4.acc_from AND a5.account_id = t4.acc_to
+    AND a1.balance > 50000;
+  ```
+
+#### Category C: Tree Query (1 query)
+
+Combines chain and branch: from a flagged account, follow one transaction to an intermediary, then trace two independent paths — one direct transfer and one 2-hop chain. Detects tree-shaped fund distribution.
+
+- **`banking_tree.sql`** — Tree pattern (9 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2,
+               txn AS t2, account AS a3,
+               txn AS t3, account AS a4, txn AS t4, account AS a5
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a2.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a4.account_id = t4.acc_from AND a5.account_id = t4.acc_to
+    AND a1.owner_id = 52;
+  ```
+
+### Files to Create
+- `input/queries/banking_1hop.sql` through `banking_5hop.sql` — chain queries (5 files)
+- `input/queries/banking_star4.sql` — 4-branch star query
+- `input/queries/banking_tree.sql` — tree pattern query
+
 ---
 
 ## W2: Social Network — LDBC SNB
@@ -309,43 +408,11 @@ A cited patent has two independent reference chains. Tests bushy join tree decom
 
 ---
 
-## W4: Controlled Synthetic Graphs (for sensitivity experiments)
-
-For experiments E5 (degree distribution) and E7 (edge-to-node ratio), we need graphs with precise control over parameters.
-
-### Controlled Degree Distribution Generator
-
-Generate a graph with exactly N_edges edges, where the degree of each node follows a specified distribution:
-- **Uniform**: Every node has the same degree (N_edges / N_nodes)
-- **Zipfian**: Degree ~ Zipf(alpha), alpha in {1.0, 1.5, 2.0}
-- **Power-law**: Degree ~ Pareto(alpha=2.1), matching real social networks
-
-All use the same total edge count (e.g., 1M) so comparisons are fair.
-
-### Variable Ratio Generator
-
-Fix total edges at 1M, vary edges-per-node:
-| Ratio | Nodes | Edges |
-|-------|-------|-------|
-| 2x | 500K | 1M |
-| 5x | 200K | 1M |
-| 10x | 100K | 1M |
-| 25x | 40K | 1M |
-| 50x | 20K | 1M |
-| 100x | 10K | 1M |
-
-### Files to Create
-- `scripts/generate_controlled_degree.py` — parameterized graph generator
-- Output directories under `input/plaintext/synthetic_*/`
-
----
-
 ## Implementation Order
 
 1. **Verify W1** at 10M edge scale (quick — just run existing generator)
 2. **Build W3 (SNAP)** — simpler pipeline (just download + convert, no external tool deps)
 3. **Build W2 (LDBC)** — requires LDBC datagen setup (Java/Spark dependency)
-4. **Build W4 (Synthetic)** — straightforward Python generator
 
 ### Verification for Each Workload
 - [ ] Generated CSVs parse correctly (header, correct column count, all values int32)

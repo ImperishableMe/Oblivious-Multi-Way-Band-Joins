@@ -330,7 +330,9 @@ namespace obligraph {
                 allPredicates.push_back(qualifiedPred);
             }
         }
-        edgeProjectedFwd.filter(allPredicates, pool);
+        if (!allPredicates.empty()) {
+            edgeProjectedFwd.filter(allPredicates, pool);
+        }
 
         // If no projection columns specified, return all columns (skip projection)
         if (query.projectionColumns.empty()) {
@@ -408,7 +410,9 @@ namespace obligraph {
                 allPredicates.push_back(qualifiedPred);
             }
         }
-        edgeProjectedFwd.filter(allPredicates, pool);
+        if (!allPredicates.empty()) {
+            edgeProjectedFwd.filter(allPredicates, pool);
+        }
 
         if (query.projectionColumns.empty()) {
             return edgeProjectedFwd;

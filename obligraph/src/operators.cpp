@@ -8,7 +8,26 @@ namespace obligraph {
 
     Table Table::project(const vector<string>& columnNames, ThreadPool &pool) const {
         ScopedTimer timer("Projecting Table: " + this->name);
-        
+
+        // Fast path: if all columns are requested in the same order they appear in
+        // the schema, no column needs to be filtered or repositioned.  A single bulk
+        // copy of the row vector is O(n) with one allocation and one contiguous
+        // memcpy, far cheaper than the per-row per-column approach below.
+        bool isIdentityProjection = (columnNames.size() == schema.columnMetas.size());
+        if (isIdentityProjection) {
+            for (size_t i = 0; i < columnNames.size(); i++) {
+                if (columnNames[i] != schema.columnMetas[i].name) {
+                    isIdentityProjection = false;
+                    break;
+                }
+            }
+        }
+        if (isIdentityProjection) {
+            Table projectedTable = *this;          // copies schema + rows in one shot
+            projectedTable.name = this->name + "_projected";
+            return projectedTable;
+        }
+
         // Create new table for projection
         Table projectedTable;
         projectedTable.name = this->name + "_projected";

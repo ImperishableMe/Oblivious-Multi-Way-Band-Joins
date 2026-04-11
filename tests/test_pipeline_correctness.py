@@ -41,14 +41,15 @@ from rewrite_chain_query import rewrite_query  # noqa: E402
 # Expected output schema
 # ---------------------------------------------------------------------------
 # sgx_app prefixes each hop's columns with the alias (h1., h2.).
-# Column order within each hop matches hop.csv column order, which is
-# alphabetical (acc_from, acc_to, amount, txn_id, txn_time, account_src_*,
-# account_dest_*) because obligraph projects edge columns through a set<string>.
+# Column order within each hop matches hop.csv column order, which follows
+# the original CSV schema order (txn_id, acc_from, acc_to, amount, txn_time,
+# account_src_*, account_dest_*) because obligraph skips projection entirely
+# when all columns are selected, preserving the original schema order.
 HOP_COLUMNS = [
+    "txn_id",
     "acc_from",
     "acc_to",
     "amount",
-    "txn_id",
     "txn_time",
     "account_src_account_id",
     "account_src_balance",

@@ -37,13 +37,13 @@ import tempfile
 # Expected output schema (must match the column order that oneHop produces)
 # ---------------------------------------------------------------------------
 # Column order matches the oneHop output exactly.
-# Edge columns are projected through a set<string> internally, so they appear
-# in alphabetical order: acc_from, acc_to, amount, txn_id, txn_time.
+# Edge columns preserve the original CSV schema order (txn_id, acc_from, ...)
+# because oneHop skips projection entirely when all columns are selected.
 EXPECTED_COLUMNS = [
+    "txn_id",
     "acc_from",
     "acc_to",
     "amount",
-    "txn_id",
     "txn_time",
     "account_src_account_id",
     "account_src_balance",
@@ -126,9 +126,9 @@ def run_sqlite_baseline(data_dir: str) -> list:
             )
 
     # Equivalent one-hop query: (account) -[txn]-> (account)
-    # Column order matches EXPECTED_COLUMNS exactly.
-    # Edge columns come first in alphabetical order (acc_from, acc_to, amount, txn_id, txn_time)
-    # because oneHop projects them through a set<string> internally.
+    # Column order in the SELECT matches EXPECTED_COLUMNS (txn_id first, original schema order).
+    # SQLite rows are compared as dicts so column ordering in the query doesn't matter
+    # for correctness, but keeping it consistent makes check_schema work correctly.
     cur.execute(
         """
         SELECT

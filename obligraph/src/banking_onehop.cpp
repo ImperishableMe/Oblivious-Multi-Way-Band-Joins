@@ -81,9 +81,17 @@ int main(int argc, char* argv[]) {
             "account_id"
         );
 
+        // TODO: Use txn_id as the primary key of the edge table instead of the (acc_from, acc_to)
+        // composite key. This would simplify internal processing significantly — deduplication
+        // in the one-hop algorithm and index lookup would be cleaner with a unique scalar key.
+        //
+        // NOTE: acc_from and acc_to are declared as int32 (not int64) to stay within the 48-byte
+        // ROW_DATA_MAX_SIZE limit. Account IDs in the banking dataset are small integers (well within
+        // int32 range), so this is safe. The original int64 typing was unnecessarily wide and left no
+        // room for additional columns (the full hop schema without txn_id already consumed all 48 bytes).
         catalog.importEdgeFromCSV(
             dataDir + "/txn.csv", ',',
-            {{"acc_from", "int64"}, {"acc_to", "int64"}, {"amount", "int32"}, {"txn_time", "int32"}},
+            {{"txn_id", "int32"}, {"acc_from", "int32"}, {"acc_to", "int32"}, {"amount", "int32"}, {"txn_time", "int32"}},
             "account", "txn", "account",
             "acc_from", "acc_to"
         );

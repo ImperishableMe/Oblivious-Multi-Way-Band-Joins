@@ -31,6 +31,12 @@ See `TDX_MIGRATION_SUMMARY.md` for complete migration details.
 ## Testing Rules
 - **NO PIPELINES IN TESTS**: Run test commands WITHOUT pipelines for proper debugging
 - **All tests must go to test folder**, isolated from the main implementation
+- **ALWAYS run both correctness tests after ANY optimization or refactoring** before considering the work done. These are the regression tests for the oneHop pipeline:
+  1. oneHop test: `python3 tests/test_onehop_correctness.py input/plaintext/banking_1k obligraph/build/banking_onehop`
+  2. Pipeline test: `python3 tests/test_pipeline_correctness.py input/plaintext/banking_1k obligraph/build/banking_onehop ./sgx_app`
+  - This applies to ANY change touching `obligraph/src/`, `app/algorithms/`, `app/core_logic/`, or any other code in the oneHop or sgx_app execution path
+  - Do not skip even if the change looks obviously safe
+  - Note: `banking_onehop` is built separately via CMake — run `cmake --build obligraph/build --target banking_onehop` after changing `obligraph/src/`
 
 ## Compilation Rules
 - **ALWAYS compile using separate commands from the project root**:

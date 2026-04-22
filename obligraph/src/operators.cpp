@@ -7,8 +7,6 @@
 namespace obligraph {
 
     Table Table::project(const vector<string>& columnNames, ThreadPool &pool) const {
-        ScopedTimer timer("Projecting Table: " + this->name);
-
         // Fast path: if all columns are requested in the same order they appear in
         // the schema, no column needs to be filtered or repositioned.  A single bulk
         // copy of the row vector is O(n) with one allocation and one contiguous
@@ -134,8 +132,6 @@ namespace obligraph {
         return projectedTable;
     }
     void Table::filter(const vector<Predicate>& predicates, ThreadPool& pool) {
-        ScopedTimer timer("Filtering Table: " + this->name);
-
         vector<uint8_t> rowPasses(this->rows.size(), true);
 
         auto thread_chunk = [&](int start, int end) {
@@ -188,17 +184,13 @@ namespace obligraph {
             fut.get();
         }
 
-        int filteredCount = 0;
-        {
-            ScopedTimer timer("Oblivious Compact");
-            filteredCount = obligraph::parallel_o_compact(this->rows.begin(), this->rows.end(), pool, rowPasses.data(), pool.size());
-        }
+        int filteredCount = obligraph::parallel_o_compact(
+            this->rows.begin(), this->rows.end(), pool, rowPasses.data(), pool.size());
         this->rows.resize(filteredCount);
         this->rowCount = filteredCount;
     }
 
     void Table::unionWith(const Table& other, ThreadPool& pool, const string& columnPrefix) {
-        ScopedTimer timer("Union Table: " + this->name + " with " + other.name);
         // Verify both tables have the same number of rows
         if (this->rowCount != other.rowCount) {
             // show the table names and row counts

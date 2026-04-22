@@ -36,9 +36,6 @@ MAX_AMOUNT = 100_000
 MIN_TIMESTAMP = 1
 MAX_TIMESTAMP = 365000
 
-# Sentinel value for last row
-SENTINEL = -10000
-
 
 class ZipfianSampler:
     """Pre-computed Zipfian distribution for fast O(log n) sampling."""
@@ -144,6 +141,7 @@ def generate_transactions(accounts, num_transactions, quiet=False):
         timestamp = random.randint(MIN_TIMESTAMP, MAX_TIMESTAMP)
 
         transactions.append({
+            'txn_id': len(transactions) + 1,
             'acc_from': acc_from,
             'acc_to': acc_to,
             'amount': amount,
@@ -165,23 +163,19 @@ def generate_transactions(accounts, num_transactions, quiet=False):
 
 
 def write_csv(output_dir, filename, data, fieldnames):
-    """Write data to CSV file with sentinel row."""
+    """Write data to CSV file with Unix line endings (required by the C++ CSV parser)."""
     filepath = output_dir / filename
 
     with open(filepath, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator='\n')
         writer.writeheader()
         writer.writerows(data)
-
-        # Add sentinel row
-        sentinel_row = {field: SENTINEL for field in fieldnames}
-        writer.writerow(sentinel_row)
 
 
 def generate_transactions_streaming(account_ids, num_transactions, output_dir, batch_size=1_000_000, quiet=False):
     """Generate transactions in streaming mode with unique (acc_from, acc_to) pairs."""
     filepath = output_dir / 'txn.csv'
-    fieldnames = ['acc_from', 'acc_to', 'amount', 'txn_time']
+    fieldnames = ['txn_id', 'acc_from', 'acc_to', 'amount', 'txn_time']
 
     # Pre-compute Zipfian distribution for O(log n) sampling
     sampler = ZipfianSampler(account_ids, alpha=1.5)
@@ -191,7 +185,7 @@ def generate_transactions_streaming(account_ids, num_transactions, output_dir, b
     exhausted_sources = set()
 
     with open(filepath, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator='\n')
         writer.writeheader()
 
         written = 0
@@ -215,20 +209,17 @@ def generate_transactions_streaming(account_ids, num_transactions, output_dir, b
                 amount = random.randint(MIN_AMOUNT, MAX_AMOUNT)
                 timestamp = random.randint(MIN_TIMESTAMP, MAX_TIMESTAMP)
 
+                written += 1
                 writer.writerow({
+                    'txn_id': written,
                     'acc_from': acc_from,
                     'acc_to': acc_to,
                     'amount': amount,
                     'txn_time': timestamp
                 })
 
-            written += batch_count
             if not quiet:
                 print(f"  Written {written:,}/{num_transactions:,} transactions ({100*written//num_transactions}%)")
-
-        # Add sentinel row
-        sentinel_row = {field: SENTINEL for field in fieldnames}
-        writer.writerow(sentinel_row)
 
     if not quiet:
         print(f"Generated {num_transactions:,} transactions (streaming mode)")
@@ -257,8 +248,8 @@ def main():
     )
     parser.add_argument('num_accounts', type=int, help='Number of accounts to generate')
     parser.add_argument('output_dir', type=Path, help='Output directory path')
-    parser.add_argument('--seed', type=int, default=None,
-                        help='Random seed (default: 42 + num_accounts)')
+    parser.add_argument('--seed', type=int, default=42,
+                        help='Random seed (default: 42)')
     parser.add_argument('--txn-ratio', type=int, default=5,
                         help='Transaction-to-account ratio (default: 5)')
     parser.add_argument('--streaming', action='store_true',
@@ -286,9 +277,7 @@ def main():
     # Auto-enable streaming for large datasets
     streaming = args.streaming or (num_transactions > 100_000)
 
-    # Use seed based on num_accounts for reproducibility across runs
-    seed = args.seed if args.seed is not None else 42 + num_accounts
-    random.seed(seed)
+    random.seed(args.seed)
 
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -328,7 +317,7 @@ def main():
         validate_data(accounts, transactions)
         if not quiet:
             print("\n✓ All data validated successfully!")
-        write_csv(output_dir, 'txn.csv', transactions, ['acc_from', 'acc_to', 'amount', 'txn_time'])
+        write_csv(output_dir, 'txn.csv', transactions, ['txn_id', 'acc_from', 'acc_to', 'amount', 'txn_time'])
 
     if not quiet:
         print("\n" + "=" * 60)

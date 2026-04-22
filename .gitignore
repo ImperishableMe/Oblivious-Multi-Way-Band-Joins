@@ -73,6 +73,7 @@ plaintext/data_1/
 encrypted/data_0_1/
 encrypted/data_1/
 raw_data/
+input/plaintext/banking_*/
 
 # Keep important files
 !Makefile

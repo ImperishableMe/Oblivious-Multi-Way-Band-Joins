@@ -23,7 +23,7 @@ using namespace std;
 
 namespace obligraph {
     std::unique_ptr<NodeIndex> buildNodeIndex(const Table& table, size_t op_num) {
-        ScopedTimer timer("buildNodeIndex");
+        TimedScope ts("buildNodeIndex", "OFFLINE");
 
         std::cout << "[INFO] Row size: " << sizeof(Row)
                   << " bytes, RowBlock size: " << ROW_BLOCK_SIZE
@@ -45,25 +45,14 @@ namespace obligraph {
         return index;
     }
 
-    void probe_with_index(NodeIndex& obin, Table& probeT, ThreadPool& pool) {
-        ScopedTimer timer("Probe with Pre-built Index");
+    void probe_with_index(NodeIndex& obin, Table& probeT, ThreadPool& pool,
+                          const std::string& label) {
+        TimedScope ts("probe " + label, "ONLINE");
 
-        // Each thread needs at most 2 dummy keys per probe row
         key_t d = 2 * probeT.rowCount;
-
-        struct ThreadTiming {
-            int thread_id;
-            int rows;
-            double ms;
-        };
-        // Use half the threads since src and dst probes run concurrently
         int num_threads = std::max(1, obligraph::number_of_threads.load() / 2);
-        std::vector<ThreadTiming> timings(num_threads);
 
         auto thread_chunk = [&](int thread_id, int start, int end) {
-            auto t0 = std::chrono::high_resolution_clock::now();
-
-            // Assign this thread's disjoint dummy key range: [-(thread_id*d+1), ...]
             using TwoTier = ORAM::OTwoTierHash<key_t, ROW_BLOCK_SIZE>;
             TwoTier::init_dummy_range(key_t(0) - key_t(1) - key_t(thread_id) * d);
 
@@ -85,45 +74,29 @@ namespace obligraph {
                     matchedRow
                 );
             }
-
-            auto t1 = std::chrono::high_resolution_clock::now();
-            timings[thread_id] = {thread_id, end - start,
-                std::chrono::duration<double, std::milli>(t1 - t0).count()};
         };
 
         std::vector<std::future<void>> futures;
-
         for (int i = 0; i < num_threads; i++) {
             auto chunks = obligraph::get_cutoffs_for_thread(i, probeT.rowCount, num_threads);
             if (chunks.first == chunks.second) continue;
-            if (i == num_threads - 1) {
+            if (i == num_threads - 1)
                 thread_chunk(i, chunks.first, chunks.second);
-            } else {
+            else
                 futures.push_back(pool.submit(thread_chunk, i, chunks.first, chunks.second));
-            }
         }
+        for (auto& fut : futures) fut.get();
+    }
 
-        for (auto& fut : futures) {
-            fut.get();
-        }
-
-        // Print per-thread timing
-        std::cout << "[PROBE] Per-thread timing (" << num_threads << " threads, "
-                  << probeT.rowCount << " rows):" << std::endl;
-        for (int i = 0; i < num_threads; i++) {
-            if (timings[i].rows == 0) continue;
-            std::cout << "  thread " << timings[i].thread_id
-                      << ": " << timings[i].ms << " ms"
-                      << " (" << timings[i].rows << " rows, "
-                      << (timings[i].rows / (timings[i].ms / 1000.0)) << " rows/s)"
-                      << std::endl;
-        }
+    // Legacy overload (no label) — used by build_and_probe.
+    void probe_with_index(NodeIndex& obin, Table& probeT, ThreadPool& pool) {
+        probe_with_index(obin, probeT, pool, "");
     }
 
     void build_and_probe(const Table& buildT, Table &probeT, ThreadPool& pool) {
-        ScopedTimer timer("Build and Probe (ObliviousBin)");
+        TimedScope ts("build_and_probe", "ONLINE");
         auto index = buildNodeIndex(buildT, probeT.rowCount);
-        probe_with_index(*index, probeT, pool);
+        probe_with_index(*index, probeT, pool, "");
     }
 
     void deduplicateRows(Table& table) {
@@ -132,8 +105,11 @@ namespace obligraph {
 
         for (size_t i = 0; i < table.rows.size(); ++i) {
             key_t currentKey = table.rows[i].key.first;
-            // Generate dummy key without MSB set (MSB reserved for ObliviousBin dummy marking)
-            dummy = static_cast<key_t>(random()) & ~DUMMY_KEY_MSB;
+            // Generate dummy key without MSB set (MSB reserved for ObliviousBin dummy marking).
+            // Offset by 2^31 to ensure lower 32 bits are in [2^31, 2^32-1], which is safely
+            // above any valid account ID (small positive integers), preventing accidental
+            // ORAM entry consumption for real account IDs.
+            dummy = (static_cast<key_t>(random()) + (key_t(1) << 31)) & ~DUMMY_KEY_MSB;
             table.rows[i].key.first = ObliviousChoose(lastKey == currentKey, dummy, currentKey);
             table.rows[i].setDummy(lastKey == currentKey);
             lastKey = currentKey;
@@ -145,46 +121,51 @@ namespace obligraph {
         for (size_t i = 0; i < table.rows.size(); ++i) {
             auto secKey = table.rows[i].key.second;
             table.rows[i] = ObliviousChoose(table.rows[i].isDummy(), lastRow, table.rows[i]);
-            table.rows[i].key.second = secKey; // Restore the second key
+            table.rows[i].key.second = secKey;
             lastRow = table.rows[i];
         }
     }
 
     Table buildSourceAndEdgeTables(Catalog& catalog, const OneHopQuery& query,
-                                    ThreadPool &pool, NodeIndex* srcIndex = nullptr) {
-        ScopedTimer timer("Building Source and Edge Tables");
+                                    ThreadPool &pool, NodeIndex* srcIndex) {
+        TimedScope ts_total("src branch (total)", "ONLINE");
 
-        // For self-referential joins, use "_src" suffix to distinguish from destination
         string srcPrefix = query.sourceNodeTableName;
-        if (query.sourceNodeTableName == query.destNodeTableName) {
+        if (query.sourceNodeTableName == query.destNodeTableName)
             srcPrefix += "_src";
-        }
 
         if (query.projectionColumns.empty()) {
-            // Fast path: all columns requested — reference catalog table directly, no projection copy.
             const Table& srcRef = catalog.getTable(query.sourceNodeTableName);
             Table edgeTableFwd = catalog.getTable(query.edgeTableName + "_fwd");
 
             Table srcSide;
             srcSide.init(srcRef);
             srcSide.rows.reserve(edgeTableFwd.rowCount);
-            for (size_t i = 0; i < edgeTableFwd.rowCount; i++) {
-                srcSide.addRow(Row());
-                srcSide.rows[i].key = edgeTableFwd.rows[i].key;
+            {
+                TimedScope ts("deduplicateRows (src)", "ONLINE");
+                for (size_t i = 0; i < edgeTableFwd.rowCount; i++) {
+                    srcSide.addRow(Row());
+                    srcSide.rows[i].key = edgeTableFwd.rows[i].key;
+                }
+                deduplicateRows(srcSide);
             }
-            deduplicateRows(srcSide);
 
             if (srcIndex)
-                probe_with_index(*srcIndex, srcSide, pool);
+                probe_with_index(*srcIndex, srcSide, pool, "src");
             else
                 build_and_probe(srcRef, srcSide, pool);
 
-            reduplicateRows(srcSide);
-            edgeTableFwd.unionWith(srcSide, pool, srcPrefix);
+            {
+                TimedScope ts("reduplicateRows (src)", "ONLINE");
+                reduplicateRows(srcSide);
+            }
+            {
+                TimedScope ts("unionWith (src)", "ONLINE");
+                edgeTableFwd.unionWith(srcSide, pool, srcPrefix);
+            }
             return edgeTableFwd;
         }
 
-        // Slow path: explicit column subset requested — project to the requested columns.
         set<string> srcColumns;
         set<string> edgeColumns;
 
@@ -193,20 +174,16 @@ namespace obligraph {
 
         for (const auto& col : query.projectionColumns) {
             if (col.first == query.sourceNodeTableName ||
-                (col.first.length() > 4 && col.first.substr(col.first.length() - 4) == "_src")) {
+                (col.first.length() > 4 && col.first.substr(col.first.length() - 4) == "_src"))
                 srcColumns.insert(col.second);
-            } else if (col.first == query.edgeTableName) {
+            else if (col.first == query.edgeTableName)
                 edgeColumns.insert(col.second);
-            }
         }
-
-        // Include columns needed for predicates
         for (const auto& tablePred : query.tablePredicates) {
-            if (tablePred.first == query.sourceNodeTableName) {
+            if (tablePred.first == query.sourceNodeTableName)
                 for (const auto& pred : tablePred.second) srcColumns.insert(pred.column);
-            } else if (tablePred.first == query.edgeTableName) {
+            else if (tablePred.first == query.edgeTableName)
                 for (const auto& pred : tablePred.second) edgeColumns.insert(pred.column);
-            }
         }
 
         Table srcProjected = srcTable.project(vector<string>(srcColumns.begin(), srcColumns.end()), pool);
@@ -215,41 +192,46 @@ namespace obligraph {
         Table srcSide;
         srcSide.init(srcProjected);
         srcSide.rows.reserve(edgeProjectedFwd.rowCount);
-        for (size_t i = 0; i < edgeProjectedFwd.rowCount; i++) {
-            srcSide.addRow(Row());
-            srcSide.rows[i].key = edgeProjectedFwd.rows[i].key;
+        {
+            TimedScope ts("deduplicateRows (src)", "ONLINE");
+            for (size_t i = 0; i < edgeProjectedFwd.rowCount; i++) {
+                srcSide.addRow(Row());
+                srcSide.rows[i].key = edgeProjectedFwd.rows[i].key;
+            }
+            deduplicateRows(srcSide);
         }
-        deduplicateRows(srcSide);
 
         if (srcIndex)
-            probe_with_index(*srcIndex, srcSide, pool);
+            probe_with_index(*srcIndex, srcSide, pool, "src");
         else
             build_and_probe(srcProjected, srcSide, pool);
 
-        reduplicateRows(srcSide);
-        edgeProjectedFwd.unionWith(srcSide, pool, srcPrefix);
+        {
+            TimedScope ts("reduplicateRows (src)", "ONLINE");
+            reduplicateRows(srcSide);
+        }
+        {
+            TimedScope ts("unionWith (src)", "ONLINE");
+            edgeProjectedFwd.unionWith(srcSide, pool, srcPrefix);
+        }
         return edgeProjectedFwd;
     }
 
     Table buildDestinationTable(Catalog& catalog, const OneHopQuery& query,
-                                ThreadPool& pool, NodeIndex* dstIndex = nullptr) {
-        ScopedTimer timer("Building Destination Table");
+                                ThreadPool& pool, NodeIndex* dstIndex) {
+        TimedScope ts_total("dst branch (total)", "ONLINE");
 
-        // For self-referential joins, use "_dest" suffix to distinguish from source
         string dstPrefix = query.destNodeTableName;
-        if (query.sourceNodeTableName == query.destNodeTableName) {
+        if (query.sourceNodeTableName == query.destNodeTableName)
             dstPrefix += "_dest";
-        }
 
         Table edgeTableRev = catalog.getTable(query.edgeTableName + "_rev");
 
         auto doSortAndReturn = [&]() -> Table {
-            ScopedTimer timerSort("Sorting Edge Table");
+            TimedScope ts("parallel_sort (dst)", "ONLINE");
             parallel_sort(edgeTableRev.rows.begin(), edgeTableRev.rows.end(),
                 pool,
                 [](const Row& a, const Row& b) {
-                    // Oblivious two-level comparator: always evaluate both conditions,
-                    // select result with ObliviousChoose (cmov) to avoid data-dependent branches.
                     bool eq  = (a.key.second == b.key.second);
                     bool lt2 = (a.key.second <  b.key.second);
                     bool lt1 = (a.key.first  <  b.key.first);
@@ -261,12 +243,11 @@ namespace obligraph {
         };
 
         if (query.projectionColumns.empty()) {
-            // Fast path: all columns requested — reference catalog table directly, no projection copy.
             const Table& dstRef = catalog.getTable(query.destNodeTableName);
 
             Table dstSide;
             {
-                ScopedTimer timer("Building Destination Side Table");
+                TimedScope ts("deduplicateRows (dst)", "ONLINE");
                 dstSide.init(dstRef);
                 dstSide.rows.reserve(edgeTableRev.rowCount);
                 for (size_t i = 0; i < edgeTableRev.rowCount; i++) {
@@ -277,45 +258,40 @@ namespace obligraph {
             }
 
             if (dstIndex)
-                probe_with_index(*dstIndex, dstSide, pool);
+                probe_with_index(*dstIndex, dstSide, pool, "dst");
             else
                 build_and_probe(dstRef, dstSide, pool);
 
             {
-                ScopedTimer timerRedup("Reduplicating Destination Rows");
+                TimedScope ts("reduplicateRows (dst)", "ONLINE");
                 reduplicateRows(dstSide);
             }
             {
-                ScopedTimer timerUnion("Union with Edge Table");
+                TimedScope ts("unionWith (dst)", "ONLINE");
                 edgeTableRev.unionWith(dstSide, pool, dstPrefix);
             }
 
             return doSortAndReturn();
         }
 
-        // Slow path: explicit column subset requested — project to the requested columns.
         set<string> dstColumns;
         Table dstTable = catalog.getTable(query.destNodeTableName);
 
         for (const auto& col : query.projectionColumns) {
             if (col.first == query.destNodeTableName ||
-                (col.first.length() > 5 && col.first.substr(col.first.length() - 5) == "_dest")) {
+                (col.first.length() > 5 && col.first.substr(col.first.length() - 5) == "_dest"))
                 dstColumns.insert(col.second);
-            }
         }
-
-        // Include columns needed for predicates
         for (const auto& tablePred : query.tablePredicates) {
-            if (tablePred.first == query.destNodeTableName) {
+            if (tablePred.first == query.destNodeTableName)
                 for (const auto& pred : tablePred.second) dstColumns.insert(pred.column);
-            }
         }
 
         Table dstProjected = dstTable.project(vector<string>(dstColumns.begin(), dstColumns.end()), pool);
 
         Table dstSide;
         {
-            ScopedTimer timer("Building Destination Side Table");
+            TimedScope ts("deduplicateRows (dst)", "ONLINE");
             dstSide.init(dstProjected);
             dstSide.rows.reserve(edgeTableRev.rowCount);
             for (size_t i = 0; i < edgeTableRev.rowCount; i++) {
@@ -326,118 +302,26 @@ namespace obligraph {
         }
 
         if (dstIndex)
-            probe_with_index(*dstIndex, dstSide, pool);
+            probe_with_index(*dstIndex, dstSide, pool, "dst");
         else
             build_and_probe(dstProjected, dstSide, pool);
 
         {
-            ScopedTimer timerRedup("Reduplicating Destination Rows");
+            TimedScope ts("reduplicateRows (dst)", "ONLINE");
             reduplicateRows(dstSide);
         }
         {
-            ScopedTimer timerUnion("Union with Edge Table");
+            TimedScope ts("unionWith (dst)", "ONLINE");
             edgeTableRev.unionWith(dstSide, pool, dstPrefix);
         }
 
         return doSortAndReturn();
     }
 
-    Table oneHop(Catalog& catalog, OneHopQuery& query, ThreadPool& pool) {
-        // Execute the two function calls in parallel
-        auto futureFwd = std::async(std::launch::async, buildSourceAndEdgeTables,
-                                  std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
-        auto futureRev = std::async(std::launch::async, buildDestinationTable,
-                                  std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
-
-        Table edgeProjectedFwd = futureFwd.get();
-        Table edgeProjectedRev = futureRev.get();
-        edgeProjectedFwd.unionWith(edgeProjectedRev, pool);
-
-        // Detect self-referential join
-        bool isSelfReferential = (query.sourceNodeTableName == query.destNodeTableName);
-
-        vector<Predicate> allPredicates;
-        for (const auto& tablePred : query.tablePredicates) {
-            // Qualify column names in predicates with table names
-            for (const auto& pred : tablePred.second) {
-                Predicate qualifiedPred = pred;
-                string tablePrefix = tablePred.first;
-
-                // In self-referential joins, predicates on the table refer to source
-                if (isSelfReferential && tablePred.first == query.sourceNodeTableName) {
-                    tablePrefix += "_src";
-                }
-
-                qualifiedPred.column = tablePrefix + "_" + pred.column;
-                allPredicates.push_back(qualifiedPred);
-            }
-        }
-        if (!allPredicates.empty()) {
-            edgeProjectedFwd.filter(allPredicates, pool);
-        }
-
-        // If no projection columns specified, return all columns (skip projection)
-        if (query.projectionColumns.empty()) {
-            return edgeProjectedFwd;
-        }
-
-        vector <string> projectionColumns;
-        for (const auto& col : query.projectionColumns) {
-            string columnName;
-
-            // Check if this is an edge column or a node column
-            if (col.first == query.edgeTableName) {
-                // Edge columns are not prefixed - they're already in the schema as-is
-                columnName = col.second;
-            } else {
-                // Node columns need table-qualified names
-                string tablePrefix = col.first;
-
-                // In self-referential joins, check for explicit _src or _dest suffix
-                if (isSelfReferential) {
-                    // Check if user explicitly specified source or destination
-                    if (col.first.length() > 4 && col.first.substr(col.first.length() - 4) == "_src") {
-                        // User wants source columns - use the base table name + _src
-                        tablePrefix = col.first;  // Already has _src suffix
-                    } else if (col.first.length() > 5 && col.first.substr(col.first.length() - 5) == "_dest") {
-                        // User wants dest columns - use the base table name + _dest
-                        tablePrefix = col.first;  // Already has _dest suffix
-                    } else if (col.first == query.destNodeTableName) {
-                        // Default: destination columns for backward compatibility
-                        tablePrefix += "_dest";
-                    }
-                }
-
-                columnName = tablePrefix + "_" + col.second;
-            }
-
-            projectionColumns.push_back(columnName);
-        }
-
-        edgeProjectedFwd = edgeProjectedFwd.project(projectionColumns, pool);
-        return edgeProjectedFwd;
-    }
-
-    Table oneHop(Catalog& catalog, OneHopQuery& query, ThreadPool& pool,
-                 std::unique_ptr<NodeIndex> srcIndex,
-                 std::unique_ptr<NodeIndex> dstIndex) {
-        // Release ownership — raw pointers needed for std::async (no move-capture in C++14-style)
-        NodeIndex* srcPtr = srcIndex.release();
-        NodeIndex* dstPtr = dstIndex.release();
-
-        auto futureFwd = std::async(std::launch::async, buildSourceAndEdgeTables,
-                                    std::ref(catalog), std::ref(query), std::ref(pool), srcPtr);
-        auto futureRev = std::async(std::launch::async, buildDestinationTable,
-                                    std::ref(catalog), std::ref(query), std::ref(pool), dstPtr);
-
-        Table edgeProjectedFwd = futureFwd.get();
-        delete srcPtr;
-        Table edgeProjectedRev = futureRev.get();
-        delete dstPtr;
-
-        edgeProjectedFwd.unionWith(edgeProjectedRev, pool);
-
-        // --- Same filter/project logic as the original oneHop ---
+    // ---------------------------------------------------------------------------
+    // Shared filter + project logic after the parallel branches complete.
+    // ---------------------------------------------------------------------------
+    static void applyFilterAndProject(Table& result, OneHopQuery& query, ThreadPool& pool) {
         bool isSelfReferential = (query.sourceNodeTableName == query.destNodeTableName);
 
         vector<Predicate> allPredicates;
@@ -445,20 +329,19 @@ namespace obligraph {
             for (const auto& pred : tablePred.second) {
                 Predicate qualifiedPred = pred;
                 string tablePrefix = tablePred.first;
-                if (isSelfReferential && tablePred.first == query.sourceNodeTableName) {
+                if (isSelfReferential && tablePred.first == query.sourceNodeTableName)
                     tablePrefix += "_src";
-                }
                 qualifiedPred.column = tablePrefix + "_" + pred.column;
                 allPredicates.push_back(qualifiedPred);
             }
         }
         if (!allPredicates.empty()) {
-            edgeProjectedFwd.filter(allPredicates, pool);
+            TimedScope ts("filter", "ONLINE");
+            result.filter(allPredicates, pool);
         }
 
-        if (query.projectionColumns.empty()) {
-            return edgeProjectedFwd;
-        }
+        if (query.projectionColumns.empty())
+            return;
 
         vector<string> projectionColumns;
         for (const auto& col : query.projectionColumns) {
@@ -468,20 +351,63 @@ namespace obligraph {
             } else {
                 string tablePrefix = col.first;
                 if (isSelfReferential) {
-                    if (col.first.length() > 4 && col.first.substr(col.first.length() - 4) == "_src") {
+                    if (col.first.length() > 4 && col.first.substr(col.first.length() - 4) == "_src")
                         tablePrefix = col.first;
-                    } else if (col.first.length() > 5 && col.first.substr(col.first.length() - 5) == "_dest") {
+                    else if (col.first.length() > 5 && col.first.substr(col.first.length() - 5) == "_dest")
                         tablePrefix = col.first;
-                    } else if (col.first == query.destNodeTableName) {
+                    else if (col.first == query.destNodeTableName)
                         tablePrefix += "_dest";
-                    }
                 }
                 columnName = tablePrefix + "_" + col.second;
             }
             projectionColumns.push_back(columnName);
         }
+        TimedScope ts("project", "ONLINE");
+        result = result.project(projectionColumns, pool);
+    }
 
-        edgeProjectedFwd = edgeProjectedFwd.project(projectionColumns, pool);
+    Table oneHop(Catalog& catalog, OneHopQuery& query, ThreadPool& pool) {
+        Table edgeProjectedFwd, edgeProjectedRev;
+        {
+            TimedScope ts("parallel branches (wall)", "ONLINE");
+            auto futureFwd = std::async(std::launch::async, buildSourceAndEdgeTables,
+                                        std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
+            auto futureRev = std::async(std::launch::async, buildDestinationTable,
+                                        std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
+            edgeProjectedFwd = futureFwd.get();
+            edgeProjectedRev = futureRev.get();
+        }
+        {
+            TimedScope ts("unionWith (final)", "ONLINE");
+            edgeProjectedFwd.unionWith(edgeProjectedRev, pool);
+        }
+        applyFilterAndProject(edgeProjectedFwd, query, pool);
+        return edgeProjectedFwd;
+    }
+
+    Table oneHop(Catalog& catalog, OneHopQuery& query, ThreadPool& pool,
+                 std::unique_ptr<NodeIndex> srcIndex,
+                 std::unique_ptr<NodeIndex> dstIndex) {
+        NodeIndex* srcPtr = srcIndex.release();
+        NodeIndex* dstPtr = dstIndex.release();
+
+        Table edgeProjectedFwd, edgeProjectedRev;
+        {
+            TimedScope ts("parallel branches (wall)", "ONLINE");
+            auto futureFwd = std::async(std::launch::async, buildSourceAndEdgeTables,
+                                        std::ref(catalog), std::ref(query), std::ref(pool), srcPtr);
+            auto futureRev = std::async(std::launch::async, buildDestinationTable,
+                                        std::ref(catalog), std::ref(query), std::ref(pool), dstPtr);
+            edgeProjectedFwd = futureFwd.get();
+            delete srcPtr;
+            edgeProjectedRev = futureRev.get();
+            delete dstPtr;
+        }
+        {
+            TimedScope ts("unionWith (final)", "ONLINE");
+            edgeProjectedFwd.unionWith(edgeProjectedRev, pool);
+        }
+        applyFilterAndProject(edgeProjectedFwd, query, pool);
         return edgeProjectedFwd;
     }
 } // namespace obligraph

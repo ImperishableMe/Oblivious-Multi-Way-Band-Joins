@@ -38,6 +38,38 @@ See `TDX_MIGRATION_SUMMARY.md` for complete migration details.
   - Do not skip even if the change looks obviously safe
   - Note: `banking_onehop` is built separately via CMake — run `cmake --build obligraph/build --target banking_onehop` after changing `obligraph/src/`
 
+## Large-Scale Regression Test (Performance Baseline)
+- **Large dataset** (200k accounts, 1M transactions) is generated with a fixed seed for reproducibility:
+  ```
+  python3 scripts/generate_banking_scaled.py 200000 input/plaintext/banking_200k --seed 42
+  ```
+- **Run the performance regression test** (times oneHop + filtered 3-hop, verifies correctness against SQLite):
+  ```
+  python3 tests/test_large_scale_regression.py input/plaintext/banking_200k obligraph/build/banking_onehop ./sgx_app
+  ```
+- Current baseline (seed=42, 200k accounts / 1M txns): `oneHop ≈ 2.3s`, `sgx_filtered_3hop ≈ 167s`
+
+## oneHop Timing Categories (banking_onehop binary)
+`banking_onehop` emits a structured timing breakdown at the end of every run. Each stage is tagged with exactly one category:
+- **`ONLINE`** — the per-query oblivious work (deduplicate, ORAM probe, reduplicate, sort, union, filter, project). **This is the default "oneHop time" to report** — it's what recurs per query.
+- **`OFFLINE`** — one-time index build + deep-copy (`buildNodeIndex`, `index copy (src)`). Report this alongside ONLINE if the setup cost is part of the comparison.
+- **`IO`** — CSV read/write. Typically **excluded** from reported times.
+
+### Selecting which categories to report
+Use the `--report` flag on `banking_onehop`:
+```
+./obligraph/build/banking_onehop <data_dir> <output_csv> --report ONLINE              # default
+./obligraph/build/banking_onehop <data_dir> <output_csv> --report ONLINE,OFFLINE      # include index build
+./obligraph/build/banking_onehop <data_dir> <output_csv> --report IO,OFFLINE,ONLINE   # end-to-end
+```
+The binary prints a `TIMING_REPORTED categories=<cats> total=<ms>ms` line that the regression test / grep harness can parse. The full per-stage breakdown is always printed regardless of `--report`.
+
+### Notable stages in the ONLINE breakdown
+- `src branch (total)` / `dst branch (total)` — wall-clock of each parallel branch **in isolation**. Reported for both so you can tell how the two sides would have cost if run sequentially.
+- `parallel branches (wall)` — actual concurrent wall-clock for both branches running together (≈ max of the two branch totals). This is what the ONLINE sum effectively credits against.
+- `probe src` / `probe dst` — the ORAM probe itself, the usual hotspot.
+- `parallel_sort (dst)` — oblivious sort on the dst side; historically large.
+
 ## Compilation Rules
 - **ALWAYS compile using separate commands from the project root**:
   - Main code: `make`

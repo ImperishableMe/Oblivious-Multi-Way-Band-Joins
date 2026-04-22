@@ -3,15 +3,19 @@
  *
  * Driver program to run one-hop join on banking dataset (account -> txn -> account).
  *
- * Usage: ./banking_onehop <data_dir> <output_csv>
- *   data_dir: Directory containing account.csv and txn.csv (comma-delimited)
- *   output_csv: Output file path for the hop result table
+ * Usage:
+ *   ./banking_onehop <data_dir> <output_csv> [--report ONLINE] [--report ONLINE,OFFLINE]
+ *
+ *   --report <cats>   Comma-separated list of timing categories to sum for the
+ *                     TIMING_REPORTED line (default: ONLINE).
+ *                     Categories: IO, OFFLINE, ONLINE
  */
 
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <chrono>
+#include <string>
+#include <vector>
 
 #include "definitions.h"
 #include "node_index.h"
@@ -21,142 +25,140 @@
 using namespace std;
 using namespace obligraph;
 
-void writeTableToCSV(const Table& table, const string& filePath) {
+static void writeTableToCSV(const Table& table, const string& filePath) {
+    TimedScope ts("CSV write", "IO");
     ofstream file(filePath);
-    if (!file.is_open()) {
+    if (!file.is_open())
         throw runtime_error("Cannot open output file: " + filePath);
-    }
 
-    // Write header row (comma-delimited for Multi-Way Band Joins format)
     for (size_t i = 0; i < table.schema.columnMetas.size(); i++) {
         file << table.schema.columnMetas[i].name;
         if (i < table.schema.columnMetas.size() - 1) file << ",";
     }
     file << "\n";
 
-    // Write data rows
     for (const auto& row : table.rows) {
-        if (row.isDummy()) continue;  // Skip dummy rows
-
+        if (row.isDummy()) continue;
         for (size_t i = 0; i < table.schema.columnMetas.size(); i++) {
             ColumnValue val = row.getColumnValue(
                 table.schema.columnMetas[i].name, table.schema);
-
             visit([&file](const auto& v) { file << v; }, val);
-
             if (i < table.schema.columnMetas.size() - 1) file << ",";
         }
         file << "\n";
     }
+}
 
-    file.close();
+// Split "ONLINE,OFFLINE" → {"ONLINE", "OFFLINE"}
+static vector<string> splitComma(const string& s) {
+    vector<string> out;
+    size_t start = 0;
+    while (true) {
+        size_t pos = s.find(',', start);
+        out.push_back(s.substr(start, pos == string::npos ? string::npos : pos - start));
+        if (pos == string::npos) break;
+        start = pos + 1;
+    }
+    return out;
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        cerr << "Usage: " << argv[0] << " <data_dir> <output_csv>" << endl;
-        cerr << "  data_dir: Directory with account.csv and txn.csv" << endl;
-        cerr << "  output_csv: Output file path for hop result" << endl;
+    if (argc < 3) {
+        cerr << "Usage: " << argv[0] << " <data_dir> <output_csv> [--report CATS]\n"
+             << "  CATS: comma-separated categories to report (default: ONLINE)\n"
+             << "  Categories: IO, OFFLINE, ONLINE\n";
         return 1;
     }
 
-    string dataDir = argv[1];
+    string dataDir   = argv[1];
     string outputPath = argv[2];
+    vector<string> reportCats = {"ONLINE"};
+
+    for (int i = 3; i < argc; i++) {
+        string arg = argv[i];
+        if (arg == "--report" && i + 1 < argc) {
+            reportCats = splitComma(argv[++i]);
+        } else if (arg.rfind("--report=", 0) == 0) {
+            reportCats = splitComma(arg.substr(9));
+        }
+    }
 
     try {
-        // Set thread count to all available hardware threads
         int nthreads = std::thread::hardware_concurrency();
         obligraph::number_of_threads.store(nthreads);
-        cout << "Using " << obligraph::number_of_threads.load() << " threads" << endl;
+        cout << "Using " << nthreads << " threads\n";
 
-        auto startTotal = chrono::high_resolution_clock::now();
-
-        // Import data directly from comma-delimited CSVs (no file conversion needed)
-        cout << "Importing data from " << dataDir << "..." << endl;
+        // --- I/O: import ---
+        cout << "Importing data from " << dataDir << "...\n";
         Catalog catalog;
+        {
+            TimedScope ts("CSV read (account)", "IO");
+            catalog.importNodeFromCSV(
+                dataDir + "/account.csv", ',',
+                {{"account_id", "int32"}, {"balance", "int32"}, {"owner_id", "int32"}},
+                "account_id"
+            );
+        }
+        {
+            TimedScope ts("CSV read (txn)", "IO");
+            // NOTE: acc_from and acc_to declared as int32 (not int64) to stay within the
+            // 48-byte ROW_DATA_MAX_SIZE limit. Account IDs are small positive integers.
+            catalog.importEdgeFromCSV(
+                dataDir + "/txn.csv", ',',
+                {{"txn_id", "int32"}, {"acc_from", "int32"}, {"acc_to", "int32"},
+                 {"amount", "int32"}, {"txn_time", "int32"}},
+                "account", "txn", "account",
+                "acc_from", "acc_to"
+            );
+        }
+        cout << "Imported " << catalog.tables.size() << " tables\n";
 
-        catalog.importNodeFromCSV(
-            dataDir + "/account.csv", ',',
-            {{"account_id", "int32"}, {"balance", "int32"}, {"owner_id", "int32"}},
-            "account_id"
-        );
-
-        // TODO: Use txn_id as the primary key of the edge table instead of the (acc_from, acc_to)
-        // composite key. This would simplify internal processing significantly — deduplication
-        // in the one-hop algorithm and index lookup would be cleaner with a unique scalar key.
-        //
-        // NOTE: acc_from and acc_to are declared as int32 (not int64) to stay within the 48-byte
-        // ROW_DATA_MAX_SIZE limit. Account IDs in the banking dataset are small integers (well within
-        // int32 range), so this is safe. The original int64 typing was unnecessarily wide and left no
-        // room for additional columns (the full hop schema without txn_id already consumed all 48 bytes).
-        catalog.importEdgeFromCSV(
-            dataDir + "/txn.csv", ',',
-            {{"txn_id", "int32"}, {"acc_from", "int32"}, {"acc_to", "int32"}, {"amount", "int32"}, {"txn_time", "int32"}},
-            "account", "txn", "account",
-            "acc_from", "acc_to"
-        );
-
-        cout << "Imported " << catalog.tables.size() << " tables" << endl;
-
-        // No filtering — return all one-hop results
-        vector<pair<string, vector<Predicate>>> tablePredicates;
-
-        // Create one-hop query for self-referential join: account -> txn -> account
-        // Empty projectionColumns = select all columns
-        OneHopQuery query(
-            "account",          // source node table
-            "txn",              // edge table
-            "account",          // destination node table
-            tablePredicates     // no filters
-        );
-
-        // Execute one-hop with offline index build
-        cout << "Executing one-hop join..." << endl;
-        ThreadPool pool(obligraph::number_of_threads.load());
-
-        // --- Offline build phase (timed separately) ---
-        auto startBuild = chrono::high_resolution_clock::now();
+        // --- OFFLINE: build index (done once, reused for both src and dst probes) ---
+        ThreadPool pool(nthreads);
         Table& accountTable = catalog.getTable("account");
         size_t edgeCount = catalog.getTable("txn_fwd").rowCount;
-        auto nodeIndex = buildNodeIndex(accountTable, edgeCount);
-        auto srcIndex = std::make_unique<NodeIndex>(*nodeIndex);  // Deep copy (probing is destructive)
-        auto dstIndex = std::move(nodeIndex);
-        auto endBuild = chrono::high_resolution_clock::now();
-        auto buildMs = chrono::duration_cast<chrono::milliseconds>(endBuild - startBuild).count();
-        cout << "Index build (offline) completed in " << buildMs << " ms" << endl;
 
-        // --- Online probe phase (timed separately) ---
-        auto startOneHop = chrono::high_resolution_clock::now();
-        Table result = oneHop(catalog, query, pool, std::move(srcIndex), std::move(dstIndex));
-        auto endOneHop = chrono::high_resolution_clock::now();
+        unique_ptr<NodeIndex> nodeIndex;
+        {
+            // buildNodeIndex itself carries a TimedScope("buildNodeIndex", "OFFLINE")
+            nodeIndex = buildNodeIndex(accountTable, edgeCount);
+        }
+        unique_ptr<NodeIndex> srcIndex, dstIndex;
+        {
+            // Deep copy: probing is destructive (entries marked consumed after access)
+            TimedScope ts("index copy (src)", "OFFLINE");
+            srcIndex = std::make_unique<NodeIndex>(*nodeIndex);
+            dstIndex = std::move(nodeIndex);
+        }
 
-        auto oneHopMs = chrono::duration_cast<chrono::milliseconds>(endOneHop - startOneHop).count();
-        cout << "One-hop probe (online) completed in " << oneHopMs << " ms" << endl;
+        // --- ONLINE: probe phase ---
+        cout << "Executing one-hop join...\n";
+        OneHopQuery query(
+            "account", "txn", "account",
+            vector<pair<string, vector<Predicate>>>{}
+        );
+        // oneHop() contains all ONLINE TimedScope entries
+        Table result = oneHop(catalog, query, pool,
+                              std::move(srcIndex), std::move(dstIndex));
+
         cout << "Result: " << result.rowCount << " rows, "
-             << result.schema.columnMetas.size() << " columns" << endl;
+             << result.schema.columnMetas.size() << " columns\n";
 
-        // Print schema for debugging
         cout << "Schema: ";
         for (size_t i = 0; i < result.schema.columnMetas.size(); i++) {
             cout << result.schema.columnMetas[i].name;
             if (i < result.schema.columnMetas.size() - 1) cout << ", ";
         }
-        cout << endl;
+        cout << "\n";
 
-        // Write result to CSV
-        cout << "Writing result to " << outputPath << "..." << endl;
+        cout << "Writing result to " << outputPath << "...\n";
         writeTableToCSV(result, outputPath);
 
-        auto endTotal = chrono::high_resolution_clock::now();
-        auto totalMs = chrono::duration_cast<chrono::milliseconds>(endTotal - startTotal).count();
-
-        cout << "\n=== TIMING ===" << endl;
-        cout << "Index build (offline):  " << buildMs << " ms" << endl;
-        cout << "One-hop probe (online): " << oneHopMs << " ms" << endl;
-        cout << "Total (with I/O):       " << totalMs << " ms" << endl;
+        // --- Print full breakdown + TIMING_REPORTED line ---
+        TimingCollector::get().report(reportCats);
 
     } catch (const exception& e) {
-        cerr << "Error: " << e.what() << endl;
+        cerr << "Error: " << e.what() << "\n";
         return 1;
     }
 

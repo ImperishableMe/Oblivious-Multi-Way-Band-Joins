@@ -21,7 +21,10 @@ public:
     AESPRF &operator=(const AESPRF &other)
     {
         if (this != &other)
+        {
             range = other.range;
+            key = other.key;
+        }
         return *this;
     }
 

@@ -14,12 +14,20 @@
 namespace obligraph {
 
 // ---------------------------------------------------------------------------
-// TimingEntry: one recorded interval
+// TimingEntry: one recorded interval.
+//
+// `contributes_to_total` is false for diagnostic scopes that run inside a
+// parallel block (per-branch sub-stages). Such entries still show in the
+// breakdown but are NOT summed into category totals / TIMING_REPORTED, so
+// the reported total is always the true wall-clock — otherwise parallel
+// branches would be double-counted and the number would no longer reflect
+// the benefit of concurrency.
 // ---------------------------------------------------------------------------
 struct TimingEntry {
     std::string name;
     std::string category;  // "IO", "OFFLINE", "ONLINE"
     double ms;
+    bool contributes_to_total;
 };
 
 // ---------------------------------------------------------------------------
@@ -37,9 +45,10 @@ public:
         return instance;
     }
 
-    void record(const std::string& name, const std::string& category, double ms) {
+    void record(const std::string& name, const std::string& category, double ms,
+                bool contributes_to_total = true) {
         std::lock_guard<std::mutex> lock(mutex_);
-        entries_.push_back({name, category, ms});
+        entries_.push_back({name, category, ms, contributes_to_total});
     }
 
     void reset() {
@@ -47,11 +56,13 @@ public:
         entries_.clear();
     }
 
-    // Sum of all entries whose category is in `categories`.
+    // Sum of all wall-clock-contributing entries whose category is in `categories`.
+    // Diagnostic entries (contributes_to_total=false) are excluded.
     double total(const std::vector<std::string>& categories) const {
         std::lock_guard<std::mutex> lock(mutex_);
         double sum = 0.0;
         for (const auto& e : entries_) {
+            if (!e.contributes_to_total) continue;
             for (const auto& c : categories) {
                 if (e.category == c) { sum += e.ms; break; }
             }
@@ -78,6 +89,7 @@ public:
         const size_t name_w = max_name + 2;
 
         std::cout << "\n=== TIMING BREAKDOWN ===\n";
+        std::cout << "(* = diagnostic, inside a parallel block — NOT summed into totals)\n";
         std::string cur_cat;
         for (const auto& e : entries_) {
             if (e.category != cur_cat) {
@@ -85,16 +97,19 @@ public:
                 std::cout << "\n[" << cur_cat << "]\n";
             }
             std::cout << "  " << std::left << std::setw(name_w) << e.name
+                      << (e.contributes_to_total ? "  " : " *")
                       << std::right << std::setw(9) << std::fixed << std::setprecision(2)
                       << e.ms << " ms\n";
         }
 
-        // Per-category sums
-        std::cout << "\n--- Category totals ---\n";
+        // Per-category sums (wall-clock: diagnostic entries excluded)
+        std::cout << "\n--- Category totals (wall-clock) ---\n";
         double grand = 0.0;
         for (const auto& cat : all_cats) {
             double sum = 0.0;
-            for (const auto& e : entries_) if (e.category == cat) sum += e.ms;
+            for (const auto& e : entries_) {
+                if (e.category == cat && e.contributes_to_total) sum += e.ms;
+            }
             grand += sum;
             std::cout << "  " << std::left << std::setw(10) << cat
                       << std::right << std::setw(9) << std::fixed << std::setprecision(2)
@@ -109,6 +124,7 @@ public:
             report_categories.empty() ? all_cats : report_categories;
         double reported = 0.0;
         for (const auto& e : entries_) {
+            if (!e.contributes_to_total) continue;
             for (const auto& c : cats) {
                 if (e.category == c) { reported += e.ms; break; }
             }
@@ -137,15 +153,17 @@ private:
 // ---------------------------------------------------------------------------
 class TimedScope {
 public:
-    TimedScope(std::string name, std::string category)
+    TimedScope(std::string name, std::string category,
+               bool contributes_to_total = true)
         : name_(std::move(name)),
           category_(std::move(category)),
+          contributes_to_total_(contributes_to_total),
           start_(std::chrono::high_resolution_clock::now()) {}
 
     ~TimedScope() {
         auto end = std::chrono::high_resolution_clock::now();
         double ms = std::chrono::duration<double, std::milli>(end - start_).count();
-        TimingCollector::get().record(name_, category_, ms);
+        TimingCollector::get().record(name_, category_, ms, contributes_to_total_);
     }
 
     TimedScope(const TimedScope&) = delete;
@@ -154,6 +172,7 @@ public:
 private:
     std::string name_;
     std::string category_;
+    bool contributes_to_total_;
     std::chrono::high_resolution_clock::time_point start_;
 };
 

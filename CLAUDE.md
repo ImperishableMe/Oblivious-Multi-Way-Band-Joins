@@ -64,11 +64,19 @@ Use the `--report` flag on `banking_onehop`:
 ```
 The binary prints a `TIMING_REPORTED categories=<cats> total=<ms>ms` line that the regression test / grep harness can parse. The full per-stage breakdown is always printed regardless of `--report`.
 
+### Wall-clock vs diagnostic entries
+Category totals and `TIMING_REPORTED` represent **true wall-clock time**. Stages that run inside the parallel block (both branches and everything nested inside them — dedup, probe, redup, unionWith per side, the dst-side oblivious sort, and the `src/dst branch (total)` wrappers) are marked with `*` in the breakdown and are **excluded from sums**. Including them would double-count the parallel work and defeat the point of running the two sides concurrently.
+
+The stages that DO contribute to the ONLINE wall-clock sum are:
+- `parallel branches (wall)` — the outer scope around both `std::async` branches (≈ max of src/dst branch totals).
+- `unionWith (final)` — sequential stage after the parallel block.
+- `filter` / `project` — sequential, only present when the query has predicates / non-identity projection.
+
 ### Notable stages in the ONLINE breakdown
-- `src branch (total)` / `dst branch (total)` — wall-clock of each parallel branch **in isolation**. Reported for both so you can tell how the two sides would have cost if run sequentially.
-- `parallel branches (wall)` — actual concurrent wall-clock for both branches running together (≈ max of the two branch totals). This is what the ONLINE sum effectively credits against.
-- `probe src` / `probe dst` — the ORAM probe itself, the usual hotspot.
-- `parallel_sort (dst)` — oblivious sort on the dst side; historically large.
+- `src branch (total)` / `dst branch (total)` — wall-clock of each parallel branch **in isolation**. Reported for both so you can tell how the two sides would have cost if run sequentially. Marked `*` (diagnostic).
+- `parallel branches (wall)` — actual concurrent wall-clock for both branches running together (≈ max of the two branch totals). This is what the ONLINE sum credits for the parallel phase.
+- `probe src` / `probe dst` — the ORAM probe itself, the usual hotspot. Diagnostic.
+- `parallel_sort (dst)` — oblivious sort on the dst side; historically large. Diagnostic.
 
 ## Compilation Rules
 - **ALWAYS compile using separate commands from the project root**:

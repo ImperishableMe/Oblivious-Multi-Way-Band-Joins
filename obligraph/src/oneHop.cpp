@@ -47,7 +47,7 @@ namespace obligraph {
 
     void probe_with_index(NodeIndex& obin, Table& probeT, ThreadPool& pool,
                           const std::string& label) {
-        TimedScope ts("probe " + label, "ONLINE");
+        TimedScope ts("probe " + label, "ONLINE", /*contributes_to_total=*/false);
 
         key_t d = 2 * probeT.rowCount;
         int num_threads = std::max(1, obligraph::number_of_threads.load() / 2);
@@ -94,7 +94,7 @@ namespace obligraph {
     }
 
     void build_and_probe(const Table& buildT, Table &probeT, ThreadPool& pool) {
-        TimedScope ts("build_and_probe", "ONLINE");
+        TimedScope ts("build_and_probe", "ONLINE", /*contributes_to_total=*/false);
         auto index = buildNodeIndex(buildT, probeT.rowCount);
         probe_with_index(*index, probeT, pool, "");
     }
@@ -128,7 +128,7 @@ namespace obligraph {
 
     Table buildSourceAndEdgeTables(Catalog& catalog, const OneHopQuery& query,
                                     ThreadPool &pool, NodeIndex* srcIndex) {
-        TimedScope ts_total("src branch (total)", "ONLINE");
+        TimedScope ts_total("src branch (total)", "ONLINE", /*contributes_to_total=*/false);
 
         string srcPrefix = query.sourceNodeTableName;
         if (query.sourceNodeTableName == query.destNodeTableName)
@@ -142,7 +142,7 @@ namespace obligraph {
             srcSide.init(srcRef);
             srcSide.rows.reserve(edgeTableFwd.rowCount);
             {
-                TimedScope ts("deduplicateRows (src)", "ONLINE");
+                TimedScope ts("deduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
                 for (size_t i = 0; i < edgeTableFwd.rowCount; i++) {
                     srcSide.addRow(Row());
                     srcSide.rows[i].key = edgeTableFwd.rows[i].key;
@@ -156,11 +156,11 @@ namespace obligraph {
                 build_and_probe(srcRef, srcSide, pool);
 
             {
-                TimedScope ts("reduplicateRows (src)", "ONLINE");
+                TimedScope ts("reduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
                 reduplicateRows(srcSide);
             }
             {
-                TimedScope ts("unionWith (src)", "ONLINE");
+                TimedScope ts("unionWith (src)", "ONLINE", /*contributes_to_total=*/false);
                 edgeTableFwd.unionWith(srcSide, pool, srcPrefix);
             }
             return edgeTableFwd;
@@ -193,7 +193,7 @@ namespace obligraph {
         srcSide.init(srcProjected);
         srcSide.rows.reserve(edgeProjectedFwd.rowCount);
         {
-            TimedScope ts("deduplicateRows (src)", "ONLINE");
+            TimedScope ts("deduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
             for (size_t i = 0; i < edgeProjectedFwd.rowCount; i++) {
                 srcSide.addRow(Row());
                 srcSide.rows[i].key = edgeProjectedFwd.rows[i].key;
@@ -207,11 +207,11 @@ namespace obligraph {
             build_and_probe(srcProjected, srcSide, pool);
 
         {
-            TimedScope ts("reduplicateRows (src)", "ONLINE");
+            TimedScope ts("reduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
             reduplicateRows(srcSide);
         }
         {
-            TimedScope ts("unionWith (src)", "ONLINE");
+            TimedScope ts("unionWith (src)", "ONLINE", /*contributes_to_total=*/false);
             edgeProjectedFwd.unionWith(srcSide, pool, srcPrefix);
         }
         return edgeProjectedFwd;
@@ -219,7 +219,7 @@ namespace obligraph {
 
     Table buildDestinationTable(Catalog& catalog, const OneHopQuery& query,
                                 ThreadPool& pool, NodeIndex* dstIndex) {
-        TimedScope ts_total("dst branch (total)", "ONLINE");
+        TimedScope ts_total("dst branch (total)", "ONLINE", /*contributes_to_total=*/false);
 
         string dstPrefix = query.destNodeTableName;
         if (query.sourceNodeTableName == query.destNodeTableName)
@@ -228,7 +228,7 @@ namespace obligraph {
         Table edgeTableRev = catalog.getTable(query.edgeTableName + "_rev");
 
         auto doSortAndReturn = [&]() -> Table {
-            TimedScope ts("parallel_sort (dst)", "ONLINE");
+            TimedScope ts("parallel_sort (dst)", "ONLINE", /*contributes_to_total=*/false);
             parallel_sort(edgeTableRev.rows.begin(), edgeTableRev.rows.end(),
                 pool,
                 [](const Row& a, const Row& b) {
@@ -247,7 +247,7 @@ namespace obligraph {
 
             Table dstSide;
             {
-                TimedScope ts("deduplicateRows (dst)", "ONLINE");
+                TimedScope ts("deduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
                 dstSide.init(dstRef);
                 dstSide.rows.reserve(edgeTableRev.rowCount);
                 for (size_t i = 0; i < edgeTableRev.rowCount; i++) {
@@ -263,11 +263,11 @@ namespace obligraph {
                 build_and_probe(dstRef, dstSide, pool);
 
             {
-                TimedScope ts("reduplicateRows (dst)", "ONLINE");
+                TimedScope ts("reduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
                 reduplicateRows(dstSide);
             }
             {
-                TimedScope ts("unionWith (dst)", "ONLINE");
+                TimedScope ts("unionWith (dst)", "ONLINE", /*contributes_to_total=*/false);
                 edgeTableRev.unionWith(dstSide, pool, dstPrefix);
             }
 
@@ -291,7 +291,7 @@ namespace obligraph {
 
         Table dstSide;
         {
-            TimedScope ts("deduplicateRows (dst)", "ONLINE");
+            TimedScope ts("deduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
             dstSide.init(dstProjected);
             dstSide.rows.reserve(edgeTableRev.rowCount);
             for (size_t i = 0; i < edgeTableRev.rowCount; i++) {
@@ -307,11 +307,11 @@ namespace obligraph {
             build_and_probe(dstProjected, dstSide, pool);
 
         {
-            TimedScope ts("reduplicateRows (dst)", "ONLINE");
+            TimedScope ts("reduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
             reduplicateRows(dstSide);
         }
         {
-            TimedScope ts("unionWith (dst)", "ONLINE");
+            TimedScope ts("unionWith (dst)", "ONLINE", /*contributes_to_total=*/false);
             edgeTableRev.unionWith(dstSide, pool, dstPrefix);
         }
 

@@ -1,0 +1,14 @@
+SELECT * FROM account AS a1, txn AS t1, account AS a5, account AS a2, txn AS t2, account AS a3, txn AS t3, account AS a4, txn AS t4
+WHERE a1.account_id = t1.acc_from
+  AND a5.account_id = t1.acc_to
+  AND a2.account_id = t2.acc_from
+  AND a5.account_id = t2.acc_to
+  AND a3.account_id = t3.acc_from
+  AND a5.account_id = t3.acc_to
+  AND a4.account_id = t4.acc_from
+  AND a5.account_id = t4.acc_to
+  AND a5.bank_id = 5
+  AND t1.amount > 50000
+  AND t2.amount > 50000
+  AND t3.amount > 50000
+  AND t4.amount > 50000;

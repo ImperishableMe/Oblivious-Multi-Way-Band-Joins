@@ -91,6 +91,10 @@ target_link_libraries(custom_dataset_queries PRIVATE core)
 add_executable(banking_onehop src/banking_onehop.cpp)
 target_link_libraries(banking_onehop PRIVATE core)
 
+# IBM AML-Data one-hop executable (W4, mirror of banking_onehop with AML schema)
+add_executable(ibm_aml_onehop src/ibm_aml_onehop.cpp)
+target_link_libraries(ibm_aml_onehop PRIVATE core)
+
 # Enable testing
 enable_testing()
 

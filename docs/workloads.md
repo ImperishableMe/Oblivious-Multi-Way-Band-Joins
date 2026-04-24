@@ -271,6 +271,8 @@ Inspired by `banking_branch_filtered.sql`. Chain from p1, p2 forks to two 2nd-or
 **Source**: [SNAP cit-Patents](https://snap.stanford.edu/data/cit-Patents.html) edge list + [NBER US Patent Data](https://www.nber.org/research/data/us-patents-1975-1999) metadata.
 **Domain**: US patent citations (1963–1999) — a different domain from W1 (financial) and W2 (social), providing a directed acyclic graph (DAG) with real attributes.
 
+> **Note**: the conversion script should report max out-degree alongside the average — the tail matters for query result sizes.
+
 ### Dataset
 
 - **Nodes**: 3,774,768 patents
@@ -408,11 +410,223 @@ A cited patent has two independent reference chains. Tests bushy join tree decom
 
 ---
 
+## W4: Anti-Money Laundering — IBM AML-Data
+
+**Source**: [IBM/AML-Data](https://github.com/IBM/AML-Data) — synthetic financial transactions generated via multi-agent simulation, published at NeurIPS 2023 ([Altman et al., arXiv:2306.16424](https://arxiv.org/abs/2306.16424)).
+
+**Domain**: Synthetic financial graph with ground-truth laundering labels. Complements Banking W1 by providing (a) a second financial-graph data point for E1 cross-dataset validation and (b) scale well beyond W1's 10M-edge target (up to 180M transactions).
+
+### Key differences from W1 Banking
+
+| Property | W1 Banking | W4 IBM AML-Data |
+|----------|------------|------------------|
+| Max scale | 10M txns | 180M txns |
+| Node attributes | `balance`, `owner_id` | `bank_id` only (no balance) |
+| Edge attributes | `amount`, `txn_time` | `amount`, `txn_time`, `currency`, `payment_format`, `is_laundering` |
+| Ground-truth labels | none | per-edge `is_laundering` + separate pattern file |
+| Origin | our synthetic generator | published NeurIPS'23 benchmark |
+
+### Dataset Variants
+
+From Altman et al. (NeurIPS 2023):
+
+| Variant | Days | Accounts | Transactions | Laundering rate |
+|---------|------|----------|--------------|------------------|
+| HI-Small | 10 | 515K | 5M | 1/981 |
+| HI-Medium | 16 | 2.08M | 32M | 1/905 |
+| HI-Large | 97 | 2.12M | 180M | 1/807 |
+
+We generate **HI-Small** and **HI-Medium**; **HI-Large** is a stretch goal for the E2 scaling ceiling. LI-* variants are skipped — same query shapes, only label density differs, and our metric is latency not detection accuracy.
+
+### Schema (after conversion to int32)
+
+The published dataset ships only a **transaction file** — no separate accounts table. The conversion script synthesizes the accounts table by taking the union of `(From Bank, Account)` and `(To Bank, Account.1)`.
+
+**Account table** (`account.csv`, synthesized):
+
+| Column | Source | Conversion |
+|--------|--------|------------|
+| `account_id` | distinct `Account` / `Account.1` hex strings | remapped to contiguous [1, N] |
+| `bank_id` | `From Bank` / `To Bank` | already integer; preserved |
+
+**Transaction table** (`txn.csv`):
+
+| Column | Source | Conversion |
+|--------|--------|------------|
+| `txn_id` | row index | 1..M contiguous |
+| `acc_from` | `Account` | remapped |
+| `acc_to` | `Account.1` | remapped |
+| `amount` | `Amount Paid` | `round(Amount Paid * 100)` — cents as int32 |
+| `txn_time` | `Timestamp` | epoch days since min timestamp |
+| `currency` | `Payment Currency` | integer code per distinct currency string |
+| `payment_format` | `Payment Format` | integer code per distinct format string |
+| `is_laundering` | `Is Laundering` | passthrough 0/1 |
+
+### Cyclic Patterns Excluded
+
+The IBM pattern zoo contains 8 labeled typologies. Five are **structurally cyclic** in their join graph (two paths converge on the same vertex pair, producing cycles in the schema hypergraph) and are **not supported by NebulaDB's acyclic-MWJ pipeline**:
+
+| Pattern | Supported? | Reason |
+|---------|-----------|--------|
+| Fan-out | ✓ | Star — acyclic |
+| Fan-in | ✓ | Star — acyclic |
+| Gather-scatter | ✓ | Star centered at hub — acyclic |
+| Scatter-gather | ✗ | 4-cycle in join graph (two paths converge) |
+| Bipartite | ✗ | K₂,₂ is a 4-cycle |
+| Stack | ✗ | Two stacked bipartite layers — cyclic |
+| Cycle | ✗ | Cyclic by definition |
+| Random | ✗ | General cyclic |
+
+W4 queries cover only the three acyclic patterns plus k-hop chains.
+
+### Query Suite (12 queries)
+
+All queries anchor the starting account set with `a1.bank_id = X`, where `X` is picked at data-gen time to yield a few thousand starting accounts (bounds the join result at higher hops). Multi-edge patterns additionally require `t_i.amount > X` on every edge to preserve "large-flow" AML semantics.
+
+Placeholders below: `5` for `bank_id`, `50000` for `amount`. Actual values emitted by the conversion script.
+
+#### Category A: k-hop Chain Queries (5 queries)
+
+- **`aml_1hop.sql`** — 1-hop (3 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a1.bank_id = 5;
+  ```
+- **`aml_2hop.sql`** — 2-hop (5 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2, txn AS t2, account AS a3
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a1.bank_id = 5;
+  ```
+- **`aml_3hop.sql`** — 3-hop (7 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2, txn AS t2, account AS a3, txn AS t3, account AS a4
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a3.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a1.bank_id = 5;
+  ```
+- **`aml_4hop.sql`** — 4-hop (9 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2, txn AS t2, account AS a3, txn AS t3, account AS a4, txn AS t4, account AS a5
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a3.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a4.account_id = t4.acc_from AND a5.account_id = t4.acc_to
+    AND a1.bank_id = 5;
+  ```
+- **`aml_5hop.sql`** — 5-hop (11 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2, txn AS t2, account AS a3, txn AS t3, account AS a4, txn AS t4, account AS a5, txn AS t5, account AS a6
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a3.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a4.account_id = t4.acc_from AND a5.account_id = t4.acc_to
+    AND a5.account_id = t5.acc_from AND a6.account_id = t5.acc_to
+    AND a1.bank_id = 5;
+  ```
+
+#### Category B: Fan-out (1 query)
+
+One source distributes large amounts to 4 distinct recipients — the classic "one-to-many" laundering shape.
+
+- **`aml_fanout.sql`** — 4-branch fan-out (9 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2,
+               txn AS t2, account AS a3,
+               txn AS t3, account AS a4,
+               txn AS t4, account AS a5
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a1.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a1.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a1.account_id = t4.acc_from AND a5.account_id = t4.acc_to
+    AND a1.bank_id = 5
+    AND t1.amount > 50000 AND t2.amount > 50000
+    AND t3.amount > 50000 AND t4.amount > 50000;
+  ```
+
+#### Category C: Fan-in (1 query)
+
+Four sources funnel large amounts into a single destination — "many-to-one" gathering.
+
+- **`aml_fanin.sql`** — 4-branch fan-in (9 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a5,
+               account AS a2, txn AS t2,
+               account AS a3, txn AS t3,
+               account AS a4, txn AS t4
+  WHERE a1.account_id = t1.acc_from AND a5.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a5.account_id = t2.acc_to
+    AND a3.account_id = t3.acc_from AND a5.account_id = t3.acc_to
+    AND a4.account_id = t4.acc_from AND a5.account_id = t4.acc_to
+    AND a5.bank_id = 5
+    AND t1.amount > 50000 AND t2.amount > 50000
+    AND t3.amount > 50000 AND t4.amount > 50000;
+  ```
+
+#### Category D: Tree (1 query)
+
+Root chains into a hub, hub splits into one direct recipient and one 2-hop chain — same structure as `banking_tree`.
+
+- **`aml_tree.sql`** — tree pattern (9 tables)
+  ```sql
+  SELECT * FROM account AS a1, txn AS t1, account AS a2,
+               txn AS t2, account AS a3,
+               txn AS t3, account AS a4, txn AS t4, account AS a5
+  WHERE a1.account_id = t1.acc_from AND a2.account_id = t1.acc_to
+    AND a2.account_id = t2.acc_from AND a3.account_id = t2.acc_to
+    AND a2.account_id = t3.acc_from AND a4.account_id = t3.acc_to
+    AND a4.account_id = t4.acc_from AND a5.account_id = t4.acc_to
+    AND a1.bank_id = 5
+    AND t1.amount > 50000 AND t2.amount > 50000
+    AND t3.amount > 50000 AND t4.amount > 50000;
+  ```
+
+#### Category E: Selectivity Variants (4 queries)
+
+2-hop chain from a fixed bank, varying `t1.amount > X_K` threshold. Thresholds picked at data-gen time to achieve the target pass rate against the amount distribution.
+
+- **`aml_sel_low.sql`** — ~80% pass: `... AND a1.bank_id = 5 AND t1.amount > X_80;`
+- **`aml_sel_med.sql`** — ~60% pass: `... AND t1.amount > X_60;`
+- **`aml_sel_high.sql`** — ~40% pass: `... AND t1.amount > X_40;`
+- **`aml_sel_vhigh.sql`** — ~20% pass: `... AND t1.amount > X_20;`
+
+(All share the same 2-hop join structure as `aml_2hop.sql`.)
+
+### Data Pipeline
+
+1. **Download** `HI-Small_Trans.csv` / `HI-Medium_Trans.csv` from the [Kaggle mirror](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml) or IBM Box.
+2. **Convert** (`scripts/convert_ibm_aml_to_nebuladb.py`):
+   - Parse IBM CSV; synthesize accounts from union of `(From Bank, Account)` and `(To Bank, Account.1)`
+   - Remap hex account IDs to contiguous [1, N]
+   - Build integer codes for `Payment Currency`, `Payment Format`
+   - Convert `Timestamp` → epoch days
+   - Scale `Amount Paid × 100` (cents as int32)
+   - Validate all values within [−1,073,741,820, 1,073,741,820]
+   - Append sentinel row (-10000 for all columns)
+   - Output comma-delimited CSV with header row
+   - Print stats: accounts per bank (top 20), amount distribution percentiles (to pick `X_K` selectivity thresholds), suggested `bank_id` anchor values
+
+### Files to Create
+
+- `scripts/convert_ibm_aml_to_nebuladb.py` — conversion script
+- `input/queries/aml_1hop.sql` … `aml_5hop.sql` — chain queries (5 files)
+- `input/queries/aml_fanout.sql` — fan-out / star
+- `input/queries/aml_fanin.sql` — fan-in
+- `input/queries/aml_tree.sql` — tree / gather-scatter
+- `input/queries/aml_sel_low.sql` … `aml_sel_vhigh.sql` — selectivity variants (4 files)
+- `input/plaintext/ibm_aml_hi_small/` and `ibm_aml_hi_medium/` — output directories (account.csv, txn.csv)
+
+---
+
 ## Implementation Order
 
 1. **Verify W1** at 10M edge scale (quick — just run existing generator)
 2. **Build W3 (SNAP)** — simpler pipeline (just download + convert, no external tool deps)
-3. **Build W2 (LDBC)** — requires LDBC datagen setup (Java/Spark dependency)
+3. **Build W4 (IBM AML-Data)** — download + convert only; also pairs with W1 in E1 for cross-dataset validation
+4. **Build W2 (LDBC)** — requires LDBC datagen setup (Java/Spark dependency)
 
 ### Verification for Each Workload
 - [ ] Generated CSVs parse correctly (header, correct column count, all values int32)

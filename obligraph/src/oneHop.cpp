@@ -12,6 +12,7 @@
 #include "node_index.h"
 #include "obl_primitives.h"
 #include "obl_building_blocks.h"
+#include "obl_row_ops.h"
 #include "slice_utils.h"
 #include "timer.h"
 #include "config.h"
@@ -97,11 +98,14 @@ namespace obligraph {
                 Row matchedRow;
                 std::memcpy(&matchedRow, result.value, sizeof(Row));
 
-                probeT.rows[i] = ObliviousChoose(
-                    dummy || result.dummy(),
-                    dummyRow,
-                    matchedRow
-                );
+                // obl_row_select: dst = cond ? t_val : f_val.
+                // cond true  -> dummyRow (this is a dummy probe or ORAM entry was empty)
+                // cond false -> matchedRow
+                // Single AVX-512 blend + store; avoids the ObliviousChoose return-by-value temporary.
+                obl_row_select(probeT.rows[i],
+                               /*t_val=*/dummyRow,
+                               /*f_val=*/matchedRow,
+                               /*cond =*/dummy || result.dummy());
             }
         };
 

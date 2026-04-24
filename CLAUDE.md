@@ -16,6 +16,27 @@ See `TDX_MIGRATION_SUMMARY.md` for complete migration details.
 
 # ============== CRITICAL RULES (MUST FOLLOW) ==============
 
+## Obliviousness Guarantee (NEVER BREAK)
+The oblivious execution model of this codebase guarantees that all observable behavior
+(memory access patterns, control flow, timing, allocation sizes, loop bounds) depends
+ONLY on three public quantities:
+  1. Input data sizes (row counts of the input tables).
+  2. Output data size (row count of the result).
+  3. The query itself (schema, predicates, projection columns, join plan).
+
+Any decision — branch, loop bound, array index, allocation size — MUST be derivable
+from those three alone. Values inside rows (keys, column payloads, dummy flags) and
+any intermediate counts MUST NOT influence observable behavior.
+
+When considering any optimization:
+  - Does it branch or allocate based on row *values*?  If yes, it breaks obliviousness.
+  - Does it branch or allocate based on row *counts* or schema?  Fine.
+  - Does it leak information through timing (e.g. data-dependent early exit)?  Breaks it.
+
+Parked optimization ideas (explicitly deferred):
+  - Parallelizing `deduplicateRows` / `reduplicateRows`: a specific technique is
+    planned for this; do not implement a naive chunked version.
+
 ## Code Modification Rules
 - **NEVER modify code with scripts** - Always edit code manually using the Edit tool. No sed, awk, perl, or any script-based modifications.
 - **NO temporary fixes or workarounds** - All issues must be addressed with proper, permanent solutions.
@@ -64,11 +85,19 @@ Use the `--report` flag on `banking_onehop`:
 ```
 The binary prints a `TIMING_REPORTED categories=<cats> total=<ms>ms` line that the regression test / grep harness can parse. The full per-stage breakdown is always printed regardless of `--report`.
 
+### Wall-clock vs diagnostic entries
+Category totals and `TIMING_REPORTED` represent **true wall-clock time**. Stages that run inside the parallel block (both branches and everything nested inside them — dedup, probe, redup, unionWith per side, the dst-side oblivious sort, and the `src/dst branch (total)` wrappers) are marked with `*` in the breakdown and are **excluded from sums**. Including them would double-count the parallel work and defeat the point of running the two sides concurrently.
+
+The stages that DO contribute to the ONLINE wall-clock sum are:
+- `parallel branches (wall)` — the outer scope around both `std::async` branches (≈ max of src/dst branch totals).
+- `unionWith (final)` — sequential stage after the parallel block.
+- `filter` / `project` — sequential, only present when the query has predicates / non-identity projection.
+
 ### Notable stages in the ONLINE breakdown
-- `src branch (total)` / `dst branch (total)` — wall-clock of each parallel branch **in isolation**. Reported for both so you can tell how the two sides would have cost if run sequentially.
-- `parallel branches (wall)` — actual concurrent wall-clock for both branches running together (≈ max of the two branch totals). This is what the ONLINE sum effectively credits against.
-- `probe src` / `probe dst` — the ORAM probe itself, the usual hotspot.
-- `parallel_sort (dst)` — oblivious sort on the dst side; historically large.
+- `src branch (total)` / `dst branch (total)` — wall-clock of each parallel branch **in isolation**. Reported for both so you can tell how the two sides would have cost if run sequentially. Marked `*` (diagnostic).
+- `parallel branches (wall)` — actual concurrent wall-clock for both branches running together (≈ max of the two branch totals). This is what the ONLINE sum credits for the parallel phase.
+- `probe src` / `probe dst` — the ORAM probe itself, the usual hotspot. Diagnostic.
+- `parallel_sort (dst)` — oblivious sort on the dst side; historically large. Diagnostic.
 
 ## Compilation Rules
 - **ALWAYS compile using separate commands from the project root**:

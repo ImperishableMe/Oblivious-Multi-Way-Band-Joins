@@ -16,6 +16,27 @@ See `TDX_MIGRATION_SUMMARY.md` for complete migration details.
 
 # ============== CRITICAL RULES (MUST FOLLOW) ==============
 
+## Obliviousness Guarantee (NEVER BREAK)
+The oblivious execution model of this codebase guarantees that all observable behavior
+(memory access patterns, control flow, timing, allocation sizes, loop bounds) depends
+ONLY on three public quantities:
+  1. Input data sizes (row counts of the input tables).
+  2. Output data size (row count of the result).
+  3. The query itself (schema, predicates, projection columns, join plan).
+
+Any decision — branch, loop bound, array index, allocation size — MUST be derivable
+from those three alone. Values inside rows (keys, column payloads, dummy flags) and
+any intermediate counts MUST NOT influence observable behavior.
+
+When considering any optimization:
+  - Does it branch or allocate based on row *values*?  If yes, it breaks obliviousness.
+  - Does it branch or allocate based on row *counts* or schema?  Fine.
+  - Does it leak information through timing (e.g. data-dependent early exit)?  Breaks it.
+
+Parked optimization ideas (explicitly deferred):
+  - Parallelizing `deduplicateRows` / `reduplicateRows`: a specific technique is
+    planned for this; do not implement a naive chunked version.
+
 ## Code Modification Rules
 - **NEVER modify code with scripts** - Always edit code manually using the Edit tool. No sed, awk, perl, or any script-based modifications.
 - **NO temporary fixes or workarounds** - All issues must be addressed with proper, permanent solutions.

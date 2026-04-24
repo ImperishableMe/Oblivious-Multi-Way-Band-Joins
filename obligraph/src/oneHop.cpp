@@ -6,11 +6,13 @@
 #include <cassert>
 #include <bit>
 #include <cstring>
+#include <random>
 
 #include "xxhash.h"
 #include "node_index.h"
 #include "obl_primitives.h"
 #include "obl_building_blocks.h"
+#include "slice_utils.h"
 #include "timer.h"
 #include "config.h"
 
@@ -153,6 +155,108 @@ namespace obligraph {
         }
     }
 
+    // Parallel dedup: 1 pre-pass (O(P), serial, boundary reads) + 1 parallel scan.
+    // The pre-pass captures each slice's entering lastKey BEFORE any writes, so each
+    // worker can run the original loop independently on its slice with the correct seed.
+    void deduplicateRowsParallel(Table& table, ThreadPool& pool) {
+        const size_t N = table.rows.size();
+        if (N == 0) return;
+        const size_t P = std::min<size_t>(pool.size(), N);
+        const auto slices = buildSlices(N, P);
+        if (slices.empty()) return;
+
+        // Pre-pass: seed[t] = key entering slice t (pre-dedup). Must run before any writes.
+        std::vector<key_t> seed(slices.size());
+        seed[0] = static_cast<key_t>(-1);  // sentinel: idx 0 is always real
+        for (size_t t = 1; t < slices.size(); ++t) {
+            seed[t] = table.rows[slices[t-1].end - 1].key.first;
+        }
+
+        // Phase 3: original loop, per slice, with correct seed.
+        std::vector<std::future<void>> fs;
+        fs.reserve(slices.size());
+        for (size_t t = 0; t < slices.size(); ++t) {
+            fs.push_back(pool.submit([&, t] {
+                // random() is not thread-safe; use a thread-local PRNG instead.
+                // Mask rng() to 31 bits so dummy lands in [2^31, 2^32-1]; serial
+                // random() returns a 31-bit positive long, giving that same range.
+                // This matters because triple32() hashes the low 32 bits of key.first:
+                // if dummy's low-32-bits collide with a real account id (small positive
+                // int), the dummy probe consumes the real ORAM entry and the later real
+                // probe returns a dummy, corrupting results (off-by-one neighbor rows).
+                thread_local std::mt19937_64 rng{std::random_device{}()};
+                key_t lastKey = seed[t];
+                for (size_t i = slices[t].begin; i < slices[t].end; ++i) {
+                    key_t currentKey = table.rows[i].key.first;
+                    key_t dummy = ((static_cast<key_t>(rng()) & 0x7FFFFFFFULL)
+                                   + (key_t(1) << 31));
+                    table.rows[i].key.first =
+                        ObliviousChoose(lastKey == currentKey, dummy, currentKey);
+                    table.rows[i].setDummy(lastKey == currentKey);
+                    lastKey = currentKey;
+                }
+            }));
+        }
+        for (auto& f : fs) f.get();
+    }
+
+    // Parallel redup: canonical 3-phase carry-forward scan.
+    // Phase 1 (parallel): each thread records its slice's tail real row.
+    // Phase 2 (serial,   O(P)): compute seed[t] = real row in effect entering slice t.
+    // Phase 3 (parallel): original redup loop per slice, seeded.
+    void reduplicateRowsParallel(Table& table, ThreadPool& pool) {
+        const size_t N = table.rows.size();
+        if (N == 0) return;
+        const size_t P = std::min<size_t>(pool.size(), N);
+        const auto slices = buildSlices(N, P);
+        if (slices.empty()) return;
+
+        // Phase 1: find "tail real row" per slice.
+        std::vector<Row>     tail(slices.size());
+        std::vector<uint8_t> tailReal(slices.size(), 0);
+
+        std::vector<std::future<void>> fs;
+        fs.reserve(slices.size());
+        for (size_t t = 0; t < slices.size(); ++t) {
+            fs.push_back(pool.submit([&, t] {
+                Row cur;
+                uint8_t have = 0;
+                for (size_t i = slices[t].begin; i < slices[t].end; ++i) {
+                    bool real = !table.rows[i].isDummy();
+                    cur  = ObliviousChoose(real, table.rows[i], cur);
+                    have = ObliviousChoose(real, uint8_t{1}, have);
+                }
+                tail[t]     = cur;
+                tailReal[t] = have;
+            }));
+        }
+        for (auto& f : fs) f.get();
+        fs.clear();
+
+        // Phase 2: serial walk, seed[t] = running, then fold tail[t] into running.
+        std::vector<Row> seed(slices.size());
+        Row running;  // default-constructed; matches serial reduplicateRows's initial state
+        for (size_t t = 0; t < slices.size(); ++t) {
+            seed[t] = running;
+            running = ObliviousChoose(tailReal[t] != 0, tail[t], running);
+        }
+
+        // Phase 3: original redup loop, per slice, with seeded lastRow.
+        for (size_t t = 0; t < slices.size(); ++t) {
+            fs.push_back(pool.submit([&, t] {
+                Row lastRow = seed[t];
+                for (size_t i = slices[t].begin; i < slices[t].end; ++i) {
+                    auto secKey = table.rows[i].key.second;
+                    table.rows[i] = ObliviousChoose(
+                        table.rows[i].isDummy(), lastRow, table.rows[i]);
+                    table.rows[i].key.second = secKey;
+                    lastRow = table.rows[i];
+                }
+            }));
+        }
+        for (auto& f : fs) f.get();
+    }
+
     Table buildSourceAndEdgeTables(Catalog& catalog, const OneHopQuery& query,
                                     ThreadPool &pool, NodeIndex* srcIndex) {
         TimedScope ts_total("src branch (total)", "ONLINE", /*contributes_to_total=*/false);
@@ -175,7 +279,7 @@ namespace obligraph {
             }
             {
                 TimedScope ts("deduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
-                deduplicateRows(srcSide);
+                deduplicateRowsParallel(srcSide, pool);
             }
 
             if (srcIndex)
@@ -185,7 +289,7 @@ namespace obligraph {
 
             {
                 TimedScope ts("reduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
-                reduplicateRows(srcSide);
+                reduplicateRowsParallel(srcSide, pool);
             }
             {
                 TimedScope ts("unionWith (src)", "ONLINE", /*contributes_to_total=*/false);
@@ -228,7 +332,7 @@ namespace obligraph {
         }
         {
             TimedScope ts("deduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
-            deduplicateRows(srcSide);
+            deduplicateRowsParallel(srcSide, pool);
         }
 
         if (srcIndex)
@@ -238,7 +342,7 @@ namespace obligraph {
 
         {
             TimedScope ts("reduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
-            reduplicateRows(srcSide);
+            reduplicateRowsParallel(srcSide, pool);
         }
         {
             TimedScope ts("unionWith (src)", "ONLINE", /*contributes_to_total=*/false);
@@ -285,7 +389,7 @@ namespace obligraph {
             }
             {
                 TimedScope ts("deduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
-                deduplicateRows(dstSide);
+                deduplicateRowsParallel(dstSide, pool);
             }
 
             if (dstIndex)
@@ -295,7 +399,7 @@ namespace obligraph {
 
             {
                 TimedScope ts("reduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
-                reduplicateRows(dstSide);
+                reduplicateRowsParallel(dstSide, pool);
             }
             {
                 TimedScope ts("unionWith (dst)", "ONLINE", /*contributes_to_total=*/false);
@@ -330,7 +434,7 @@ namespace obligraph {
         }
         {
             TimedScope ts("deduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
-            deduplicateRows(dstSide);
+            deduplicateRowsParallel(dstSide, pool);
         }
 
         if (dstIndex)
@@ -340,7 +444,7 @@ namespace obligraph {
 
         {
             TimedScope ts("reduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
-            reduplicateRows(dstSide);
+            reduplicateRowsParallel(dstSide, pool);
         }
         {
             TimedScope ts("unionWith (dst)", "ONLINE", /*contributes_to_total=*/false);

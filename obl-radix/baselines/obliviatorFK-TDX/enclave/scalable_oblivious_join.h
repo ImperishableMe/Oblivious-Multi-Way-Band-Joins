@@ -30,4 +30,22 @@ void scalable_oblivious_join_free();
 
 double scalable_oblivious_join(elem_t *arr, long long length1, long long length2, char* output_path, double *sort_time_out);
 
+/* Multi-way variant: same as scalable_oblivious_join, but hands back the
+ * matched pairs as two elem_t[] arrays instead of rendering to ASCII.
+ *
+ *   arr              (in/out) caller-owned buffer of length length1+length2.
+ *                    On return, [0..*result_len) holds the compacted
+ *                    table_0=false (probe-side) rows.
+ *   *arr_out         (out)    freshly-malloc'd array of length length1+length2.
+ *                    On return, [0..*result_len) holds the compacted
+ *                    table_0=true (index-side) rows. CALLER MUST FREE.
+ *   *result_len      (out)    number of matched pairs.
+ *   *sort_time_out   (out)    bitonic sort time in seconds (same as original).
+ *
+ * Return value: total execution time in seconds.
+ */
+double scalable_oblivious_join_to_array(elem_t *arr, long long length1, long long length2,
+                                         elem_t **arr_out, long long *result_len,
+                                         double *sort_time_out);
+
 #endif /* distributed-sgx-sort/enclave/ojoin.h */

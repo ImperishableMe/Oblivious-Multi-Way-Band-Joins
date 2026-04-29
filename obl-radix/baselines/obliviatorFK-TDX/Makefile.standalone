@@ -1,0 +1,34 @@
+CC = gcc
+CFLAGS = -DPRE_ALLOCATION -DDISTRIBUTED_SGX_SORT_HOSTONLY -DSTANDALONE_BUILD \
+         -I. -Ithird_party/liboblivious/include \
+         -pthread -O3 -march=native -mno-avx512f
+
+CORE_SOURCES = \
+    enclave/synch.c \
+    enclave/scalable_oblivious_join.c \
+    enclave/bitonic.c \
+    enclave/oblivious_compact.c \
+    enclave/threading.c \
+    common/error.c \
+    common/util.c 
+
+all: liboblivious standalone_join multiway_join
+
+liboblivious:
+	$(MAKE) -C third_party/liboblivious
+
+standalone_join: liboblivious
+	$(CC) $(CFLAGS) standalone_main.c $(CORE_SOURCES) \
+	    -Lthird_party/liboblivious -l:liboblivious.a \
+	    -lm -o standalone_join
+
+multiway_join: liboblivious
+	$(CC) $(CFLAGS) multiway_main.c $(CORE_SOURCES) \
+	    -Lthird_party/liboblivious -l:liboblivious.a \
+	    -lm -o multiway_join
+
+clean:
+	rm -f standalone_join multiway_join
+	$(MAKE) -C third_party/liboblivious clean
+
+.PHONY: all clean liboblivious

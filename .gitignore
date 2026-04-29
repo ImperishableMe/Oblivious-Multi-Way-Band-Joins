@@ -23,6 +23,10 @@ sqlite_baseline
 overhead_*
 *_test
 
+# Obliviator baseline binaries
+obl-radix/baselines/*/multiway_join
+obl-radix/baselines/*/standalone_join
+
 # Test outputs
 *.log
 *.trace

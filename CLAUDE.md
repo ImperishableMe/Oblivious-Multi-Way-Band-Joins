@@ -73,7 +73,7 @@ Parked optimization ideas (explicitly deferred):
 ## oneHop Timing Categories (banking_onehop binary)
 `banking_onehop` emits a structured timing breakdown at the end of every run. Each stage is tagged with exactly one category:
 - **`ONLINE`** — the per-query oblivious work (deduplicate, ORAM probe, reduplicate, sort, union, filter, project). **This is the default "oneHop time" to report** — it's what recurs per query.
-- **`OFFLINE`** — one-time index build + deep-copy (`buildNodeIndex`, `index copy (src)`). Report this alongside ONLINE if the setup cost is part of the comparison.
+- **`OFFLINE`** — query-independent setup: index build, index deep-copy, and per-side probe-scaffold initialization (`buildNodeIndex`, `index copy (src)`, `initProbeSide (wall)`, with `initProbeSide (src)` / `(dst)` as diagnostic per-side breakdowns). Report this alongside ONLINE if the setup cost is part of the comparison.
 - **`IO`** — CSV read/write. Typically **excluded** from reported times.
 
 ### Selecting which categories to report
@@ -98,6 +98,12 @@ The stages that DO contribute to the ONLINE wall-clock sum are:
 - `parallel branches (wall)` — actual concurrent wall-clock for both branches running together (≈ max of the two branch totals). This is what the ONLINE sum credits for the parallel phase.
 - `probe src` / `probe dst` — the ORAM probe itself, the usual hotspot. Diagnostic.
 - `parallel_sort (dst)` — oblivious sort on the dst side; historically large. Diagnostic.
+
+### Notable stages in the OFFLINE breakdown
+- `buildNodeIndex` — builds the oblivious cuckoo/bin index from the node table; sized by the public edge count.
+- `index copy (src)` — deep-copies the index for the src side because probing is destructive.
+- `initProbeSide (src)` / `initProbeSide (dst)` — populate the per-side probe scaffold (resize to `edgeCount` + parallel key-copy from the corresponding edge table). Marked `*` (diagnostic); they run concurrently inside `initProbeSide (wall)`.
+- `initProbeSide (wall)` — actual concurrent wall-clock for both side scaffolds running together (≈ max of (src) and (dst)). This is what the OFFLINE sum credits for scaffold init.
 
 ## One-Hop Scaling Benchmark
 Use `scripts/run_onehop_scaling.py` to measure how the per-stage breakdown of `banking_onehop` scales with dataset size. This is the canonical way to gather the timing data we report for one-hop scaling.

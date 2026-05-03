@@ -18,7 +18,7 @@
  * Override at compile time with -DDATA_LENGTH=N for future workloads.
  */
 #ifndef DATA_LENGTH
-#define DATA_LENGTH 640
+#define DATA_LENGTH 64
 #endif
 
 typedef long long ojoin_int_type;

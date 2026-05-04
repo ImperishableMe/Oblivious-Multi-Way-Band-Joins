@@ -4,11 +4,12 @@
  * Driver program to run one-hop join on banking dataset (account -> txn -> account).
  *
  * Usage:
- *   ./banking_onehop <data_dir> <output_csv> [--report ONLINE] [--report ONLINE,OFFLINE]
+ *   ./banking_onehop <data_dir> <output_csv> [--report CATS] [--threads N]
  *
  *   --report <cats>   Comma-separated list of timing categories to sum for the
  *                     TIMING_REPORTED line (default: ONLINE).
  *                     Categories: IO, OFFLINE, ONLINE
+ *   --threads <N>     Override the thread count (default: std::thread::hardware_concurrency()).
  */
 
 #include <iostream>
@@ -64,15 +65,17 @@ static vector<string> splitComma(const string& s) {
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        cerr << "Usage: " << argv[0] << " <data_dir> <output_csv> [--report CATS]\n"
+        cerr << "Usage: " << argv[0] << " <data_dir> <output_csv> [--report CATS] [--threads N]\n"
              << "  CATS: comma-separated categories to report (default: ONLINE)\n"
-             << "  Categories: IO, OFFLINE, ONLINE\n";
+             << "  Categories: IO, OFFLINE, ONLINE\n"
+             << "  N:     thread count (default: hardware_concurrency())\n";
         return 1;
     }
 
     string dataDir   = argv[1];
     string outputPath = argv[2];
     vector<string> reportCats = {"ONLINE"};
+    int nthreadsOverride = 0;  // 0 = unset, fall back to hardware_concurrency()
 
     for (int i = 3; i < argc; i++) {
         string arg = argv[i];
@@ -80,11 +83,21 @@ int main(int argc, char* argv[]) {
             reportCats = splitComma(argv[++i]);
         } else if (arg.rfind("--report=", 0) == 0) {
             reportCats = splitComma(arg.substr(9));
+        } else if (arg == "--threads" && i + 1 < argc) {
+            nthreadsOverride = std::stoi(argv[++i]);
+        } else if (arg.rfind("--threads=", 0) == 0) {
+            nthreadsOverride = std::stoi(arg.substr(10));
         }
+    }
+    if (nthreadsOverride < 0) {
+        cerr << "--threads must be > 0 (got " << nthreadsOverride << ")\n";
+        return 1;
     }
 
     try {
-        int nthreads = std::thread::hardware_concurrency();
+        int nthreads = nthreadsOverride > 0
+                       ? nthreadsOverride
+                       : static_cast<int>(std::thread::hardware_concurrency());
         obligraph::number_of_threads.store(nthreads);
         cout << "Using " << nthreads << " threads\n";
 

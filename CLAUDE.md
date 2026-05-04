@@ -73,7 +73,7 @@ Parked optimization ideas (explicitly deferred):
 ## oneHop Timing Categories (banking_onehop binary)
 `banking_onehop` emits a structured timing breakdown at the end of every run. Each stage is tagged with exactly one category:
 - **`ONLINE`** — the per-query oblivious work (deduplicate, ORAM probe, reduplicate, sort, union, filter, project). **This is the default "oneHop time" to report** — it's what recurs per query.
-- **`OFFLINE`** — one-time index build + deep-copy (`buildNodeIndex`, `index copy (src)`). Report this alongside ONLINE if the setup cost is part of the comparison.
+- **`OFFLINE`** — query-independent setup: index build, index deep-copy, and per-side probe-scaffold initialization (`buildNodeIndex`, `index copy (src)`, `initProbeSide (wall)`, with `initProbeSide (src)` / `(dst)` as diagnostic per-side breakdowns). Report this alongside ONLINE if the setup cost is part of the comparison.
 - **`IO`** — CSV read/write. Typically **excluded** from reported times.
 
 ### Selecting which categories to report
@@ -98,6 +98,45 @@ The stages that DO contribute to the ONLINE wall-clock sum are:
 - `parallel branches (wall)` — actual concurrent wall-clock for both branches running together (≈ max of the two branch totals). This is what the ONLINE sum credits for the parallel phase.
 - `probe src` / `probe dst` — the ORAM probe itself, the usual hotspot. Diagnostic.
 - `parallel_sort (dst)` — oblivious sort on the dst side; historically large. Diagnostic.
+
+### Notable stages in the OFFLINE breakdown
+- `buildNodeIndex` — builds the oblivious cuckoo/bin index from the node table; sized by the public edge count.
+- `index copy (src)` — deep-copies the index for the src side because probing is destructive.
+- `initProbeSide (src)` / `initProbeSide (dst)` — populate the per-side probe scaffold (resize to `edgeCount` + parallel key-copy from the corresponding edge table). Marked `*` (diagnostic); they run concurrently inside `initProbeSide (wall)`.
+- `initProbeSide (wall)` — actual concurrent wall-clock for both side scaffolds running together (≈ max of (src) and (dst)). This is what the OFFLINE sum credits for scaffold init.
+
+## One-Hop Scaling Benchmark
+Use `scripts/run_onehop_scaling.py` to measure how the per-stage breakdown of `banking_onehop` scales with dataset size. This is the canonical way to gather the timing data we report for one-hop scaling.
+
+### What it does (in order)
+1. Rebuilds `obligraph/build/banking_onehop` in Release mode (`-O3 -DNDEBUG`) — skip with `--skip-build`.
+2. Generates Banking W1 datasets at **200K / 500K / 1M / 10M accounts** (5× txns each = 1M / 2.5M / 5M / 50M edges) under `input/plaintext/banking_{200k,500k,1M,10M}` using `scripts/generate_banking_scaled.py --seed 42`. A dataset is regenerated only if its row counts don't match what seed=42 would produce; skip generation entirely with `--skip-generation`.
+3. Runs `banking_onehop` **twice per dataset, strictly sequentially** — run 1 is a cache warm-up and is discarded; run 2 is the recorded measurement. Each invocation gets the full machine; the binary picks its own thread count from available cores.
+4. Parses the binary's `=== TIMING BREAKDOWN ===` block and emits the CSVs below.
+
+### Run commands
+```
+python3 scripts/run_onehop_scaling.py                                  # full run, fresh build, regenerate any missing/wrong-sized datasets
+python3 scripts/run_onehop_scaling.py --skip-build --skip-generation   # re-run experiment only
+python3 scripts/run_onehop_scaling.py --sizes 200k                     # subset, e.g. for smoke tests
+```
+
+### Output files (in `results/onehop_scaling/`)
+- `breakdown.csv` — raw per-stage timings, **both runs** (warm-up + measured). Columns: `dataset, num_accounts, num_edges, run_id, is_warmup, stage, category, time_ms, in_wall_clock`.
+- `breakdown_summary.csv` — same as above but **run 2 only**, plus `timing_reported_categories` and `timing_reported_total_ms`. `run_id` and `is_warmup` are dropped (they would be constant).
+- `breakdown_sorted.csv` — derived from `breakdown_summary.csv` with **IO category removed** and stages sorted by `time_ms` **descending within each dataset** (`rank` column = 1 is the most expensive stage). Use this to spot where time is going at each scale.
+- `category_summary.csv` — top-level latency, **one row per dataset**, wide format: `dataset, num_accounts, num_edges, online_ms, offline_ms`. Both numbers are wall-clock-contributing totals (sum of stages where `in_wall_clock=1`).
+- `run_metadata.json` — git commit, branch, hostname, `nproc`, build flags, seed, timestamp. Reproducibility context for the CSVs.
+- `binary_stdout.log` — full stdout from every `banking_onehop` invocation.
+
+### `in_wall_clock` flag
+Every per-stage row carries `in_wall_clock` ∈ {0, 1}:
+- `1` — the stage runs sequentially within its category and contributes to the category total. Summing `in_wall_clock=1` rows for a category gives the truthful wall-clock figure.
+- `0` — diagnostic stages that run *inside* `parallel branches (wall)` (per-side dedup/probe/redup/union, plus `parallel_sort (dst)`, plus the `src/dst branch (total)` wrappers). These are reported only so you can see *how* the parallel block spent its time. They must NOT be summed alongside `in_wall_clock=1` rows or you'll double-count parallel work.
+
+### Reproducibility notes
+- All four datasets are generated under **seed 42** so the experiment is reproducible. The row-count check only verifies size, not content — if you suspect a directory was generated under a different seed, `rm -rf` it before running.
+- The run is **strictly sequential** by design: dataset generation is one-at-a-time, and the binary is invoked one run at a time. This guarantees each invocation has the full machine and avoids contention that would distort per-stage timings.
 
 ## Compilation Rules
 - **ALWAYS compile using separate commands from the project root**:

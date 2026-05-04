@@ -262,7 +262,8 @@ namespace obligraph {
     }
 
     Table buildSourceAndEdgeTables(Catalog& catalog, const OneHopQuery& query,
-                                    ThreadPool &pool, NodeIndex* srcIndex) {
+                                    ThreadPool &pool, NodeIndex* srcIndex,
+                                    Table srcSide) {
         TimedScope ts_total("src branch (total)", "ONLINE", /*contributes_to_total=*/false);
 
         string srcPrefix = query.sourceNodeTableName;
@@ -275,12 +276,7 @@ namespace obligraph {
             // is not read again after this call. Avoids a 50M-row copy on banking_10M.
             Table edgeTableFwd = std::move(catalog.getTable(query.edgeTableName + "_fwd"));
 
-            Table srcSide;
-            srcSide.init(srcRef);
-            {
-                TimedScope ts("initProbeSide (src)", "ONLINE", /*contributes_to_total=*/false);
-                initProbeSide(srcSide, edgeTableFwd, pool);
-            }
+            // srcSide arrives initialized (full node schema, edge keys copied) — see oneHop().
             {
                 TimedScope ts("deduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
                 deduplicateRowsParallel(srcSide, pool);
@@ -302,38 +298,27 @@ namespace obligraph {
             return edgeTableFwd;
         }
 
-        set<string> srcColumns;
         set<string> edgeColumns;
 
-        // srcTable is only read by .project() (const method), so bind by reference —
-        // avoids copying the full node table (10M rows on banking_10M).
+        // srcTable is only read by build_and_probe (the no-srcIndex fallback), so bind
+        // by reference — avoids copying the full node table (10M rows on banking_10M).
         const Table& srcTable = catalog.getTable(query.sourceNodeTableName);
         // Move out of the catalog: single-use driver, fwd edge table not read again.
         Table edgeTableFwd = std::move(catalog.getTable(query.edgeTableName + "_fwd"));
 
         for (const auto& col : query.projectionColumns) {
-            if (col.first == query.sourceNodeTableName ||
-                (col.first.length() > 4 && col.first.substr(col.first.length() - 4) == "_src"))
-                srcColumns.insert(col.second);
-            else if (col.first == query.edgeTableName)
+            if (col.first == query.edgeTableName)
                 edgeColumns.insert(col.second);
         }
         for (const auto& tablePred : query.tablePredicates) {
-            if (tablePred.first == query.sourceNodeTableName)
-                for (const auto& pred : tablePred.second) srcColumns.insert(pred.column);
-            else if (tablePred.first == query.edgeTableName)
+            if (tablePred.first == query.edgeTableName)
                 for (const auto& pred : tablePred.second) edgeColumns.insert(pred.column);
         }
 
-        Table srcProjected = srcTable.project(vector<string>(srcColumns.begin(), srcColumns.end()), pool);
+        // srcSide carries the full node schema (built in oneHop OFFLINE phase). Per-query
+        // narrowing of node columns is deferred to applyFilterAndProject.
         Table edgeProjectedFwd = edgeTableFwd.project(vector<string>(edgeColumns.begin(), edgeColumns.end()), pool);
 
-        Table srcSide;
-        srcSide.init(srcProjected);
-        {
-            TimedScope ts("initProbeSide (src)", "ONLINE", /*contributes_to_total=*/false);
-            initProbeSide(srcSide, edgeProjectedFwd, pool);
-        }
         {
             TimedScope ts("deduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
             deduplicateRowsParallel(srcSide, pool);
@@ -342,7 +327,7 @@ namespace obligraph {
         if (srcIndex)
             probe_with_index(*srcIndex, srcSide, pool, "src");
         else
-            build_and_probe(srcProjected, srcSide, pool);
+            build_and_probe(srcTable, srcSide, pool);
 
         {
             TimedScope ts("reduplicateRows (src)", "ONLINE", /*contributes_to_total=*/false);
@@ -356,7 +341,8 @@ namespace obligraph {
     }
 
     Table buildDestinationTable(Catalog& catalog, const OneHopQuery& query,
-                                ThreadPool& pool, NodeIndex* dstIndex) {
+                                ThreadPool& pool, NodeIndex* dstIndex,
+                                Table dstSide) {
         TimedScope ts_total("dst branch (total)", "ONLINE", /*contributes_to_total=*/false);
 
         string dstPrefix = query.destNodeTableName;
@@ -385,12 +371,7 @@ namespace obligraph {
         if (query.projectionColumns.empty()) {
             const Table& dstRef = catalog.getTable(query.destNodeTableName);
 
-            Table dstSide;
-            dstSide.init(dstRef);
-            {
-                TimedScope ts("initProbeSide (dst)", "ONLINE", /*contributes_to_total=*/false);
-                initProbeSide(dstSide, edgeTableRev, pool);
-            }
+            // dstSide arrives initialized (full node schema, edge keys copied) — see oneHop().
             {
                 TimedScope ts("deduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
                 deduplicateRowsParallel(dstSide, pool);
@@ -413,29 +394,12 @@ namespace obligraph {
             return doSortAndReturn();
         }
 
-        set<string> dstColumns;
-        // dstTable is only read by .project() (const method), so bind by reference —
-        // avoids copying the full node table.
+        // dstTable is only read by build_and_probe (the no-dstIndex fallback), so bind
+        // by reference — avoids copying the full node table.
         const Table& dstTable = catalog.getTable(query.destNodeTableName);
 
-        for (const auto& col : query.projectionColumns) {
-            if (col.first == query.destNodeTableName ||
-                (col.first.length() > 5 && col.first.substr(col.first.length() - 5) == "_dest"))
-                dstColumns.insert(col.second);
-        }
-        for (const auto& tablePred : query.tablePredicates) {
-            if (tablePred.first == query.destNodeTableName)
-                for (const auto& pred : tablePred.second) dstColumns.insert(pred.column);
-        }
-
-        Table dstProjected = dstTable.project(vector<string>(dstColumns.begin(), dstColumns.end()), pool);
-
-        Table dstSide;
-        dstSide.init(dstProjected);
-        {
-            TimedScope ts("initProbeSide (dst)", "ONLINE", /*contributes_to_total=*/false);
-            initProbeSide(dstSide, edgeTableRev, pool);
-        }
+        // dstSide carries the full node schema (built in oneHop OFFLINE phase). Per-query
+        // narrowing of node columns is deferred to applyFilterAndProject.
         {
             TimedScope ts("deduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
             deduplicateRowsParallel(dstSide, pool);
@@ -444,7 +408,7 @@ namespace obligraph {
         if (dstIndex)
             probe_with_index(*dstIndex, dstSide, pool, "dst");
         else
-            build_and_probe(dstProjected, dstSide, pool);
+            build_and_probe(dstTable, dstSide, pool);
 
         {
             TimedScope ts("reduplicateRows (dst)", "ONLINE", /*contributes_to_total=*/false);
@@ -506,14 +470,39 @@ namespace obligraph {
         result = result.project(projectionColumns, pool);
     }
 
+    // Build the two probe-side scaffolds: full node schema + per-edge key copy. The
+    // result depends only on the graph (node table + edge keys + edge count), never on
+    // query particulars, so this whole block is OFFLINE — query-independent setup that
+    // can be amortized across queries against the same graph.
+    static void initProbeSidesOffline(Catalog& catalog, const OneHopQuery& query,
+                                       ThreadPool& pool, Table& srcSide, Table& dstSide) {
+        srcSide.init(catalog.getTable(query.sourceNodeTableName));
+        dstSide.init(catalog.getTable(query.destNodeTableName));
+        TimedScope ts_wall("initProbeSide (wall)", "OFFLINE");
+        auto fSrc = std::async(std::launch::async, [&] {
+            TimedScope ts("initProbeSide (src)", "OFFLINE", /*contributes_to_total=*/false);
+            initProbeSide(srcSide, catalog.getTable(query.edgeTableName + "_fwd"), pool);
+        });
+        {
+            TimedScope ts("initProbeSide (dst)", "OFFLINE", /*contributes_to_total=*/false);
+            initProbeSide(dstSide, catalog.getTable(query.edgeTableName + "_rev"), pool);
+        }
+        fSrc.get();
+    }
+
     Table oneHop(Catalog& catalog, OneHopQuery& query, ThreadPool& pool) {
+        Table srcSide, dstSide;
+        initProbeSidesOffline(catalog, query, pool, srcSide, dstSide);
+
         Table edgeProjectedFwd, edgeProjectedRev;
         {
             TimedScope ts("parallel branches (wall)", "ONLINE");
             auto futureFwd = std::async(std::launch::async, buildSourceAndEdgeTables,
-                                        std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
+                                        std::ref(catalog), std::ref(query), std::ref(pool),
+                                        nullptr, std::move(srcSide));
             auto futureRev = std::async(std::launch::async, buildDestinationTable,
-                                        std::ref(catalog), std::ref(query), std::ref(pool), nullptr);
+                                        std::ref(catalog), std::ref(query), std::ref(pool),
+                                        nullptr, std::move(dstSide));
             edgeProjectedFwd = futureFwd.get();
             edgeProjectedRev = futureRev.get();
         }
@@ -531,13 +520,18 @@ namespace obligraph {
         NodeIndex* srcPtr = srcIndex.release();
         NodeIndex* dstPtr = dstIndex.release();
 
+        Table srcSide, dstSide;
+        initProbeSidesOffline(catalog, query, pool, srcSide, dstSide);
+
         Table edgeProjectedFwd, edgeProjectedRev;
         {
             TimedScope ts("parallel branches (wall)", "ONLINE");
             auto futureFwd = std::async(std::launch::async, buildSourceAndEdgeTables,
-                                        std::ref(catalog), std::ref(query), std::ref(pool), srcPtr);
+                                        std::ref(catalog), std::ref(query), std::ref(pool),
+                                        srcPtr, std::move(srcSide));
             auto futureRev = std::async(std::launch::async, buildDestinationTable,
-                                        std::ref(catalog), std::ref(query), std::ref(pool), dstPtr);
+                                        std::ref(catalog), std::ref(query), std::ref(pool),
+                                        dstPtr, std::move(dstSide));
             edgeProjectedFwd = futureFwd.get();
             delete srcPtr;
             edgeProjectedRev = futureRev.get();

@@ -176,6 +176,7 @@ namespace ORAM
                      two_tier_time) = OTwoTierHash<KeyType,
                                                    BlockSize>::compute_epsilon_inv(data.data(),
                                                                                    n,
+                                                                                   op_num,
                                                                                    delta_inv_log2);
             time_file << dp_cnt << "n: " << n << " op_num: " << op_num << " two_tier_time: " << two_tier_time << ", epsilon: " << epsilon_inv << std::endl;
         }

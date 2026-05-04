@@ -69,6 +69,7 @@ namespace ORAM
         static std::tuple<KeyType, double> compute_epsilon_inv(
             Block<KeyType, BlockSize> *data,
             const KeyType n,
+            const KeyType op_num,
             const KeyType delta_inv_log2 = DELTA_INV_LOG2)
         {
             std::random_device rd;
@@ -87,7 +88,7 @@ namespace ORAM
                 OTwoTierHash<KeyType, BlockSize> oht(n, delta_inv_log2, epsilon_inv);
                 Timer t;
                 oht.build(data);
-                for (KeyType i = 0; i < n; i++)
+                for (KeyType i = 0; i < op_num; i++)
                     oht[dist(gen)];
                 oht.extract();
                 double cur_time = t.get_total_time();

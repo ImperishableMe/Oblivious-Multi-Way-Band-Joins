@@ -12,7 +12,7 @@ CORE_SOURCES = \
     common/error.c \
     common/util.c 
 
-all: liboblivious standalone_join multiway_join obliviator_1hop
+all: liboblivious standalone_join multiway_join obliviator_1hop obliviator_1hop_chained
 
 liboblivious:
 	$(MAKE) -C third_party/liboblivious
@@ -32,8 +32,13 @@ obliviator_1hop: liboblivious
 	    -Lthird_party/liboblivious -l:liboblivious.a \
 	    -lm -o obliviator_1hop
 
+obliviator_1hop_chained: liboblivious
+	$(CC) $(CFLAGS) obliviator_1hop_chained_main.c $(CORE_SOURCES) \
+	    -Lthird_party/liboblivious -l:liboblivious.a \
+	    -lm -o obliviator_1hop_chained
+
 clean:
-	rm -f standalone_join multiway_join obliviator_1hop
+	rm -f standalone_join multiway_join obliviator_1hop obliviator_1hop_chained
 	$(MAKE) -C third_party/liboblivious clean
 
 .PHONY: all clean liboblivious

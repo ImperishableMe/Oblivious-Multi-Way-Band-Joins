@@ -23,6 +23,14 @@ sqlite_baseline
 overhead_*
 *_test
 
+# Obliviator baseline binaries
+obl-radix/baselines/*/multiway_join
+obl-radix/baselines/*/standalone_join
+obl-radix/baselines/*/obliviator_1hop
+
+# Obliviator scratch dirs (converter outputs, test outputs)
+obl-radix/baselines/*/work_*/
+
 # Test outputs
 *.log
 *.trace

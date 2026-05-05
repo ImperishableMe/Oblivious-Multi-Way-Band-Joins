@@ -1,0 +1,44 @@
+CC = gcc
+CFLAGS = -DPRE_ALLOCATION -DDISTRIBUTED_SGX_SORT_HOSTONLY -DSTANDALONE_BUILD \
+         -I. -Ithird_party/liboblivious/include \
+         -pthread -O3 -march=native -mno-avx512f
+
+CORE_SOURCES = \
+    enclave/synch.c \
+    enclave/scalable_oblivious_join.c \
+    enclave/bitonic.c \
+    enclave/oblivious_compact.c \
+    enclave/threading.c \
+    common/error.c \
+    common/util.c 
+
+all: liboblivious standalone_join multiway_join obliviator_1hop obliviator_1hop_chained
+
+liboblivious:
+	$(MAKE) -C third_party/liboblivious
+
+standalone_join: liboblivious
+	$(CC) $(CFLAGS) standalone_main.c $(CORE_SOURCES) \
+	    -Lthird_party/liboblivious -l:liboblivious.a \
+	    -lm -o standalone_join
+
+multiway_join: liboblivious
+	$(CC) $(CFLAGS) multiway_main.c $(CORE_SOURCES) \
+	    -Lthird_party/liboblivious -l:liboblivious.a \
+	    -lm -o multiway_join
+
+obliviator_1hop: liboblivious
+	$(CC) $(CFLAGS) obliviator_1hop_main.c $(CORE_SOURCES) \
+	    -Lthird_party/liboblivious -l:liboblivious.a \
+	    -lm -o obliviator_1hop
+
+obliviator_1hop_chained: liboblivious
+	$(CC) $(CFLAGS) obliviator_1hop_chained_main.c $(CORE_SOURCES) \
+	    -Lthird_party/liboblivious -l:liboblivious.a \
+	    -lm -o obliviator_1hop_chained
+
+clean:
+	rm -f standalone_join multiway_join obliviator_1hop obliviator_1hop_chained
+	$(MAKE) -C third_party/liboblivious clean
+
+.PHONY: all clean liboblivious

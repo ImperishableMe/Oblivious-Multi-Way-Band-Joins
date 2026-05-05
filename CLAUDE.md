@@ -14,6 +14,24 @@ Key changes:
 
 See `TDX_MIGRATION_SUMMARY.md` for complete migration details.
 
+## "The Obliviator One Hop" — Canonical Reference
+
+When the user says **"the obliviator one hop"** (without further qualification),
+they mean the **chained FK driver**, not the join-sort variant.
+
+- **Source:** `obl-radix/baselines/obliviatorFK-TDX/obliviator_1hop_chained_main.c`
+- **Build target:** `obliviator_1hop_chained` (via `Makefile.standalone`)
+- **CLI:** `./obliviator_1hop_chained <num_threads> <src.txt> <output.csv>`
+- **Pipeline:** `account ⋈ txn` on `acc_from` → repack as intermediate keyed by
+  `acc_to` → `account ⋈ inter` on `acc_to`. No bitonic stitch.
+- **Headline:** banking_1M @ 32 threads, OBLIVIOUS WORK ≈ 0.60 s.
+
+The other variant (`obliviator_1hop_main.c`, the "join-sort" baseline at
+commit `77e89e1`) does two independent FK joins followed by an oblivious
+bitonic stitch by `txn_id`. It is kept as an alternative reference, but
+is **not** the default. Only use it when the user explicitly says
+"join-sort baseline" or names it directly.
+
 # ============== CRITICAL RULES (MUST FOLLOW) ==============
 
 ## Obliviousness Guarantee (NEVER BREAK)

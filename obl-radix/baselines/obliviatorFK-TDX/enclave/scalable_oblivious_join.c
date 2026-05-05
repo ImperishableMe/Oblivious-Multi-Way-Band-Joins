@@ -194,7 +194,20 @@ void aggregation_tree_op2(void *voidargs) {
     return;
 }
 
-double scalable_oblivious_join(elem_t *arr, long long length1, long long length2, char* output_path, double *sort_time_out){
+/* Internal core: runs bitonic sort + aggregation + oblivious compaction.
+ *
+ * Hands back the compacted matched pairs via out-params so both the original
+ * text-emitting wrapper (scalable_oblivious_join) and the multi-way array
+ * wrapper (scalable_oblivious_join_to_array) can share the body.
+ *
+ * On return:
+ *   arr[0..*result_len)           compacted table_0=false (probe) rows.
+ *   (*arr_index_out)[0..*result_len)  compacted table_0=true  (index) rows.
+ * *arr_index_out is a fresh calloc; caller must free().
+ */
+static double oblivious_join_core(elem_t *arr, long long length1, long long length2,
+                                   elem_t **arr_index_out, long long *result_len,
+                                   double *sort_time_out) {
     long long length = length1 + length2;
     elem_t* arr_ = calloc(length, sizeof(*arr_));
     for (long long i = 0; i < length; i++) {
@@ -215,7 +228,7 @@ double scalable_oblivious_join(elem_t *arr, long long length1, long long length2
     control_bit = calloc(length, sizeof(*control_bit));
     int result_length = 0;
     control_bit[0] = false;
-    // init_time2();
+
     gettimeofday(&start_time, NULL);
 
     bitonic_sort(arr, true, 0, length, number_threads, true);
@@ -233,7 +246,7 @@ double scalable_oblivious_join(elem_t *arr, long long length1, long long length2
         for (long long i = 1; i < length; i++) {
             condition = arr[i].table_0;
             condition2 = arr[i].key == arr_temp[0].key;
-            control_bit[i] = (!condition) && condition2; 
+            control_bit[i] = (!condition) && condition2;
             o_memcpy(arr_ + i, arr_temp, sizeof(*arr_), control_bit[i]);
             o_memcpy(arr_temp, arr + i, sizeof(*arr), condition);
         }
@@ -242,22 +255,22 @@ double scalable_oblivious_join(elem_t *arr, long long length1, long long length2
             idx_start_thread[i + 1] = idx_start_thread[i] + length_thread + (i < length_extra);
 
             args_op2_[i].arr = arr;
-                args_op2_[i].arr_ = arr_;
-                args_op2_[i].index_thread_start = idx_start_thread[i];
-                args_op2_[i].index_thread_end = idx_start_thread[i + 1];
-                if (number_threads == 6) {
-                    args_op2_[i].thread_order = tree_node_idx_6[i];        
-                } else if (number_threads == 48) {
-                    args_op2_[i].thread_order = tree_node_idx_48[i];
-                } else {
-                    args_op2_[i].thread_order = number_threads + i - 1;
-                }
-                if (i < number_threads - 1) {
-                    multi_thread_aggregation_tree_1[i].type = THREAD_WORK_SINGLE;
-                    multi_thread_aggregation_tree_1[i].single.func = aggregation_tree_op2;
-                    multi_thread_aggregation_tree_1[i].single.arg = &args_op2_[i];
-                    thread_work_push(&multi_thread_aggregation_tree_1[i]);
-                }
+            args_op2_[i].arr_ = arr_;
+            args_op2_[i].index_thread_start = idx_start_thread[i];
+            args_op2_[i].index_thread_end = idx_start_thread[i + 1];
+            if (number_threads == 6) {
+                args_op2_[i].thread_order = tree_node_idx_6[i];
+            } else if (number_threads == 48) {
+                args_op2_[i].thread_order = tree_node_idx_48[i];
+            } else {
+                args_op2_[i].thread_order = number_threads + i - 1;
+            }
+            if (i < number_threads - 1) {
+                multi_thread_aggregation_tree_1[i].type = THREAD_WORK_SINGLE;
+                multi_thread_aggregation_tree_1[i].single.func = aggregation_tree_op2;
+                multi_thread_aggregation_tree_1[i].single.arg = &args_op2_[i];
+                thread_work_push(&multi_thread_aggregation_tree_1[i]);
+            }
         }
         aggregation_tree_op2(&args_op2_[number_threads - 1]);
         for (long long i = 0; i < number_threads - 1; i++) {
@@ -267,28 +280,40 @@ double scalable_oblivious_join(elem_t *arr, long long length1, long long length2
 
     result_length = oblivious_compact_elem(arr, control_bit, length, 1, number_threads);
     oblivious_compact_elem(arr_, control_bit, length, 1, number_threads);
-    
-    // get_time2(true);
-    // End timing
+
     gettimeofday(&end_time, NULL);
-    execution_time = (end_time.tv_sec - start_time.tv_sec) + 
+    execution_time = (end_time.tv_sec - start_time.tv_sec) +
                        (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
     printf("Execution time: %.6f seconds\n", execution_time);
     printf("length_result: %d\n", result_length);
-    
+
+    free(ag_tree);
+    free(arr_temp);
+    free(control_bit);
+
+    *arr_index_out = arr_;
+    *result_len = (long long)result_length;
+    return execution_time;
+}
+
+double scalable_oblivious_join(elem_t *arr, long long length1, long long length2, char* output_path, double *sort_time_out) {
+    elem_t *arr_ = NULL;
+    long long result_length = 0;
+    double exec = oblivious_join_core(arr, length1, length2, &arr_, &result_length, sort_time_out);
+
     char *char_current = output_path;
-    for (int i = 0; i < result_length; i++) {
+    for (long long i = 0; i < result_length; i++) {
         int key1 = arr[i].key;
         int key2 = arr_[i].key;
 
-        char string_key1[10];
-        char string_key2[10];
+        char string_key1[16];
+        char string_key2[16];
         int str1_len, str2_len;
         itoa2(key1, string_key1, &str1_len);
         itoa2(key2, string_key2, &str2_len);
         int data_len1 = my_len(arr[i].data);
         int data_len2 = my_len(arr_[i].data);
-        
+
         strncpy(char_current, string_key1, str1_len);
         char_current += str1_len; char_current[0] = ' '; char_current += 1;
         strncpy(char_current, arr[i].data, data_len1);
@@ -300,10 +325,13 @@ double scalable_oblivious_join(elem_t *arr, long long length1, long long length2
     }
     char_current[0] = '\0';
 
-    free(ag_tree);
-    free(arr_temp);
     free(arr_);
-    free(control_bit);
 
-    return execution_time;
+    return exec;
+}
+
+double scalable_oblivious_join_to_array(elem_t *arr, long long length1, long long length2,
+                                         elem_t **arr_out, long long *result_len,
+                                         double *sort_time_out) {
+    return oblivious_join_core(arr, length1, length2, arr_out, result_len, sort_time_out);
 }

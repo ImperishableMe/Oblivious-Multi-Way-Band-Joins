@@ -1,0 +1,497 @@
+system,threads,run_id,is_warmup,stage,category,time_ms,in_wall_clock
+ours,1,1,1,CSV read (account),IO,346.090,1
+ours,1,1,1,CSV read (txn),IO,3963.430,1
+ours,1,1,1,buildNodeIndex,OFFLINE,897.510,1
+ours,1,1,1,index copy (src),OFFLINE,144.910,1
+ours,1,1,1,initProbeSide (dst),OFFLINE,189.000,0
+ours,1,1,1,initProbeSide (src),OFFLINE,201.830,0
+ours,1,1,1,initProbeSide (wall),OFFLINE,202.460,1
+ours,1,1,1,deduplicateRows (src),ONLINE,46.990,0
+ours,1,1,1,deduplicateRows (dst),ONLINE,85.000,0
+ours,1,1,1,probe src,ONLINE,3625.220,0
+ours,1,1,1,probe dst,ONLINE,3607.990,0
+ours,1,1,1,reduplicateRows (src),ONLINE,351.520,0
+ours,1,1,1,unionWith (src),ONLINE,71.040,0
+ours,1,1,1,src branch (total),ONLINE,4094.800,0
+ours,1,1,1,reduplicateRows (dst),ONLINE,456.700,0
+ours,1,1,1,unionWith (dst),ONLINE,68.390,0
+ours,1,1,1,parallel_sort (dst),ONLINE,2247.690,0
+ours,1,1,1,dst branch (total),ONLINE,6465.820,0
+ours,1,1,1,parallel branches (wall),ONLINE,6480.760,1
+ours,1,1,1,unionWith (final),ONLINE,56.980,1
+ours,1,1,1,CSV write,IO,2473.010,1
+ours,1,2,0,CSV read (account),IO,354.420,1
+ours,1,2,0,CSV read (txn),IO,3975.200,1
+ours,1,2,0,buildNodeIndex,OFFLINE,868.870,1
+ours,1,2,0,index copy (src),OFFLINE,144.880,1
+ours,1,2,0,initProbeSide (dst),OFFLINE,173.770,0
+ours,1,2,0,initProbeSide (src),OFFLINE,192.470,0
+ours,1,2,0,initProbeSide (wall),OFFLINE,193.210,1
+ours,1,2,0,deduplicateRows (src),ONLINE,39.250,0
+ours,1,2,0,deduplicateRows (dst),ONLINE,76.290,0
+ours,1,2,0,probe src,ONLINE,3492.110,0
+ours,1,2,0,probe dst,ONLINE,3585.190,0
+ours,1,2,0,reduplicateRows (src),ONLINE,216.720,0
+ours,1,2,0,unionWith (src),ONLINE,80.340,0
+ours,1,2,0,src branch (total),ONLINE,3828.450,0
+ours,1,2,0,reduplicateRows (dst),ONLINE,309.500,0
+ours,1,2,0,unionWith (dst),ONLINE,66.230,0
+ours,1,2,0,parallel_sort (dst),ONLINE,2225.400,0
+ours,1,2,0,dst branch (total),ONLINE,6262.670,0
+ours,1,2,0,parallel branches (wall),ONLINE,6276.390,1
+ours,1,2,0,unionWith (final),ONLINE,57.800,1
+ours,1,2,0,CSV write,IO,2476.980,1
+obliviator,1,1,1,step 1 (sort),ONLINE,4157.983,0
+obliviator,1,1,1,step 1 (total),ONLINE,5038.398,1
+obliviator,1,1,1,build intermediate,ONLINE,707.994,1
+obliviator,1,1,1,step 2 (sort),ONLINE,4424.996,0
+obliviator,1,1,1,step 2 (total),ONLINE,5280.937,1
+obliviator,1,1,1,emit (in-memory),ONLINE,682.575,0
+obliviator,1,1,1,OBLIVIOUS WORK,ONLINE,11027.329,0
+obliviator,1,1,1,OBLIVIOUS WORK + EMIT,ONLINE,11709.904,0
+obliviator,1,1,1,CSV load,IO,837.000,0
+obliviator,1,1,1,CSV write,IO,163.000,0
+obliviator,1,2,0,step 1 (sort),ONLINE,4159.107,0
+obliviator,1,2,0,step 1 (total),ONLINE,5003.854,1
+obliviator,1,2,0,build intermediate,ONLINE,702.354,1
+obliviator,1,2,0,step 2 (sort),ONLINE,4426.591,0
+obliviator,1,2,0,step 2 (total),ONLINE,5252.501,1
+obliviator,1,2,0,emit (in-memory),ONLINE,682.219,0
+obliviator,1,2,0,OBLIVIOUS WORK,ONLINE,10958.709,0
+obliviator,1,2,0,OBLIVIOUS WORK + EMIT,ONLINE,11640.928,0
+obliviator,1,2,0,CSV load,IO,831.000,0
+obliviator,1,2,0,CSV write,IO,160.000,0
+ours,2,1,1,CSV read (account),IO,343.990,1
+ours,2,1,1,CSV read (txn),IO,3927.800,1
+ours,2,1,1,buildNodeIndex,OFFLINE,871.870,1
+ours,2,1,1,index copy (src),OFFLINE,140.930,1
+ours,2,1,1,initProbeSide (dst),OFFLINE,156.810,0
+ours,2,1,1,initProbeSide (src),OFFLINE,192.620,0
+ours,2,1,1,initProbeSide (wall),OFFLINE,193.390,1
+ours,2,1,1,deduplicateRows (src),ONLINE,18.770,0
+ours,2,1,1,deduplicateRows (dst),ONLINE,35.340,0
+ours,2,1,1,probe dst,ONLINE,3573.660,0
+ours,2,1,1,probe src,ONLINE,3593.760,0
+ours,2,1,1,reduplicateRows (dst),ONLINE,173.610,0
+ours,2,1,1,reduplicateRows (src),ONLINE,232.040,0
+ours,2,1,1,unionWith (dst),ONLINE,83.670,0
+ours,2,1,1,unionWith (src),ONLINE,80.680,0
+ours,2,1,1,src branch (total),ONLINE,3925.270,0
+ours,2,1,1,parallel_sort (dst),ONLINE,1215.730,0
+ours,2,1,1,dst branch (total),ONLINE,5082.100,0
+ours,2,1,1,parallel branches (wall),ONLINE,5102.560,1
+ours,2,1,1,unionWith (final),ONLINE,35.410,1
+ours,2,1,1,CSV write,IO,2435.940,1
+ours,2,2,0,CSV read (account),IO,357.330,1
+ours,2,2,0,CSV read (txn),IO,3974.480,1
+ours,2,2,0,buildNodeIndex,OFFLINE,951.460,1
+ours,2,2,0,index copy (src),OFFLINE,141.890,1
+ours,2,2,0,initProbeSide (dst),OFFLINE,156.500,0
+ours,2,2,0,initProbeSide (src),OFFLINE,175.200,0
+ours,2,2,0,initProbeSide (wall),OFFLINE,175.990,1
+ours,2,2,0,deduplicateRows (src),ONLINE,19.370,0
+ours,2,2,0,deduplicateRows (dst),ONLINE,35.630,0
+ours,2,2,0,probe src,ONLINE,3567.520,0
+ours,2,2,0,probe dst,ONLINE,3649.720,0
+ours,2,2,0,reduplicateRows (src),ONLINE,110.630,0
+ours,2,2,0,unionWith (src),ONLINE,77.070,0
+ours,2,2,0,src branch (total),ONLINE,3774.610,0
+ours,2,2,0,reduplicateRows (dst),ONLINE,152.410,0
+ours,2,2,0,unionWith (dst),ONLINE,35.390,0
+ours,2,2,0,parallel_sort (dst),ONLINE,1198.330,0
+ours,2,2,0,dst branch (total),ONLINE,5071.570,0
+ours,2,2,0,parallel branches (wall),ONLINE,5091.890,1
+ours,2,2,0,unionWith (final),ONLINE,37.370,1
+ours,2,2,0,CSV write,IO,2461.210,1
+obliviator,2,1,1,step 1 (sort),ONLINE,2187.695,0
+obliviator,2,1,1,step 1 (total),ONLINE,2798.856,1
+obliviator,2,1,1,build intermediate,ONLINE,373.958,1
+obliviator,2,1,1,step 2 (sort),ONLINE,2343.449,0
+obliviator,2,1,1,step 2 (total),ONLINE,2960.328,1
+obliviator,2,1,1,emit (in-memory),ONLINE,354.941,0
+obliviator,2,1,1,OBLIVIOUS WORK,ONLINE,6133.142,0
+obliviator,2,1,1,OBLIVIOUS WORK + EMIT,ONLINE,6488.083,0
+obliviator,2,1,1,CSV load,IO,856.000,0
+obliviator,2,1,1,CSV write,IO,163.000,0
+obliviator,2,2,0,step 1 (sort),ONLINE,2199.014,0
+obliviator,2,2,0,step 1 (total),ONLINE,2784.022,1
+obliviator,2,2,0,build intermediate,ONLINE,363.232,1
+obliviator,2,2,0,step 2 (sort),ONLINE,2355.507,0
+obliviator,2,2,0,step 2 (total),ONLINE,2976.322,1
+obliviator,2,2,0,emit (in-memory),ONLINE,345.225,0
+obliviator,2,2,0,OBLIVIOUS WORK,ONLINE,6123.576,0
+obliviator,2,2,0,OBLIVIOUS WORK + EMIT,ONLINE,6468.801,0
+obliviator,2,2,0,CSV load,IO,846.000,0
+obliviator,2,2,0,CSV write,IO,155.000,0
+ours,4,1,1,CSV read (account),IO,340.150,1
+ours,4,1,1,CSV read (txn),IO,3898.430,1
+ours,4,1,1,buildNodeIndex,OFFLINE,911.700,1
+ours,4,1,1,index copy (src),OFFLINE,139.510,1
+ours,4,1,1,initProbeSide (dst),OFFLINE,159.390,0
+ours,4,1,1,initProbeSide (src),OFFLINE,170.210,0
+ours,4,1,1,initProbeSide (wall),OFFLINE,170.900,1
+ours,4,1,1,deduplicateRows (dst),ONLINE,24.910,0
+ours,4,1,1,deduplicateRows (src),ONLINE,26.130,0
+ours,4,1,1,probe dst,ONLINE,1827.960,0
+ours,4,1,1,probe src,ONLINE,1872.130,0
+ours,4,1,1,reduplicateRows (dst),ONLINE,62.820,0
+ours,4,1,1,unionWith (dst),ONLINE,33.540,0
+ours,4,1,1,reduplicateRows (src),ONLINE,79.740,0
+ours,4,1,1,unionWith (src),ONLINE,67.350,0
+ours,4,1,1,src branch (total),ONLINE,2045.360,0
+ours,4,1,1,parallel_sort (dst),ONLINE,713.160,0
+ours,4,1,1,dst branch (total),ONLINE,2662.440,0
+ours,4,1,1,parallel branches (wall),ONLINE,2682.960,1
+ours,4,1,1,unionWith (final),ONLINE,63.440,1
+ours,4,1,1,CSV write,IO,2429.280,1
+ours,4,2,0,CSV read (account),IO,352.710,1
+ours,4,2,0,CSV read (txn),IO,3947.000,1
+ours,4,2,0,buildNodeIndex,OFFLINE,877.450,1
+ours,4,2,0,index copy (src),OFFLINE,122.390,1
+ours,4,2,0,initProbeSide (dst),OFFLINE,150.710,0
+ours,4,2,0,initProbeSide (src),OFFLINE,161.970,0
+ours,4,2,0,initProbeSide (wall),OFFLINE,162.570,1
+ours,4,2,0,deduplicateRows (src),ONLINE,15.710,0
+ours,4,2,0,deduplicateRows (dst),ONLINE,17.960,0
+ours,4,2,0,probe dst,ONLINE,1843.530,0
+ours,4,2,0,reduplicateRows (dst),ONLINE,61.580,0
+ours,4,2,0,unionWith (dst),ONLINE,19.810,0
+ours,4,2,0,probe src,ONLINE,1940.990,0
+ours,4,2,0,reduplicateRows (src),ONLINE,219.770,0
+ours,4,2,0,unionWith (src),ONLINE,85.460,0
+ours,4,2,0,src branch (total),ONLINE,2261.960,0
+ours,4,2,0,parallel_sort (dst),ONLINE,659.430,0
+ours,4,2,0,dst branch (total),ONLINE,2602.360,0
+ours,4,2,0,parallel branches (wall),ONLINE,2621.590,1
+ours,4,2,0,unionWith (final),ONLINE,54.640,1
+ours,4,2,0,CSV write,IO,2431.400,1
+obliviator,4,1,1,step 1 (sort),ONLINE,1111.757,0
+obliviator,4,1,1,step 1 (total),ONLINE,1448.936,1
+obliviator,4,1,1,build intermediate,ONLINE,186.771,1
+obliviator,4,1,1,step 2 (sort),ONLINE,1190.212,0
+obliviator,4,1,1,step 2 (total),ONLINE,1533.621,1
+obliviator,4,1,1,emit (in-memory),ONLINE,174.998,0
+obliviator,4,1,1,OBLIVIOUS WORK,ONLINE,3169.328,0
+obliviator,4,1,1,OBLIVIOUS WORK + EMIT,ONLINE,3344.326,0
+obliviator,4,1,1,CSV load,IO,849.000,0
+obliviator,4,1,1,CSV write,IO,149.000,0
+obliviator,4,2,0,step 1 (sort),ONLINE,1102.061,0
+obliviator,4,2,0,step 1 (total),ONLINE,1434.342,1
+obliviator,4,2,0,build intermediate,ONLINE,186.039,1
+obliviator,4,2,0,step 2 (sort),ONLINE,1185.545,0
+obliviator,4,2,0,step 2 (total),ONLINE,1527.192,1
+obliviator,4,2,0,emit (in-memory),ONLINE,176.689,0
+obliviator,4,2,0,OBLIVIOUS WORK,ONLINE,3147.573,0
+obliviator,4,2,0,OBLIVIOUS WORK + EMIT,ONLINE,3324.262,0
+obliviator,4,2,0,CSV load,IO,839.000,0
+obliviator,4,2,0,CSV write,IO,153.000,0
+ours,8,1,1,CSV read (account),IO,337.490,1
+ours,8,1,1,CSV read (txn),IO,3966.530,1
+ours,8,1,1,buildNodeIndex,OFFLINE,902.710,1
+ours,8,1,1,index copy (src),OFFLINE,135.440,1
+ours,8,1,1,initProbeSide (dst),OFFLINE,137.940,0
+ours,8,1,1,initProbeSide (src),OFFLINE,158.480,0
+ours,8,1,1,initProbeSide (wall),OFFLINE,159.240,1
+ours,8,1,1,deduplicateRows (src),ONLINE,9.170,0
+ours,8,1,1,deduplicateRows (dst),ONLINE,12.780,0
+ours,8,1,1,probe src,ONLINE,1002.130,0
+ours,8,1,1,probe dst,ONLINE,999.260,0
+ours,8,1,1,reduplicateRows (src),ONLINE,53.710,0
+ours,8,1,1,reduplicateRows (dst),ONLINE,70.630,0
+ours,8,1,1,unionWith (src),ONLINE,30.990,0
+ours,8,1,1,src branch (total),ONLINE,1096.020,0
+ours,8,1,1,unionWith (dst),ONLINE,19.580,0
+ours,8,1,1,parallel_sort (dst),ONLINE,370.590,0
+ours,8,1,1,dst branch (total),ONLINE,1472.890,0
+ours,8,1,1,parallel branches (wall),ONLINE,1494.730,1
+ours,8,1,1,unionWith (final),ONLINE,16.440,1
+ours,8,1,1,CSV write,IO,2477.990,1
+ours,8,2,0,CSV read (account),IO,355.270,1
+ours,8,2,0,CSV read (txn),IO,3946.220,1
+ours,8,2,0,buildNodeIndex,OFFLINE,906.040,1
+ours,8,2,0,index copy (src),OFFLINE,137.290,1
+ours,8,2,0,initProbeSide (dst),OFFLINE,135.760,0
+ours,8,2,0,initProbeSide (src),OFFLINE,159.300,0
+ours,8,2,0,initProbeSide (wall),OFFLINE,159.960,1
+ours,8,2,0,deduplicateRows (src),ONLINE,9.110,0
+ours,8,2,0,deduplicateRows (dst),ONLINE,11.770,0
+ours,8,2,0,probe dst,ONLINE,972.760,0
+ours,8,2,0,reduplicateRows (dst),ONLINE,48.010,0
+ours,8,2,0,probe src,ONLINE,1032.500,0
+ours,8,2,0,unionWith (dst),ONLINE,10.410,0
+ours,8,2,0,reduplicateRows (src),ONLINE,147.920,0
+ours,8,2,0,unionWith (src),ONLINE,68.500,0
+ours,8,2,0,src branch (total),ONLINE,1258.040,0
+ours,8,2,0,parallel_sort (dst),ONLINE,365.160,0
+ours,8,2,0,dst branch (total),ONLINE,1408.160,0
+ours,8,2,0,parallel branches (wall),ONLINE,1424.540,1
+ours,8,2,0,unionWith (final),ONLINE,16.820,1
+ours,8,2,0,CSV write,IO,2420.770,1
+obliviator,8,1,1,step 1 (sort),ONLINE,590.762,0
+obliviator,8,1,1,step 1 (total),ONLINE,788.545,1
+obliviator,8,1,1,build intermediate,ONLINE,101.646,1
+obliviator,8,1,1,step 2 (sort),ONLINE,649.309,0
+obliviator,8,1,1,step 2 (total),ONLINE,849.831,1
+obliviator,8,1,1,emit (in-memory),ONLINE,94.962,0
+obliviator,8,1,1,OBLIVIOUS WORK,ONLINE,1740.022,0
+obliviator,8,1,1,OBLIVIOUS WORK + EMIT,ONLINE,1834.984,0
+obliviator,8,1,1,CSV load,IO,875.000,0
+obliviator,8,1,1,CSV write,IO,158.000,0
+obliviator,8,2,0,step 1 (sort),ONLINE,595.675,0
+obliviator,8,2,0,step 1 (total),ONLINE,797.386,1
+obliviator,8,2,0,build intermediate,ONLINE,102.821,1
+obliviator,8,2,0,step 2 (sort),ONLINE,631.790,0
+obliviator,8,2,0,step 2 (total),ONLINE,831.138,1
+obliviator,8,2,0,emit (in-memory),ONLINE,96.262,0
+obliviator,8,2,0,OBLIVIOUS WORK,ONLINE,1731.345,0
+obliviator,8,2,0,OBLIVIOUS WORK + EMIT,ONLINE,1827.607,0
+obliviator,8,2,0,CSV load,IO,870.000,0
+obliviator,8,2,0,CSV write,IO,174.000,0
+ours,16,1,1,CSV read (account),IO,350.190,1
+ours,16,1,1,CSV read (txn),IO,3887.290,1
+ours,16,1,1,buildNodeIndex,OFFLINE,899.680,1
+ours,16,1,1,index copy (src),OFFLINE,130.080,1
+ours,16,1,1,initProbeSide (dst),OFFLINE,133.410,0
+ours,16,1,1,initProbeSide (src),OFFLINE,156.310,0
+ours,16,1,1,initProbeSide (wall),OFFLINE,157.030,1
+ours,16,1,1,deduplicateRows (dst),ONLINE,6.670,0
+ours,16,1,1,deduplicateRows (src),ONLINE,8.950,0
+ours,16,1,1,probe dst,ONLINE,579.380,0
+ours,16,1,1,probe src,ONLINE,590.560,0
+ours,16,1,1,reduplicateRows (dst),ONLINE,27.550,0
+ours,16,1,1,reduplicateRows (src),ONLINE,22.580,0
+ours,16,1,1,unionWith (dst),ONLINE,13.030,0
+ours,16,1,1,unionWith (src),ONLINE,17.700,0
+ours,16,1,1,src branch (total),ONLINE,639.830,0
+ours,16,1,1,parallel_sort (dst),ONLINE,202.260,0
+ours,16,1,1,dst branch (total),ONLINE,828.920,0
+ours,16,1,1,parallel branches (wall),ONLINE,842.960,1
+ours,16,1,1,unionWith (final),ONLINE,11.970,1
+ours,16,1,1,CSV write,IO,2462.740,1
+ours,16,2,0,CSV read (account),IO,348.690,1
+ours,16,2,0,CSV read (txn),IO,3972.570,1
+ours,16,2,0,buildNodeIndex,OFFLINE,961.420,1
+ours,16,2,0,index copy (src),OFFLINE,150.120,1
+ours,16,2,0,initProbeSide (dst),OFFLINE,133.890,0
+ours,16,2,0,initProbeSide (src),OFFLINE,149.390,0
+ours,16,2,0,initProbeSide (wall),OFFLINE,150.090,1
+ours,16,2,0,deduplicateRows (dst),ONLINE,7.580,0
+ours,16,2,0,deduplicateRows (src),ONLINE,7.710,0
+ours,16,2,0,probe dst,ONLINE,571.790,0
+ours,16,2,0,probe src,ONLINE,588.650,0
+ours,16,2,0,reduplicateRows (dst),ONLINE,24.560,0
+ours,16,2,0,unionWith (dst),ONLINE,10.800,0
+ours,16,2,0,reduplicateRows (src),ONLINE,25.680,0
+ours,16,2,0,unionWith (src),ONLINE,69.730,0
+ours,16,2,0,src branch (total),ONLINE,691.810,0
+ours,16,2,0,parallel_sort (dst),ONLINE,212.130,0
+ours,16,2,0,dst branch (total),ONLINE,826.920,0
+ours,16,2,0,parallel branches (wall),ONLINE,842.080,1
+ours,16,2,0,unionWith (final),ONLINE,10.920,1
+ours,16,2,0,CSV write,IO,2479.790,1
+obliviator,16,1,1,step 1 (sort),ONLINE,311.706,0
+obliviator,16,1,1,step 1 (total),ONLINE,442.351,1
+obliviator,16,1,1,build intermediate,ONLINE,52.662,1
+obliviator,16,1,1,step 2 (sort),ONLINE,338.031,0
+obliviator,16,1,1,step 2 (total),ONLINE,468.115,1
+obliviator,16,1,1,emit (in-memory),ONLINE,48.329,0
+obliviator,16,1,1,OBLIVIOUS WORK,ONLINE,963.128,0
+obliviator,16,1,1,OBLIVIOUS WORK + EMIT,ONLINE,1011.457,0
+obliviator,16,1,1,CSV load,IO,875.000,0
+obliviator,16,1,1,CSV write,IO,157.000,0
+obliviator,16,2,0,step 1 (sort),ONLINE,314.347,0
+obliviator,16,2,0,step 1 (total),ONLINE,449.715,1
+obliviator,16,2,0,build intermediate,ONLINE,54.236,1
+obliviator,16,2,0,step 2 (sort),ONLINE,358.815,0
+obliviator,16,2,0,step 2 (total),ONLINE,490.588,1
+obliviator,16,2,0,emit (in-memory),ONLINE,48.251,0
+obliviator,16,2,0,OBLIVIOUS WORK,ONLINE,994.539,0
+obliviator,16,2,0,OBLIVIOUS WORK + EMIT,ONLINE,1042.790,0
+obliviator,16,2,0,CSV load,IO,865.000,0
+obliviator,16,2,0,CSV write,IO,141.000,0
+ours,32,1,1,CSV read (account),IO,347.090,1
+ours,32,1,1,CSV read (txn),IO,3904.050,1
+ours,32,1,1,buildNodeIndex,OFFLINE,932.530,1
+ours,32,1,1,index copy (src),OFFLINE,136.620,1
+ours,32,1,1,initProbeSide (dst),OFFLINE,132.370,0
+ours,32,1,1,initProbeSide (src),OFFLINE,158.030,0
+ours,32,1,1,initProbeSide (wall),OFFLINE,158.790,1
+ours,32,1,1,deduplicateRows (dst),ONLINE,5.800,0
+ours,32,1,1,deduplicateRows (src),ONLINE,5.810,0
+ours,32,1,1,probe dst,ONLINE,360.110,0
+ours,32,1,1,reduplicateRows (dst),ONLINE,17.090,0
+ours,32,1,1,probe src,ONLINE,377.290,0
+ours,32,1,1,unionWith (dst),ONLINE,6.860,0
+ours,32,1,1,reduplicateRows (src),ONLINE,57.150,0
+ours,32,1,1,unionWith (src),ONLINE,15.250,0
+ours,32,1,1,src branch (total),ONLINE,455.540,0
+ours,32,1,1,parallel_sort (dst),ONLINE,154.140,0
+ours,32,1,1,dst branch (total),ONLINE,544.040,0
+ours,32,1,1,parallel branches (wall),ONLINE,556.210,1
+ours,32,1,1,unionWith (final),ONLINE,8.440,1
+ours,32,1,1,CSV write,IO,2436.180,1
+ours,32,2,0,CSV read (account),IO,351.360,1
+ours,32,2,0,CSV read (txn),IO,3891.180,1
+ours,32,2,0,buildNodeIndex,OFFLINE,904.550,1
+ours,32,2,0,index copy (src),OFFLINE,135.180,1
+ours,32,2,0,initProbeSide (dst),OFFLINE,134.890,0
+ours,32,2,0,initProbeSide (src),OFFLINE,158.060,0
+ours,32,2,0,initProbeSide (wall),OFFLINE,158.910,1
+ours,32,2,0,deduplicateRows (dst),ONLINE,6.300,0
+ours,32,2,0,deduplicateRows (src),ONLINE,7.560,0
+ours,32,2,0,probe dst,ONLINE,377.260,0
+ours,32,2,0,probe src,ONLINE,392.570,0
+ours,32,2,0,reduplicateRows (dst),ONLINE,17.270,0
+ours,32,2,0,unionWith (dst),ONLINE,7.610,0
+ours,32,2,0,reduplicateRows (src),ONLINE,12.800,0
+ours,32,2,0,unionWith (src),ONLINE,43.880,0
+ours,32,2,0,src branch (total),ONLINE,456.830,0
+ours,32,2,0,parallel_sort (dst),ONLINE,156.460,0
+ours,32,2,0,dst branch (total),ONLINE,564.940,0
+ours,32,2,0,parallel branches (wall),ONLINE,580.910,1
+ours,32,2,0,unionWith (final),ONLINE,14.260,1
+ours,32,2,0,CSV write,IO,2450.070,1
+obliviator,32,1,1,step 1 (sort),ONLINE,173.000,0
+obliviator,32,1,1,step 1 (total),ONLINE,283.794,1
+obliviator,32,1,1,build intermediate,ONLINE,36.974,1
+obliviator,32,1,1,step 2 (sort),ONLINE,217.398,0
+obliviator,32,1,1,step 2 (total),ONLINE,322.559,1
+obliviator,32,1,1,emit (in-memory),ONLINE,24.589,0
+obliviator,32,1,1,OBLIVIOUS WORK,ONLINE,643.327,0
+obliviator,32,1,1,OBLIVIOUS WORK + EMIT,ONLINE,667.916,0
+obliviator,32,1,1,CSV load,IO,904.000,0
+obliviator,32,1,1,CSV write,IO,150.000,0
+obliviator,32,2,0,step 1 (sort),ONLINE,197.702,0
+obliviator,32,2,0,step 1 (total),ONLINE,313.379,1
+obliviator,32,2,0,build intermediate,ONLINE,30.875,1
+obliviator,32,2,0,step 2 (sort),ONLINE,199.589,0
+obliviator,32,2,0,step 2 (total),ONLINE,303.929,1
+obliviator,32,2,0,emit (in-memory),ONLINE,26.179,0
+obliviator,32,2,0,OBLIVIOUS WORK,ONLINE,648.183,0
+obliviator,32,2,0,OBLIVIOUS WORK + EMIT,ONLINE,674.362,0
+obliviator,32,2,0,CSV load,IO,884.000,0
+obliviator,32,2,0,CSV write,IO,159.000,0
+ours,64,1,1,CSV read (account),IO,348.350,1
+ours,64,1,1,CSV read (txn),IO,3906.410,1
+ours,64,1,1,buildNodeIndex,OFFLINE,966.310,1
+ours,64,1,1,index copy (src),OFFLINE,142.190,1
+ours,64,1,1,initProbeSide (dst),OFFLINE,143.380,0
+ours,64,1,1,initProbeSide (src),OFFLINE,155.330,0
+ours,64,1,1,initProbeSide (wall),OFFLINE,156.020,1
+ours,64,1,1,deduplicateRows (dst),ONLINE,6.640,0
+ours,64,1,1,deduplicateRows (src),ONLINE,6.860,0
+ours,64,1,1,probe dst,ONLINE,333.380,0
+ours,64,1,1,probe src,ONLINE,340.660,0
+ours,64,1,1,reduplicateRows (dst),ONLINE,14.140,0
+ours,64,1,1,reduplicateRows (src),ONLINE,13.610,0
+ours,64,1,1,unionWith (dst),ONLINE,8.700,0
+ours,64,1,1,unionWith (src),ONLINE,7.070,0
+ours,64,1,1,src branch (total),ONLINE,368.220,0
+ours,64,1,1,parallel_sort (dst),ONLINE,110.610,0
+ours,64,1,1,dst branch (total),ONLINE,473.500,0
+ours,64,1,1,parallel branches (wall),ONLINE,484.290,1
+ours,64,1,1,unionWith (final),ONLINE,5.050,1
+ours,64,1,1,CSV write,IO,2455.350,1
+ours,64,2,0,CSV read (account),IO,339.840,1
+ours,64,2,0,CSV read (txn),IO,3862.440,1
+ours,64,2,0,buildNodeIndex,OFFLINE,918.060,1
+ours,64,2,0,index copy (src),OFFLINE,140.320,1
+ours,64,2,0,initProbeSide (dst),OFFLINE,138.990,0
+ours,64,2,0,initProbeSide (src),OFFLINE,154.650,0
+ours,64,2,0,initProbeSide (wall),OFFLINE,155.210,1
+ours,64,2,0,deduplicateRows (src),ONLINE,6.360,0
+ours,64,2,0,deduplicateRows (dst),ONLINE,6.730,0
+ours,64,2,0,probe dst,ONLINE,274.670,0
+ours,64,2,0,reduplicateRows (dst),ONLINE,13.900,0
+ours,64,2,0,probe src,ONLINE,290.830,0
+ours,64,2,0,unionWith (dst),ONLINE,6.130,0
+ours,64,2,0,reduplicateRows (src),ONLINE,31.280,0
+ours,64,2,0,unionWith (src),ONLINE,9.060,0
+ours,64,2,0,src branch (total),ONLINE,337.550,0
+ours,64,2,0,parallel_sort (dst),ONLINE,110.200,0
+ours,64,2,0,dst branch (total),ONLINE,411.700,0
+ours,64,2,0,parallel branches (wall),ONLINE,426.040,1
+ours,64,2,0,unionWith (final),ONLINE,4.640,1
+ours,64,2,0,CSV write,IO,2503.800,1
+obliviator,64,1,1,step 1 (sort),ONLINE,134.249,0
+obliviator,64,1,1,step 1 (total),ONLINE,228.884,1
+obliviator,64,1,1,build intermediate,ONLINE,29.559,1
+obliviator,64,1,1,step 2 (sort),ONLINE,149.368,0
+obliviator,64,1,1,step 2 (total),ONLINE,230.601,1
+obliviator,64,1,1,emit (in-memory),ONLINE,19.129,0
+obliviator,64,1,1,OBLIVIOUS WORK,ONLINE,489.044,0
+obliviator,64,1,1,OBLIVIOUS WORK + EMIT,ONLINE,508.173,0
+obliviator,64,1,1,CSV load,IO,970.000,0
+obliviator,64,1,1,CSV write,IO,129.000,0
+obliviator,64,2,0,step 1 (sort),ONLINE,138.150,0
+obliviator,64,2,0,step 1 (total),ONLINE,225.582,1
+obliviator,64,2,0,build intermediate,ONLINE,21.813,1
+obliviator,64,2,0,step 2 (sort),ONLINE,150.579,0
+obliviator,64,2,0,step 2 (total),ONLINE,235.822,1
+obliviator,64,2,0,emit (in-memory),ONLINE,19.325,0
+obliviator,64,2,0,OBLIVIOUS WORK,ONLINE,483.217,0
+obliviator,64,2,0,OBLIVIOUS WORK + EMIT,ONLINE,502.542,0
+obliviator,64,2,0,CSV load,IO,922.000,0
+obliviator,64,2,0,CSV write,IO,117.000,0
+ours,120,1,1,CSV read (account),IO,359.110,1
+ours,120,1,1,CSV read (txn),IO,3871.740,1
+ours,120,1,1,buildNodeIndex,OFFLINE,875.430,1
+ours,120,1,1,index copy (src),OFFLINE,140.210,1
+ours,120,1,1,initProbeSide (dst),OFFLINE,157.820,0
+ours,120,1,1,initProbeSide (src),OFFLINE,163.770,0
+ours,120,1,1,initProbeSide (wall),OFFLINE,164.490,1
+ours,120,1,1,deduplicateRows (dst),ONLINE,5.510,0
+ours,120,1,1,deduplicateRows (src),ONLINE,10.890,0
+ours,120,1,1,probe src,ONLINE,228.590,0
+ours,120,1,1,reduplicateRows (src),ONLINE,10.350,0
+ours,120,1,1,unionWith (src),ONLINE,7.100,0
+ours,120,1,1,src branch (total),ONLINE,256.970,0
+ours,120,1,1,probe dst,ONLINE,255.190,0
+ours,120,1,1,reduplicateRows (dst),ONLINE,6.960,0
+ours,120,1,1,unionWith (dst),ONLINE,4.560,0
+ours,120,1,1,parallel_sort (dst),ONLINE,116.580,0
+ours,120,1,1,dst branch (total),ONLINE,388.850,0
+ours,120,1,1,parallel branches (wall),ONLINE,398.280,1
+ours,120,1,1,unionWith (final),ONLINE,4.330,1
+ours,120,1,1,CSV write,IO,2490.260,1
+ours,120,2,0,CSV read (account),IO,352.820,1
+ours,120,2,0,CSV read (txn),IO,3933.820,1
+ours,120,2,0,buildNodeIndex,OFFLINE,894.900,1
+ours,120,2,0,index copy (src),OFFLINE,137.370,1
+ours,120,2,0,initProbeSide (dst),OFFLINE,147.000,0
+ours,120,2,0,initProbeSide (src),OFFLINE,171.600,0
+ours,120,2,0,initProbeSide (wall),OFFLINE,172.560,1
+ours,120,2,0,deduplicateRows (dst),ONLINE,5.910,0
+ours,120,2,0,deduplicateRows (src),ONLINE,7.850,0
+ours,120,2,0,probe dst,ONLINE,287.460,0
+ours,120,2,0,probe src,ONLINE,286.010,0
+ours,120,2,0,reduplicateRows (dst),ONLINE,9.160,0
+ours,120,2,0,reduplicateRows (src),ONLINE,9.850,0
+ours,120,2,0,unionWith (dst),ONLINE,8.450,0
+ours,120,2,0,unionWith (src),ONLINE,8.270,0
+ours,120,2,0,src branch (total),ONLINE,312.010,0
+ours,120,2,0,parallel_sort (dst),ONLINE,115.730,0
+ours,120,2,0,dst branch (total),ONLINE,426.780,0
+ours,120,2,0,parallel branches (wall),ONLINE,436.820,1
+ours,120,2,0,unionWith (final),ONLINE,3.880,1
+ours,120,2,0,CSV write,IO,2457.970,1
+obliviator,120,1,1,step 1 (sort),ONLINE,146.446,0
+obliviator,120,1,1,step 1 (total),ONLINE,249.972,1
+obliviator,120,1,1,build intermediate,ONLINE,24.143,1
+obliviator,120,1,1,step 2 (sort),ONLINE,149.825,0
+obliviator,120,1,1,step 2 (total),ONLINE,235.318,1
+obliviator,120,1,1,emit (in-memory),ONLINE,11.209,0
+obliviator,120,1,1,OBLIVIOUS WORK,ONLINE,509.433,0
+obliviator,120,1,1,OBLIVIOUS WORK + EMIT,ONLINE,520.642,0
+obliviator,120,1,1,CSV load,IO,1368.000,0
+obliviator,120,1,1,CSV write,IO,139.000,0
+obliviator,120,2,0,step 1 (sort),ONLINE,154.728,0
+obliviator,120,2,0,step 1 (total),ONLINE,261.784,1
+obliviator,120,2,0,build intermediate,ONLINE,22.913,1
+obliviator,120,2,0,step 2 (sort),ONLINE,159.046,0
+obliviator,120,2,0,step 2 (total),ONLINE,251.042,1
+obliviator,120,2,0,emit (in-memory),ONLINE,12.546,0
+obliviator,120,2,0,OBLIVIOUS WORK,ONLINE,535.739,0
+obliviator,120,2,0,OBLIVIOUS WORK + EMIT,ONLINE,548.285,0
+obliviator,120,2,0,CSV load,IO,1369.000,0
+obliviator,120,2,0,CSV write,IO,139.000,0

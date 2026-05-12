@@ -133,6 +133,32 @@ This document defines the experiments for a SIGMOD/VLDB submission. Primary work
 
 ---
 
+## E6: One-Hop Thread Scaling (ours vs Obliviator)
+
+**Goal**: Inside the one-hop layer alone, measure how our `banking_onehop` driver scales with threads against the canonical Obliviator chained 1-hop driver. Distinct from E4 — E4 compares one-hop vs full NebulaDB pipeline; E6 stays inside one-hop and isolates the ours-vs-Obliviator parallelism gap on a fixed query and dataset.
+
+| Parameter | Value |
+|-----------|-------|
+| Systems   | Ours (`obligraph/build/banking_onehop`), Obliviator (`obliviator_1hop_chained`) |
+| Threads   | 1, 2, 4, 8, 16, 32, 64, 120 |
+| Query     | One-hop (single FK join, fixed) |
+| Dataset   | Banking W1: 1M accounts / 5M txns (`input/plaintext/banking_1M`; Obliviator side at `obl-radix/baselines/obliviatorFK-TDX/work_1M/src.txt`, generated from the same CSVs by `convert_banking_1hop.py`) |
+| Per-cell  | 1 warm-up (discarded) + 1 measurement; strictly sequential, full machine per run; cells interleaved by thread count |
+| Headline  | Ours: ONLINE wall-clock total. Obliviator: `OBLIVIOUS WORK` (= step 1 + build inter + step 2). Both exclude CSV I/O and any setup/load that sits off-clock in the respective binary. |
+
+**Runner**: `scripts/experiments/run_one_hop_thread_scaling.py` — rebuilds both binaries in Release with `-O3` (cmake `Release` for ours, `Makefile.standalone` already has `-O3 -march=native` for Obliviator), runs the sweep, and writes:
+
+- `results/one_hop_thread_scaling/breakdown.csv` — every stage of every run
+- `results/one_hop_thread_scaling/breakdown_summary.csv` — measured runs only
+- `results/one_hop_thread_scaling/headline.csv` — per-thread `ours_online_ms`, `obliviator_oblivious_work_ms`, `speedup_obliv_over_ours`
+- `results/one_hop_thread_scaling/run_metadata.json`, `binary_stdout.log`
+
+**Presentation**: line plot — X = thread count, Y = latency (log-y if the spread warrants it); one line per system. Speedup column in `headline.csv` is the supporting number.
+
+**Expected story**: *TBD* — write after seeing the data. Both systems parallelise the oblivious sort + probe, but the implementations are different (our two-tier bucket hashmap + parallel branches vs Obliviator's two-step FK kernel), so the curves can diverge in shape, not just constant factor.
+
+---
+
 ## Experiment Priority and Dependencies
 
 | Priority | Experiment | Blocking? | Depends on |
@@ -142,6 +168,7 @@ This document defines the experiments for a SIGMOD/VLDB submission. Primary work
 | P1 | E3 (breakdown) | Yes — justifies design | Per-phase timing instrumentation (in place) |
 | P1 | E4 (threads) | Yes — parallelism | Partial one-hop results exist |
 | P1 | E5 (online/offline) | Must-run | Dataset generator with configurable |V| / |E| |
+| P2 | E6 (one-hop thread scaling) | Supplementary — analysis of one-hop parallelism | Banking 1M, both binaries built |
 
 ### System Dependencies
 

@@ -1,0 +1,3 @@
+system,query,dataset,n_runs,median_ms,min_ms,max_ms,stddev_ms,output_rows
+full_mwj,banking_3hop,banking_1M,1,1599059.011,1599059.011,1599059.011,0.0,608
+nebuladb,banking_3hop,banking_1M,1,819467.9099999999,819467.9099999999,819467.9099999999,0.0,608

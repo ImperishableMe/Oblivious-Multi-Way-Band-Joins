@@ -1,0 +1,3 @@
+system,query,dataset,run_id,is_warmup,total_ms,onehop_ms,mwj_ms,output_rows
+nebuladb,banking_3hop,banking_1M,1,0,819467.9099999999,314.262,819153.6479999999,608
+full_mwj,banking_3hop,banking_1M,1,0,1599059.011,,1599059.011,608

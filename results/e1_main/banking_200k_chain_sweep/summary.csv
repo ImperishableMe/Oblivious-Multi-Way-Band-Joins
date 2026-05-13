@@ -1,0 +1,9 @@
+system,query,dataset,n_runs,median_ms,min_ms,max_ms,stddev_ms,output_rows
+full_mwj,banking_2hop,banking_200k,1,206164.204,206164.204,206164.204,0.0,6580
+nebuladb,banking_2hop,banking_200k,1,82953.62000000001,82953.62000000001,82953.62000000001,0.0,6580
+full_mwj,banking_3hop,banking_200k,1,325974.05,325974.05,325974.05,0.0,204018
+nebuladb,banking_3hop,banking_200k,1,165603.701,165603.701,165603.701,0.0,204018
+full_mwj,banking_4hop,banking_200k,1,512406.202,512406.202,512406.202,0.0,843011
+nebuladb,banking_4hop,banking_200k,1,274301.724,274301.724,274301.724,0.0,843011
+full_mwj,banking_5hop,banking_200k,1,1093067.676,1093067.676,1093067.676,0.0,3677928
+nebuladb,banking_5hop,banking_200k,1,532049.361,532049.361,532049.361,0.0,3677928

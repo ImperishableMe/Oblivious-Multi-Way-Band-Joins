@@ -1,0 +1,9 @@
+system,query,dataset,run_id,is_warmup,total_ms,onehop_ms,mwj_ms,output_rows
+nebuladb,banking_2hop,banking_200k,1,0,82953.62000000001,137.508,82816.11200000001,6580
+full_mwj,banking_2hop,banking_200k,1,0,206164.204,,206164.204,6580
+nebuladb,banking_3hop,banking_200k,1,0,165603.701,143.481,165460.22,204018
+full_mwj,banking_3hop,banking_200k,1,0,325974.05,,325974.05,204018
+nebuladb,banking_4hop,banking_200k,1,0,274301.724,140.73,274160.994,843011
+full_mwj,banking_4hop,banking_200k,1,0,512406.202,,512406.202,843011
+nebuladb,banking_5hop,banking_200k,1,0,532049.361,137.592,531911.7690000001,3677928
+full_mwj,banking_5hop,banking_200k,1,0,1093067.676,,1093067.676,3677928

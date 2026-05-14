@@ -1,7 +1,4 @@
 #include "table.h"
-#include <chrono>
-#include <cstdio>
-#include <cstdlib>
 #include <stdexcept>
 #include <climits>
 #include <cstring>
@@ -9,84 +6,9 @@
 #include "../core_logic/core.h"
 #include "../core_logic/algorithms/oblivious_waksman.h"
 #include "../core_logic/algorithms/min_heap.h"
-#include "obl_building_blocks.h"  // obligraph::o_sort (parallel oblivious bitonic sort);
-                                  // also transitively includes obligraph::ThreadPool
 
 // Comparator dispatch lives in app/core_logic/operations/merge_comparators.c
 extern "C" comparator_func_t get_merge_comparator(OpEcall type);
-
-// Process-wide profile of shuffle_merge_sort. Reset / printed by ObliviousJoin.
-namespace {
-// Comparator op_types occupy values [0..N_OP_BUCKETS). Per-op counters let us
-// see how much of total sort time is in each comparator family.
-constexpr int N_OP_BUCKETS = 16;
-
-struct ShuffleSortProfile {
-    size_t calls = 0;
-    size_t input_rows = 0;   // sum of pre-pad sizes (old path) / pre-sort sizes (new path)
-    size_t padded_rows = 0;  // sum of post-pad sizes (old path); == input_rows for new path
-    double total_s = 0.0;
-    double pad_s = 0.0;
-    double waksman_s = 0.0;
-    double heap_sort_s = 0.0;
-    double osort_s = 0.0;         // time inside obligraph::o_sort path
-    double truncate_s = 0.0;
-    size_t per_op_calls[N_OP_BUCKETS] = {};
-    double per_op_time_s[N_OP_BUCKETS] = {};
-    size_t per_op_rows[N_OP_BUCKETS] = {};
-    size_t osort_calls = 0;       // sort calls that took the o_sort path
-};
-ShuffleSortProfile g_sms_profile;
-
-using SmsClock = std::chrono::steady_clock;
-inline double sms_dur(SmsClock::time_point a, SmsClock::time_point b) {
-    return std::chrono::duration<double>(b - a).count();
-}
-
-// Env-var switch: OBL_OSORT_THREADS=N (N >= 1) routes JOIN_ATTR sorts through
-// obligraph::o_sort with N threads. N=0 or unset keeps the old Waksman path.
-// Read once per process.
-size_t osort_thread_count() {
-    static size_t n = []() -> size_t {
-        const char* e = std::getenv("OBL_OSORT_THREADS");
-        if (!e) return 0;
-        long v = std::atol(e);
-        if (v < 0) v = 0;
-        return static_cast<size_t>(v);
-    }();
-    return n;
-}
-
-// ThreadPool singleton sized to OBL_OSORT_THREADS. Constructed lazily on
-// first use so size matches the env var read above.
-obligraph::ThreadPool& spike_pool() {
-    static obligraph::ThreadPool pool(std::max<size_t>(1, osort_thread_count()));
-    return pool;
-}
-}
-
-void Table::reset_shuffle_merge_sort_profile() {
-    g_sms_profile = ShuffleSortProfile{};
-}
-
-void Table::print_shuffle_merge_sort_profile() {
-    const auto& p = g_sms_profile;
-    double stages = p.pad_s + p.waksman_s + p.heap_sort_s + p.osort_s + p.truncate_s;
-    printf("SHUFFLE_MERGE_SORT_TIMING: calls=%zu osort_calls=%zu input_rows=%zu padded_rows=%zu "
-           "total=%.6fs pad=%.6fs waksman=%.6fs heap_sort=%.6fs osort=%.6fs truncate=%.6fs stages=%.6fs\n",
-           p.calls, p.osort_calls, p.input_rows, p.padded_rows, p.total_s,
-           p.pad_s, p.waksman_s, p.heap_sort_s, p.osort_s, p.truncate_s, stages);
-    static const char* op_names[N_OP_BUCKETS] = {
-        "JOIN_ATTR", "PAIRWISE", "END_FIRST", "JOIN_THEN_OTHER",
-        "ORIGINAL_INDEX", "ALIGNMENT_KEY", "PADDING_LAST", "DISTRIBUTE",
-        "op8","op9","op10","op11","op12","op13","op14","op15"
-    };
-    for (int i = 0; i < N_OP_BUCKETS; ++i) {
-        if (p.per_op_calls[i] == 0) continue;
-        printf("SHUFFLE_MERGE_SORT_PER_OP: op=%s calls=%zu rows=%zu time=%.6fs\n",
-               op_names[i], p.per_op_calls[i], p.per_op_rows[i], p.per_op_time_s[i]);
-    }
-}
 
 // Constructor with required schema
 Table::Table(const std::string& name, const std::vector<std::string>& schema)
@@ -541,96 +463,17 @@ void Table::shuffle_merge_sort(OpEcall op_type) {
     DEBUG_INFO("Table::shuffle_merge_sort: Starting with %zu entries, op_type=%d",
                original_size, op_type);
 
-    auto sms_t0 = SmsClock::now();
-    g_sms_profile.calls += 1;
-    g_sms_profile.input_rows += original_size;
-    int op_bucket = (static_cast<int>(op_type) < N_OP_BUCKETS) ? static_cast<int>(op_type) : N_OP_BUCKETS - 1;
-    g_sms_profile.per_op_calls[op_bucket] += 1;
-    g_sms_profile.per_op_rows[op_bucket] += original_size;
-
-    // SPIKE PATH: obligraph::o_sort for JOIN_ATTR (single-threaded). Bitonic
-    // sort is itself oblivious (o_mem_swap is a CMOV-style conditional swap;
-    // access pattern depends only on public n), so we skip the pad + Waksman
-    // prefix entirely. The comparator (compare_join_attr) is already
-    // branchless (oblivious_sign + arithmetic masks - see merge_comparators.c).
-    size_t osort_T = (op_type == OP_ECALL_COMPARATOR_JOIN_ATTR) ? osort_thread_count() : 0;
-    if (osort_T >= 1) {
-        comparator_func_t cmp = get_merge_comparator(op_type);
-        if (!cmp) {
-            throw std::runtime_error("Unknown comparator op_type for shuffle_merge_sort");
-        }
-        // INDIRECT BITONIC: sort a uint32_t[] permutation, comparator
-        // dereferences entries[i]. Swap cost is 4 B (uint32_t) instead of
-        // sizeof(entry_t) ~316 B. After sort, materialize entries in place
-        // via cycle-following (same trick as heap_sort).
-        if (entries.size() > 0x7FFFFFFFu) {
-            throw std::runtime_error("indirect o_sort spike: N exceeds 2^31");
-        }
-        const size_t N = entries.size();
-        auto t = SmsClock::now();
-        std::vector<uint32_t> perm(N);
-        for (size_t i = 0; i < N; ++i) perm[i] = (uint32_t)i;
-
-        entry_t* arr = entries.data();
-        obligraph::o_sort<uint32_t>(
-            perm.data(), 0, N,
-            [cmp, arr](uint32_t i, uint32_t j) -> bool {
-                return cmp(arr + i, arr + j) != 0;
-            },
-            spike_pool(), osort_T);
-
-        // Cycle-following materialization. perm[i] = source slot for sorted
-        // position i. Visited marker in high bit (N <= 2^31 enforced above).
-        constexpr uint32_t VISITED = 0x80000000u;
-        entry_t scratch;
-        for (size_t i = 0; i < N; ++i) {
-            if (perm[i] & VISITED) continue;
-            if (perm[i] == (uint32_t)i) { perm[i] |= VISITED; continue; }
-            size_t cur = i;
-            scratch = arr[i];
-            while (true) {
-                uint32_t src = perm[cur];
-                perm[cur] = src | VISITED;
-                if ((size_t)src == i) { arr[cur] = scratch; break; }
-                arr[cur] = arr[src];
-                cur = src;
-            }
-        }
-        double dt = sms_dur(t, SmsClock::now());
-
-        // Sanity (cheap): verify sortedness.
-        bool sorted_ok = true;
-        for (size_t i = 1; i < N; ++i) {
-            if (cmp(&entries[i], &entries[i-1]) != 0) { sorted_ok = false; break; }
-        }
-        if (!sorted_ok) {
-            printf("OSORT_SANITY_FAIL (indirect): N=%zu T=%zu\n", N, osort_T);
-        }
-
-        g_sms_profile.osort_s += dt;
-        g_sms_profile.osort_calls += 1;
-        g_sms_profile.padded_rows += original_size; // no padding on this path
-        g_sms_profile.total_s += sms_dur(sms_t0, SmsClock::now());
-        g_sms_profile.per_op_time_s[op_bucket] += sms_dur(sms_t0, SmsClock::now());
-        return;
-    }
-
     // Phase 1: Pad once to next power of 2 (Waksman requirement).
-    auto t = SmsClock::now();
     pad_to_shuffle_size();
-    g_sms_profile.pad_s += sms_dur(t, SmsClock::now());
-    g_sms_profile.padded_rows += entries.size();
     DEBUG_INFO("Table::shuffle_merge_sort: Padded to %zu entries", entries.size());
 
     // Phase 2: One in-place Waksman shuffle over the whole table.
     // Obliviousness: switch bits depend only on (rng_seed, level, position) -
     // all functions of public n. Failure here is non-recoverable.
-    t = SmsClock::now();
     if (oblivious_2way_waksman(entries.data(), entries.size()) != 0) {
         throw std::runtime_error("oblivious_2way_waksman failed for n=" +
                                  std::to_string(entries.size()));
     }
-    g_sms_profile.waksman_s += sms_dur(t, SmsClock::now());
     DEBUG_INFO("Table::shuffle_merge_sort: Shuffle phase complete");
 
     // Phase 3: One in-place comparison sort over the shuffled table.
@@ -640,21 +483,14 @@ void Table::shuffle_merge_sort(OpEcall op_type) {
     if (!cmp) {
         throw std::runtime_error("Unknown comparator op_type for shuffle_merge_sort");
     }
-    t = SmsClock::now();
     heap_sort(entries.data(), entries.size(), cmp);
-    g_sms_profile.heap_sort_s += sms_dur(t, SmsClock::now());
     DEBUG_INFO("Table::shuffle_merge_sort: Sort phase complete");
 
     // Phase 4: Drop padding (SORT_PADDING entries have JOIN_ATTR_POS_INF and
     // sort to the high end under join-attr-asc comparators).
-    t = SmsClock::now();
     if (entries.size() > original_size) {
         entries.resize(original_size);
     }
-    g_sms_profile.truncate_s += sms_dur(t, SmsClock::now());
-
-    g_sms_profile.total_s += sms_dur(sms_t0, SmsClock::now());
-    g_sms_profile.per_op_time_s[op_bucket] += sms_dur(sms_t0, SmsClock::now());
 
     DEBUG_INFO("Table::shuffle_merge_sort: Complete with %zu entries", entries.size());
 }

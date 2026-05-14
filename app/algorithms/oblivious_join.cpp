@@ -37,10 +37,6 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, const std::vector<FilterCondi
     auto start_time = Clock::now();
     auto phase_start = Clock::now();
 
-    // Reset the process-wide shuffle_merge_sort profile so SHUFFLE_MERGE_SORT_TIMING
-    // reflects only this query's sort work.
-    Table::reset_shuffle_merge_sort_profile();
-
     // Phase 1: Bottom-Up - Compute local multiplicities (with filters applied)
     phase_start = Clock::now();
     BottomUpPhase::Execute(root, filters);
@@ -81,7 +77,6 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, const std::vector<FilterCondi
            bottom_up_size, top_down_size, distribute_expand_size, align_concat_size);
     printf("ALIGN_CONCAT_SORTS: Total=%.6fs, Accumulator=%.6fs, Child=%.6fs\n",
            sort_time, acc_sort_time, child_sort_time);
-    Table::print_shuffle_merge_sort_profile();
 
     return result;
 }

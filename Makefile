@@ -53,7 +53,7 @@ App_C_Files := app/core_logic/algorithms/min_heap.c \
                app/core_logic/operations/distribute_functions.c
 
 # Include paths
-App_Include_Paths := -Icommon -Iapp -Iapp/core_logic
+App_Include_Paths := -Icommon -Iapp -Iapp/core_logic -Iobligraph/include
 
 # Debug level setting
 ifndef DEBUG_LEVEL
@@ -62,7 +62,7 @@ endif
 
 # Compiler flags
 App_Compile_CFlags := $(COMMON_FLAGS) -fPIC $(App_Include_Paths) -DDEBUG_LEVEL=$(DEBUG_LEVEL)
-App_Compile_CXXFlags := $(App_Compile_CFlags) -std=c++11
+App_Compile_CXXFlags := $(App_Compile_CFlags) -std=c++20
 
 # Add SLIM_ENTRY flag if specified
 ifeq ($(SLIM_ENTRY), 1)

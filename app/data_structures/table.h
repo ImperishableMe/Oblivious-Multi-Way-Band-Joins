@@ -140,6 +140,13 @@ public:
      */
     void shuffle_merge_sort(OpEcall op_type);
 
+    // Profiling: process-wide counters for shuffle_merge_sort wall time and
+    // per-stage breakdown (pad / Waksman / heap_sort / truncate). Reset by
+    // ObliviousJoin::Execute at the start of every query; printed at the
+    // end as a single SHUFFLE_MERGE_SORT_TIMING line.
+    static void reset_shuffle_merge_sort_profile();
+    static void print_shuffle_merge_sort_profile();
+
     /**
      * DistributePass: Process pairs at given distance
      * @param distance Distance between pairs to process

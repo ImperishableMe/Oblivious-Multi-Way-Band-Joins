@@ -553,17 +553,7 @@ void Table::shuffle_merge_sort(OpEcall op_type) {
     // access pattern depends only on public n), so we skip the pad + Waksman
     // prefix entirely. The comparator (compare_join_attr) is already
     // branchless (oblivious_sign + arithmetic masks - see merge_comparators.c).
-    // Indirect bitonic spike covers the three branchless comparators that
-    // together account for ~95% of sort time on banking_3hop:
-    //   JOIN_ATTR, PAIRWISE, END_FIRST.
-    // All three are verified branchless (oblivious_sign + integer masks
-    // in app/core_logic/operations/merge_comparators.c); routing them through
-    // bitonic preserves the obliviousness guarantee.
-    bool indirect_eligible =
-        (op_type == OP_ECALL_COMPARATOR_JOIN_ATTR) ||
-        (op_type == OP_ECALL_COMPARATOR_PAIRWISE)  ||
-        (op_type == OP_ECALL_COMPARATOR_END_FIRST);
-    size_t osort_T = indirect_eligible ? osort_thread_count() : 0;
+    size_t osort_T = (op_type == OP_ECALL_COMPARATOR_JOIN_ATTR) ? osort_thread_count() : 0;
     if (osort_T >= 1) {
         comparator_func_t cmp = get_merge_comparator(op_type);
         if (!cmp) {

@@ -129,8 +129,13 @@ public:
 
     /**
      * ShuffleMergeSort: Two-phase oblivious sort
-     * Phase 1: Oblivious shuffle using ShuffleManager (Waksman network)
-     * Phase 2: Non-oblivious merge sort using MergeSortManager
+     * Phase 1: Pad to next power of two, oblivious Waksman shuffle over the
+     *          whole table (switch bits depend only on public n).
+     * Phase 2: In-place heap_sort over the shuffled table (info-theoretically
+     *          oblivious because input is now a uniformly random permutation
+     *          conditioned on public n).
+     * Phase 3: Truncate padding (sort_padding entries with JOIN_ATTR_POS_INF
+     *          sort to the high end under the join-attr-asc comparators).
      * @param op_type Comparator operation type
      */
     void shuffle_merge_sort(OpEcall op_type);

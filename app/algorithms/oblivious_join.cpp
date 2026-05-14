@@ -77,7 +77,7 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, const std::vector<FilterCondi
            bottom_up_size, top_down_size, distribute_expand_size, align_concat_size);
     printf("ALIGN_CONCAT_SORTS: Total=%.6fs, Accumulator=%.6fs, Child=%.6fs\n",
            sort_time, acc_sort_time, child_sort_time);
-    
+
     return result;
 }
 

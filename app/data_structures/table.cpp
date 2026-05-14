@@ -4,8 +4,11 @@
 #include <cstring>
 #include "debug_util.h"
 #include "../core_logic/core.h"
-#include "../algorithms/merge_sort_manager.h"
-#include "../algorithms/shuffle_manager.h"
+#include "../core_logic/algorithms/oblivious_waksman.h"
+#include "../core_logic/algorithms/min_heap.h"
+
+// Comparator dispatch lives in app/core_logic/operations/merge_comparators.c
+extern "C" comparator_func_t get_merge_comparator(OpEcall type);
 
 // Constructor with required schema
 Table::Table(const std::string& name, const std::vector<std::string>& schema)
@@ -278,63 +281,63 @@ static dual_entry_op_fn get_dual_entry_op_function(OpEcall op_type) {
     }
 }
 
-Table Table::map(OpEcall op_type, int32_t* params) const {
-    DEBUG_TRACE("Table::map: Starting with %zu entries, op_type=%d", entries.size(), op_type);
-
-    Table result(table_name, schema_column_names);
-    result.set_num_columns(num_columns);
-
-    // Handle operations with special parameter signatures
+// Apply a single-entry transform op over entries[begin..end), in place.
+// Shared by map_inplace and append_transformed - keeps the op-dispatch
+// switch in one place.
+static void apply_single_op_range(entry_t* data, size_t begin, size_t end,
+                                   OpEcall op_type, int32_t* params) {
     if (op_type == OP_ECALL_TRANSFORM_TO_START || op_type == OP_ECALL_TRANSFORM_TO_END) {
-        // Two-parameter operations: deviation, equality_type
-        for (const auto& entry : entries) {
-            entry_t new_entry = entry;
-
-            int32_t deviation = params ? params[0] : 0;
-            equality_type_t equality = params ? (equality_type_t)params[1] : EQ;
-
-            if (op_type == OP_ECALL_TRANSFORM_TO_START) {
-                transform_to_start_op(&new_entry, deviation, equality);
-            } else {
-                transform_to_end_op(&new_entry, deviation, equality);
-            }
-
-            result.add_entry(new_entry);
+        const int32_t deviation = params ? params[0] : 0;
+        const equality_type_t equality = params ? (equality_type_t)params[1] : EQ;
+        if (op_type == OP_ECALL_TRANSFORM_TO_START) {
+            for (size_t i = begin; i < end; i++) transform_to_start_op(&data[i], deviation, equality);
+        } else {
+            for (size_t i = begin; i < end; i++) transform_to_end_op(&data[i], deviation, equality);
         }
     } else if (op_type == OP_ECALL_TRANSFORM_SET_INDEX ||
                op_type == OP_ECALL_TRANSFORM_SET_JOIN_ATTR ||
                op_type == OP_ECALL_INIT_METADATA_NULL) {
-        // Single-parameter operations
-        for (const auto& entry : entries) {
-            entry_t new_entry = entry;
-
-            int32_t param = params ? params[0] : 0;
-
-            if (op_type == OP_ECALL_TRANSFORM_SET_INDEX) {
-                transform_set_index_op(&new_entry, (uint32_t)param);
-            } else if (op_type == OP_ECALL_TRANSFORM_SET_JOIN_ATTR) {
-                transform_set_join_attr_op(&new_entry, param);
-            } else {
-                transform_init_metadata_null_op(&new_entry, (uint32_t)param);
-            }
-
-            result.add_entry(new_entry);
+        const int32_t param = params ? params[0] : 0;
+        if (op_type == OP_ECALL_TRANSFORM_SET_INDEX) {
+            for (size_t i = begin; i < end; i++) transform_set_index_op(&data[i], (uint32_t)param);
+        } else if (op_type == OP_ECALL_TRANSFORM_SET_JOIN_ATTR) {
+            for (size_t i = begin; i < end; i++) transform_set_join_attr_op(&data[i], param);
+        } else {
+            for (size_t i = begin; i < end; i++) transform_init_metadata_null_op(&data[i], (uint32_t)param);
         }
     } else {
-        // No-parameter operations
         single_op_fn func = get_single_op_function(op_type);
         if (!func) {
             throw std::runtime_error("Unknown single-entry operation type");
         }
-
-        for (const auto& entry : entries) {
-            entry_t new_entry = entry;
-            func(&new_entry);
-            result.add_entry(new_entry);
-        }
+        for (size_t i = begin; i < end; i++) func(&data[i]);
     }
+}
 
-    DEBUG_TRACE("Table::map: Complete with %zu entries", result.size());
+void Table::map_inplace(OpEcall op_type, int32_t* params) {
+    DEBUG_TRACE("Table::map_inplace: %zu entries, op_type=%d", entries.size(), op_type);
+    apply_single_op_range(entries.data(), 0, entries.size(), op_type, params);
+}
+
+void Table::reserve(size_t n) {
+    entries.reserve(n);
+}
+
+void Table::append_transformed(const Table& src, OpEcall op_type, int32_t* params) {
+    const size_t start = entries.size();
+    // One bulk insert: one allocation (if reserve was called ahead, none) +
+    // one memcpy of src.entries.
+    entries.insert(entries.end(), src.entries.begin(), src.entries.end());
+    apply_single_op_range(entries.data(), start, entries.size(), op_type, params);
+}
+
+Table Table::map(OpEcall op_type, int32_t* params) const {
+    // One bulk vector deep-copy (single allocation + memcpy of all entries)
+    // followed by in-place transform - avoids the old push_back-with-growth
+    // loop, which paid a per-entry reallocation cost on top of two 316-byte
+    // copies per entry (entry->tmp->push_back). Now: ~316B per entry, once.
+    Table result(*this);
+    result.map_inplace(op_type, params);
     return result;
 }
 
@@ -444,84 +447,51 @@ void Table::pad_to_shuffle_size() {
 }
 
 size_t Table::calculate_shuffle_padding(size_t n) {
-    if (n <= MAX_BATCH_SIZE) {
-        // Small vector: just pad to power of 2
-        return next_power_of_two(n);
-    }
-    
-    // Large vector: need m = 2^a * k^b
-    const size_t k = MERGE_SORT_K;
-    
-    // First determine b: number of k-way decomposition levels needed
-    // After b levels, we want size <= MAX_BATCH_SIZE
-    size_t temp = n;
-    size_t b = 0;
-    size_t k_power = 1;
-    
-    while (temp > MAX_BATCH_SIZE) {
-        temp = (temp + k - 1) / k;  // Ceiling division
-        b++;
-        k_power *= k;
-    }
-    
-    // Now temp <= MAX_BATCH_SIZE after b levels of division by k
-    // We need temp to be a power of 2 for the final Waksman shuffle
-    size_t a_part = next_power_of_two(temp);
-    
-    // Calculate m = a_part * k^b
-    size_t m = a_part * k_power;
-    
-    // Ensure m >= n (it should be by construction, but let's be safe)
-    if (m < n) {
-        // This shouldn't happen, but if it does, we need to increase a_part
-        a_part *= 2;
-        m = a_part * k_power;
-    }
-    
-    DEBUG_TRACE("Shuffle padding: n=%zu, b=%zu, a_part=%zu, k^b=%zu, m=%zu",
-                n, b, a_part, k_power, m);
-    
-    return m;
+    // Waksman needs a power-of-2 array; no k-way decomposition any more.
+    return next_power_of_two(n);
 }
 
 bool Table::is_valid_shuffle_size(size_t n) {
-    // Check if n = 2^a * k^b
-    while (n > MAX_BATCH_SIZE && n % MERGE_SORT_K == 0) {
-        n /= MERGE_SORT_K;
-    }
-    // Should be power of 2 and <= MAX_BATCH_SIZE
-    return n <= MAX_BATCH_SIZE && (n & (n - 1)) == 0;
+    // Valid shuffle size is any power of 2 (>= 1).
+    return n > 0 && (n & (n - 1)) == 0;
 }
 
 void Table::shuffle_merge_sort(OpEcall op_type) {
     if (entries.size() <= 1) return;
 
-    size_t original_size = entries.size();
+    const size_t original_size = entries.size();
     DEBUG_INFO("Table::shuffle_merge_sort: Starting with %zu entries, op_type=%d",
                original_size, op_type);
 
-    // Phase 1: Pad to 2^a * k^b format
+    // Phase 1: Pad once to next power of 2 (Waksman requirement).
     pad_to_shuffle_size();
     DEBUG_INFO("Table::shuffle_merge_sort: Padded to %zu entries", entries.size());
 
-    // Phase 2: Shuffle using ShuffleManager (expects padded input)
-    ShuffleManager shuffle_mgr;
-    shuffle_mgr.shuffle(*this);
+    // Phase 2: One in-place Waksman shuffle over the whole table.
+    // Obliviousness: switch bits depend only on (rng_seed, level, position) -
+    // all functions of public n. Failure here is non-recoverable.
+    if (oblivious_2way_waksman(entries.data(), entries.size()) != 0) {
+        throw std::runtime_error("oblivious_2way_waksman failed for n=" +
+                                 std::to_string(entries.size()));
+    }
     DEBUG_INFO("Table::shuffle_merge_sort: Shuffle phase complete");
 
-    // Phase 3: Merge sort using MergeSortManager (works with padded data)
-    MergeSortManager merge_mgr(op_type);
-    merge_mgr.sort(*this);
-    DEBUG_INFO("Table::shuffle_merge_sort: Merge sort phase complete");
-    
-    // Phase 4: Truncate to original size
-    // After sorting, padding entries (with JOIN_ATTR_POS_INF) are at the end
+    // Phase 3: One in-place comparison sort over the shuffled table.
+    // Safe (info-theoretically oblivious) because input is now a uniformly
+    // random permutation conditioned on public n.
+    comparator_func_t cmp = get_merge_comparator(op_type);
+    if (!cmp) {
+        throw std::runtime_error("Unknown comparator op_type for shuffle_merge_sort");
+    }
+    heap_sort(entries.data(), entries.size(), cmp);
+    DEBUG_INFO("Table::shuffle_merge_sort: Sort phase complete");
+
+    // Phase 4: Drop padding (SORT_PADDING entries have JOIN_ATTR_POS_INF and
+    // sort to the high end under join-attr-asc comparators).
     if (entries.size() > original_size) {
-        DEBUG_INFO("Table::shuffle_merge_sort: Truncating from %zu to %zu entries",
-                   entries.size(), original_size);
         entries.resize(original_size);
     }
-    
+
     DEBUG_INFO("Table::shuffle_merge_sort: Complete with %zu entries", entries.size());
 }
 

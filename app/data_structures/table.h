@@ -80,12 +80,36 @@ public:
     // ========================================================================
 
     /**
-     * Map: Apply transformation to each entry
-     * @param op_type Operation type for core function
-     * @param params Optional parameters for operations (can be nullptr)
-     * @return New table with transformed entries
+     * Map: Apply transformation to each entry, returning a new table.
+     * Implemented as (Table copy; copy.map_inplace(...)) - one bulk
+     * vector deep-copy followed by in-place transform. Prefer
+     * map_inplace() at call sites where the source table is no longer
+     * needed afterwards.
      */
     Table map(OpEcall op_type, int32_t* params = nullptr) const;
+
+    /**
+     * MapInPlace: Apply transformation to each entry in-place.
+     * No allocation, no per-entry copy - one pass over entries[].
+     */
+    void map_inplace(OpEcall op_type, int32_t* params = nullptr);
+
+    /**
+     * Reserve capacity for n entries (forwards to underlying vector).
+     * Use before a sequence of add_entry / append_transformed to avoid
+     * incremental reallocation cost on large builds.
+     */
+    void reserve(size_t n);
+
+    /**
+     * AppendTransformed: Bulk-append src.entries to this table's tail
+     * (one vector insert: single allocation + single memcpy), then
+     * apply the per-entry transform in-place over the appended range
+     * only. Used by CombineTable to fuse three "copy + transform"
+     * passes into one without materialising intermediate Tables.
+     */
+    void append_transformed(const Table& src, OpEcall op_type,
+                            int32_t* params = nullptr);
 
     /**
      * LinearPass: Apply window function to adjacent pairs

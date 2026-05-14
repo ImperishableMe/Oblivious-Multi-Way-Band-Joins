@@ -16,7 +16,7 @@ COMMON_FLAGS := -Wall -Wextra -Wno-attributes
 ifeq ($(DEBUG), 1)
 	COMMON_FLAGS += -O0 -g -DDEBUG
 else
-	COMMON_FLAGS += -O2 -DNDEBUG
+	COMMON_FLAGS += -O3 -DNDEBUG
 endif
 
 ######## App Settings ########

@@ -45,19 +45,41 @@ static uint8_t get_switch_bit(ShuffleRNG* rng, uint32_t level, uint32_t position
  * Oblivious swap using constant-time operations
  * Swaps if swap=1, doesn't swap if swap=0
  * No branches based on swap value
+ *
+ * Wide path: process the entry as uint64_t chunks (memcpy keeps it
+ * strict-aliasing-safe; -O2 lowers the memcpys to native unaligned
+ * loads/stores). Any tail bytes are handled byte-by-byte. sizeof(entry_t)
+ * is a compile-time constant so the tail loop and its guard fold away
+ * when the struct is 8-byte-multiple sized.
  */
 static void oblivious_swap(entry_t* a, entry_t* b, uint8_t swap) {
-    // Create mask: 0x00 if swap=0, 0xFF if swap=1
-    uint8_t mask = (uint8_t)(-(int8_t)swap);
-    
-    // XOR swap without branches
-    uint8_t* pa = (uint8_t*)a;
-    uint8_t* pb = (uint8_t*)b;
-    
-    for (size_t i = 0; i < sizeof(entry_t); i++) {
-        uint8_t diff = pa[i] ^ pb[i];
-        pa[i] ^= diff & mask;
-        pb[i] ^= diff & mask;
+    const uint64_t mask64 = (uint64_t)(-(int64_t)swap);
+    const size_t total = sizeof(entry_t);
+    const size_t n64 = total / 8;
+
+    unsigned char* pa = (unsigned char*)a;
+    unsigned char* pb = (unsigned char*)b;
+
+    for (size_t i = 0; i < n64; i++) {
+        uint64_t va, vb;
+        memcpy(&va, pa + i * 8, 8);
+        memcpy(&vb, pb + i * 8, 8);
+        uint64_t diff = (va ^ vb) & mask64;
+        va ^= diff;
+        vb ^= diff;
+        memcpy(pa + i * 8, &va, 8);
+        memcpy(pb + i * 8, &vb, 8);
+    }
+
+    // Tail: any bytes past the last full uint64_t (constant-folded away
+    // when total % 8 == 0). Still constant-time across swap values.
+    if (total % 8 != 0) {
+        const uint8_t mask8 = (uint8_t)(-(int8_t)swap);
+        for (size_t i = n64 * 8; i < total; i++) {
+            uint8_t diff = (pa[i] ^ pb[i]) & mask8;
+            pa[i] ^= diff;
+            pb[i] ^= diff;
+        }
     }
 }
 
@@ -107,16 +129,9 @@ void waksman_recursive(
     for (size_t i = 0; i < half; i++) {
         size_t idx1 = start + (i * 2) * stride;
         size_t idx2 = start + (i * 2 + 1) * stride;
-        
-        // Add bounds check for debugging
-        if (idx1 >= MAX_BATCH_SIZE || idx2 >= MAX_BATCH_SIZE) {
-            DEBUG_ERROR("BOUNDS ERROR: idx1=%zu, idx2=%zu exceed MAX_BATCH_SIZE=%d", 
-                       idx1, idx2, MAX_BATCH_SIZE);
-            return;
-        }
-        
+
         uint8_t swap = get_switch_bit(rng, level, idx1);
-        DEBUG_TRACE("  Input switch %zu: swap=%d at positions %zu,%zu", 
+        DEBUG_TRACE("  Input switch %zu: swap=%d at positions %zu,%zu",
                     i, swap, idx1, idx2);
         oblivious_swap(&array[idx1], &array[idx2], swap);
     }
@@ -138,17 +153,10 @@ void waksman_recursive(
     for (size_t i = 1; i <= num_output_switches; i++) {
         size_t idx1 = start + (i * 2) * stride;
         size_t idx2 = start + (i * 2 + 1) * stride;
-        
-        // Add bounds check for debugging
-        if (idx1 >= MAX_BATCH_SIZE || idx2 >= MAX_BATCH_SIZE) {
-            DEBUG_ERROR("BOUNDS ERROR in output: idx1=%zu, idx2=%zu exceed MAX_BATCH_SIZE=%d", 
-                       idx1, idx2, MAX_BATCH_SIZE);
-            return;
-        }
-        
+
         // Use different level offset to ensure different bits
         uint8_t swap = get_switch_bit(rng, level + 10000, idx1);
-        DEBUG_TRACE("  Output switch %zu: swap=%d at positions %zu,%zu", 
+        DEBUG_TRACE("  Output switch %zu: swap=%d at positions %zu,%zu",
                     i - 1, swap, idx1, idx2);
         oblivious_swap(&array[idx1], &array[idx2], swap);
     }
@@ -169,11 +177,6 @@ int oblivious_2way_waksman(entry_t* data, size_t n) {
     if (!data || n == 0) {
         DEBUG_ERROR("Invalid parameters: data=%p, n=%zu", data, n);
         return -1;
-    }
-
-    if (n > MAX_BATCH_SIZE) {
-        DEBUG_ERROR("Array too large: n=%zu > MAX_BATCH_SIZE=%d", n, MAX_BATCH_SIZE);
-        return -1;  // Too large for in-memory shuffle
     }
 
     // Check that n is a power of 2

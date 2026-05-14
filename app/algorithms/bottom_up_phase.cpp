@@ -68,12 +68,11 @@ void BottomUpPhase::InitializeAllTables(JoinTreeNodePtr node) {
     // Initialize ALL metadata fields to NULL_VALUE for clarity in debugging
     // Then set specific values as needed
     
-    // First batch: Initialize all metadata to NULL_VALUE
+    // Both transforms mutate the node's own table in place - no allocation.
     int32_t params[1] = { METADATA_ALL };
-    Table temp = node->get_table().map( OP_ECALL_INIT_METADATA_NULL, params);
-    
-    // Second batch: Set local_mult to 1
-    node->set_table(temp.map( OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE));
+    Table& tbl = node->get_table();
+    tbl.map_inplace(OP_ECALL_INIT_METADATA_NULL, params);
+    tbl.map_inplace(OP_ECALL_TRANSFORM_SET_LOCAL_MULT_ONE);
     
     // Set original indices using LinearPass with window function
     Table& table = node->get_table();
@@ -161,48 +160,23 @@ Table BottomUpPhase::CombineTable(
     DEBUG_INFO("Is dev2 meant to be infinity? dev2=%d vs INT_MAX/2=%d", 
                dev2, INT_MAX/2);
     
-    // Transform source entries to SOURCE type
-    DEBUG_INFO("Transforming source entries to SOURCE type");
-    Table source_entries = source.map( OP_ECALL_TRANSFORM_TO_SOURCE);
-    
-    // Transform target entries to START boundaries
-    DEBUG_INFO("Transforming target entries to START boundaries");
+    // Build combined directly: reserve final size, then for each section
+    // do a single bulk insert followed by in-place transform on the
+    // appended range. Eliminates 3 intermediate Tables and the
+    // per-entry add_entry loop (which previously incurred 6 full table
+    // copies per CombineTable call - see git blame for context).
     int32_t start_params[2] = { dev1, (int32_t)eq1 };
-    Table start_entries = target.map( OP_ECALL_TRANSFORM_TO_START, start_params);
-    
-    // Transform target entries to END boundaries
-    DEBUG_INFO("Transforming target entries to END boundaries");
-    int32_t end_params[2] = { dev2, (int32_t)eq2 };
-    Table end_entries = target.map( OP_ECALL_TRANSFORM_TO_END, end_params);
-    
-    // Combine all three tables
-    DEBUG_INFO("Combining tables: source=%zu, start=%zu, end=%zu",
-               source_entries.size(), start_entries.size(), end_entries.size());
-    
-    // Use source schema for combined table (all three should have same schema)
-    Table combined("combined", source.get_schema().empty() ? target.get_schema() : source.get_schema());
-    
-    // Add source entries
-    DEBUG_INFO("Adding source entries");
-    for (const auto& entry : source_entries) {
-        combined.add_entry(entry);
-    }
-    
-    // Add start entries
-    DEBUG_INFO("Adding start entries");
-    for (const auto& entry : start_entries) {
-        combined.add_entry(entry);
-    }
-    
-    // Add end entries
-    DEBUG_INFO("Adding end entries");
-    for (const auto& entry : end_entries) {
-        combined.add_entry(entry);
-    }
-    
+    int32_t end_params[2]   = { dev2, (int32_t)eq2 };
+
+    Table combined("combined",
+                   source.get_schema().empty() ? target.get_schema()
+                                               : source.get_schema());
+    combined.reserve(source.size() + 2 * target.size());
+    combined.append_transformed(source, OP_ECALL_TRANSFORM_TO_SOURCE);
+    combined.append_transformed(target, OP_ECALL_TRANSFORM_TO_START, start_params);
+    combined.append_transformed(target, OP_ECALL_TRANSFORM_TO_END,   end_params);
+
     DEBUG_INFO("Combined table created with %zu entries", combined.size());
-    
-    
     return combined;
 }
 
@@ -238,7 +212,7 @@ void BottomUpPhase::ComputeLocalMultiplicities(
     
     // Step 2: Initialize temporary fields (local_cumsum = local_mult, local_interval = 0)
     DEBUG_INFO("Initializing temporary fields");
-    combined = combined.map( OP_ECALL_TRANSFORM_INIT_LOCAL_TEMPS);
+    combined.map_inplace(OP_ECALL_TRANSFORM_INIT_LOCAL_TEMPS);
     DEBUG_INFO("Temporary fields initialized");
     
     // Debug: Dump after initializing temps

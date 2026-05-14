@@ -91,7 +91,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     
     // Step 4: Mark entries with final_mult = 0 as DIST_PADDING
     DEBUG_INFO("Step 4 - Marking entries with final_mult=0 as padding");
-    working = working.map(OP_ECALL_TRANSFORM_MARK_ZERO_MULT_PADDING);
+    working.map_inplace(OP_ECALL_TRANSFORM_MARK_ZERO_MULT_PADDING);
     DEBUG_INFO("Step 4 complete, table size=%zu", working.size());
     
     // Debug: Show which entries are marked as padding
@@ -130,7 +130,7 @@ Table DistributeExpand::ExpandSingleTable(const Table& table) {
     
     // Step 7: Initialize index field (0 to output_size-1)
     DEBUG_INFO("Step 7 - Initializing index field");
-    working = working.map(OP_ECALL_TRANSFORM_INIT_INDEX);
+    working.map_inplace(OP_ECALL_TRANSFORM_INIT_INDEX);
 
     working.linear_pass(OP_ECALL_WINDOW_INCREMENT_INDEX);
     DEBUG_INFO("Step 7 complete, table size=%zu", working.size());

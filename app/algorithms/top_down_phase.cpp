@@ -54,13 +54,12 @@ void TopDownPhase::Execute(JoinTreeNodePtr root) {
 
 void TopDownPhase::InitializeRootTable(JoinTreeNodePtr node) {
     // Initialize root table only: final_mult = local_mult
-    // Initialize root table
-    node->set_table(node->get_table().map( OP_ECALL_TRANSFORM_INIT_FINAL_MULT));
+    node->get_table().map_inplace(OP_ECALL_TRANSFORM_INIT_FINAL_MULT);
 }
 
 void TopDownPhase::InitializeForeignFields(JoinTreeNodePtr node) {
     // Initialize foreign-related fields to 0
-    node->set_table(node->get_table().map( OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS));
+    node->get_table().map_inplace(OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS);
 }
 
 Table TopDownPhase::CombineTableForForeign(
@@ -87,41 +86,21 @@ Table TopDownPhase::CombineTableForForeign(
                constraint.get_params().deviation1, constraint.get_params().deviation2);
     DEBUG_INFO("Reversed constraint: dev1=%d, dev2=%d", dev1, dev2);
     
-    // Transform parent entries to SOURCE type (parent provides multiplicities)
-    DEBUG_INFO("Transforming parent entries to SOURCE type");
-    Table source_entries = parent.map( OP_ECALL_TRANSFORM_TO_SOURCE);
-    
-    // Transform child entries to START boundaries (child receives multiplicities)
-    DEBUG_INFO("Transforming child entries to START boundaries");
-    int32_t start_params[] = {dev1, eq1};
-    Table start_entries = child.map( OP_ECALL_TRANSFORM_TO_START, start_params);
-    
-    // Transform child entries to END boundaries
-    DEBUG_INFO("Transforming child entries to END boundaries");
-    int32_t end_params[] = {dev2, eq2};
-    Table end_entries = child.map( OP_ECALL_TRANSFORM_TO_END, end_params);
-    
-    // Combine all three tables
-    // Use parent schema for combined table (all three should have same schema)
-    Table combined("combined_foreign", parent.get_schema().empty() ? child.get_schema() : parent.get_schema());
-    
-    // Add source entries (parent)
-    for (const auto& entry : source_entries) {
-        combined.add_entry(entry);
-    }
-    
-    // Add start entries (child)
-    for (const auto& entry : start_entries) {
-        combined.add_entry(entry);
-    }
-    
-    // Add end entries (child)
-    for (const auto& entry : end_entries) {
-        combined.add_entry(entry);
-    }
-    
+    // Build combined directly: parent SOURCE rows + 2x child START/END rows.
+    // See BottomUpPhase::CombineTable for the same pattern (single reserve
+    // + bulk insert + in-place transform per section).
+    int32_t start_params[2] = {dev1, eq1};
+    int32_t end_params[2]   = {dev2, eq2};
+
+    Table combined("combined_foreign",
+                   parent.get_schema().empty() ? child.get_schema()
+                                               : parent.get_schema());
+    combined.reserve(parent.size() + 2 * child.size());
+    combined.append_transformed(parent, OP_ECALL_TRANSFORM_TO_SOURCE);
+    combined.append_transformed(child,  OP_ECALL_TRANSFORM_TO_START, start_params);
+    combined.append_transformed(child,  OP_ECALL_TRANSFORM_TO_END,   end_params);
+
     DEBUG_INFO("Combined table created with %zu entries", combined.size());
-    
     return combined;
 }
 
@@ -149,7 +128,7 @@ void TopDownPhase::ComputeForeignMultiplicities(
     
     // Step 2: Initialize foreign temporary fields
     DEBUG_INFO("Initializing foreign temporary fields");
-    combined = combined.map( OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS);
+    combined.map_inplace(OP_ECALL_TRANSFORM_INIT_FOREIGN_TEMPS);
     
     // Debug: Dump after initializing foreign temps
     uint32_t foreign_init_mask = DEBUG_COL_ORIGINAL_INDEX | DEBUG_COL_FIELD_TYPE |

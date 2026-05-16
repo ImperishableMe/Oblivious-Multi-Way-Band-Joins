@@ -2,10 +2,15 @@
 #include <stdexcept>
 #include <climits>
 #include <cstring>
+#include <cstdlib>
+#include <thread>
 #include "debug_util.h"
 #include "../core_logic/core.h"
 #include "../core_logic/algorithms/oblivious_waksman.h"
 #include "../core_logic/algorithms/min_heap.h"
+#include "entry_oblivious_ops.h"   // obligraph::o_mem_swap<entry_t> specialization
+                                    // (also transitively pulls obl_building_blocks.h
+                                    //  with parallel_sort, ThreadPool)
 
 // Comparator dispatch lives in app/core_logic/operations/merge_comparators.c
 extern "C" comparator_func_t get_merge_comparator(OpEcall type);
@@ -459,39 +464,37 @@ bool Table::is_valid_shuffle_size(size_t n) {
 void Table::shuffle_merge_sort(OpEcall op_type) {
     if (entries.size() <= 1) return;
 
-    const size_t original_size = entries.size();
-    DEBUG_INFO("Table::shuffle_merge_sort: Starting with %zu entries, op_type=%d",
-               original_size, op_type);
-
-    // Phase 1: Pad once to next power of 2 (Waksman requirement).
-    pad_to_shuffle_size();
-    DEBUG_INFO("Table::shuffle_merge_sort: Padded to %zu entries", entries.size());
-
-    // Phase 2: One in-place Waksman shuffle over the whole table.
-    // Obliviousness: switch bits depend only on (rng_seed, level, position) -
-    // all functions of public n. Failure here is non-recoverable.
-    if (oblivious_2way_waksman(entries.data(), entries.size()) != 0) {
-        throw std::runtime_error("oblivious_2way_waksman failed for n=" +
-                                 std::to_string(entries.size()));
-    }
-    DEBUG_INFO("Table::shuffle_merge_sort: Shuffle phase complete");
-
-    // Phase 3: One in-place comparison sort over the shuffled table.
-    // Safe (info-theoretically oblivious) because input is now a uniformly
-    // random permutation conditioned on public n.
     comparator_func_t cmp = get_merge_comparator(op_type);
     if (!cmp) {
         throw std::runtime_error("Unknown comparator op_type for shuffle_merge_sort");
     }
-    heap_sort(entries.data(), entries.size(), cmp);
-    DEBUG_INFO("Table::shuffle_merge_sort: Sort phase complete");
 
-    // Phase 4: Drop padding (SORT_PADDING entries have JOIN_ATTR_POS_INF and
-    // sort to the high end under join-attr-asc comparators).
-    if (entries.size() > original_size) {
-        entries.resize(original_size);
-    }
+    // Thread count: OBL_MWJ_SORT_THREADS overrides; default to hardware concurrency.
+    // Read once per process via a magic-static initializer.
+    static const size_t sort_threads = []() -> size_t {
+        if (const char* e = std::getenv("OBL_MWJ_SORT_THREADS")) {
+            long v = std::atol(e);
+            if (v >= 1) return static_cast<size_t>(v);
+        }
+        unsigned hw = std::thread::hardware_concurrency();
+        return hw > 0 ? hw : 1;
+    }();
 
-    DEBUG_INFO("Table::shuffle_merge_sort: Complete with %zu entries", entries.size());
+    // ThreadPool constructed once on first call, shared across every sort.
+    static obligraph::ThreadPool pool(sort_threads);
+
+    // Bitonic sort over the entries. parallel_sort handles arbitrary n (uses
+    // greatest_power_of_two_less_than internally), so no pad / no truncate.
+    // The network topology is data-independent; o_mem_swap<entry_t> is
+    // branchless (AVX2 vpblendvb). Structurally oblivious — no pre-shuffle.
+    obligraph::parallel_sort(
+        entries.begin(), entries.end(),
+        pool,
+        // C-style comparator cmp returns 1 iff a < b; bitonic Compare wants a < b.
+        [cmp](const Entry& a, const Entry& b) -> bool {
+            return cmp(const_cast<entry_t*>(&a),
+                       const_cast<entry_t*>(&b)) != 0;
+        },
+        sort_threads);
 }
 

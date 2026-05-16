@@ -10,7 +10,7 @@ DEBUG ?= 0
 SLIM_ENTRY ?= 0
 
 # Common compiler flags
-COMMON_FLAGS := -Wall -Wextra -Wno-attributes
+COMMON_FLAGS := -Wall -Wextra -Wno-attributes -mavx2 -DUSE_AVX2
 
 # Debug/Release flags
 ifeq ($(DEBUG), 1)
@@ -40,7 +40,8 @@ App_Cpp_Files := main/sgx_join/main.cpp \
                  app/algorithms/distribute_expand.cpp \
                  app/algorithms/align_concat.cpp \
                  app/algorithms/oblivious_join.cpp \
-                 app/debug_stubs.cpp
+                 app/debug_stubs.cpp \
+                 obligraph/src/par_obl_primitives.cpp
 
 # C source files from core_logic (merged from enclave)
 App_C_Files := app/core_logic/algorithms/min_heap.c \
@@ -53,7 +54,11 @@ App_C_Files := app/core_logic/algorithms/min_heap.c \
                app/core_logic/operations/distribute_functions.c
 
 # Include paths
-App_Include_Paths := -Icommon -Iapp -Iapp/core_logic
+# obligraph/include is added with -isystem so its pre-existing warnings
+# (sign-compare, unused-variable in ObliviousArrayAccessSimd, etc.) don't
+# fail the strict -Wall -Wextra build. obligraph is vendored, fixing its
+# warnings is out of scope.
+App_Include_Paths := -Icommon -Iapp -Iapp/core_logic -isystem obligraph/include
 
 # Debug level setting
 ifndef DEBUG_LEVEL
@@ -62,7 +67,7 @@ endif
 
 # Compiler flags
 App_Compile_CFlags := $(COMMON_FLAGS) -fPIC $(App_Include_Paths) -DDEBUG_LEVEL=$(DEBUG_LEVEL)
-App_Compile_CXXFlags := $(App_Compile_CFlags) -std=c++11
+App_Compile_CXXFlags := $(App_Compile_CFlags) -std=c++20
 
 # Add SLIM_ENTRY flag if specified
 ifeq ($(SLIM_ENTRY), 1)
@@ -95,6 +100,11 @@ main/%.o: main/%.cpp
 	@echo "CXX  <=  $<"
 
 app/%.o: app/%.cpp
+	@$(CXX) $(App_Compile_CXXFlags) -c $< -o $@
+	@echo "CXX  <=  $<"
+
+# Compile C++ source files from obligraph (parallel sort primitives)
+obligraph/src/%.o: obligraph/src/%.cpp
 	@$(CXX) $(App_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 

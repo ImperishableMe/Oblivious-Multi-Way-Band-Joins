@@ -15,19 +15,20 @@ namespace obligraph {
 
 std::pair<int, int> get_cutoffs_for_thread(int thread_id, int total, int n_threads);
 
-template <typename T, typename Comparator>
-inline void o_compare_and_swap(T &a, T &b, Comparator cmp, bool asc = true) {
-    bool cond = !(cmp(a, b) == asc);
-    T tmp = a;
-    a = ObliviousChoose(cond, b, a);
-    b = ObliviousChoose(cond, tmp, b);
-}
-
 template <typename T>
 inline void o_mem_swap(T &a, T &b, bool cond) {
     T tmp = a;
     a = ObliviousChoose(cond, b, a);
     b = ObliviousChoose(cond, tmp, b);
+}
+
+template <typename T, typename Comparator>
+inline void o_compare_and_swap(T &a, T &b, Comparator cmp, bool asc = true) {
+    bool cond = !(cmp(a, b) == asc);
+    // Route through o_mem_swap so type-specialized in-place swaps (e.g. the
+    // entry_t specialization in app/data_structures/entry_oblivious_ops.h)
+    // get picked up via the existing dispatch.
+    o_mem_swap(a, b, cond);
 }
 
 

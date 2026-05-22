@@ -110,10 +110,17 @@ def hop_count(query_name: str) -> int:
 # Subprocess helpers
 # ---------------------------------------------------------------------------
 
-def run_capture(cmd, *, log_file) -> str:
+def run_capture(cmd, *, log_file, env_extra=None) -> str:
     log_file.write(f"\n+++ {' '.join(str(c) for c in cmd)}\n")
+    if env_extra:
+        log_file.write(f"    env_extra: {env_extra}\n")
     log_file.flush()
-    proc = subprocess.run([str(c) for c in cmd], capture_output=True, text=True)
+    proc_env = None
+    if env_extra:
+        proc_env = os.environ.copy()
+        proc_env.update({str(k): str(v) for k, v in env_extra.items()})
+    proc = subprocess.run(
+        [str(c) for c in cmd], capture_output=True, text=True, env=proc_env)
     log_file.write(proc.stdout)
     if proc.stderr:
         log_file.write("\n--- stderr ---\n" + proc.stderr)
@@ -134,7 +141,7 @@ def run_onehop(data_dir: Path, out_dir: Path, threads: int, log_file) -> tuple:
     """Run banking_onehop and place hop.csv in out_dir. Returns (onehop_ms, rows)."""
     hop_csv = out_dir / "hop.csv"
     stdout = run_capture(
-        [ONEHOP_BIN, "--threads", str(threads), data_dir, hop_csv],
+        [ONEHOP_BIN, data_dir, hop_csv, "--threads", str(threads)],
         log_file=log_file,
     )
     return parse_onehop_total_ms(stdout), parse_result_rows(stdout)
@@ -145,11 +152,20 @@ def run_rewrite(query_path: Path, out_path: Path, log_file):
     run_capture(["python3", REWRITER, query_path, out_path], log_file=log_file)
 
 
-def run_mwj(query_path: Path, data_dir: Path, log_file) -> tuple:
-    """Run sgx_app once. Returns (mwj_ms, output_rows)."""
+def run_mwj(query_path: Path, data_dir: Path, mwj_threads: int, log_file) -> tuple:
+    """Run sgx_app once. Returns (mwj_ms, output_rows). Sets
+    OBL_MWJ_SORT_THREADS=mwj_threads in the subprocess env to size sgx_app's
+    shared bitonic parallel_sort thread pool (read once via magic static in
+    app/data_structures/table.cpp). Pass 0 to leave the env unset; sgx_app
+    then defaults to std::thread::hardware_concurrency()."""
+    env_extra = None
+    if mwj_threads and mwj_threads > 0:
+        env_extra = {"OBL_MWJ_SORT_THREADS": str(mwj_threads)}
     with tempfile.TemporaryDirectory() as tmp:
         out_csv = Path(tmp) / "out.csv"
-        stdout = run_capture([SGX_APP, query_path, data_dir, out_csv], log_file=log_file)
+        stdout = run_capture(
+            [SGX_APP, query_path, data_dir, out_csv],
+            log_file=log_file, env_extra=env_extra)
     return parse_mwj_total_ms(stdout), parse_result_rows(stdout)
 
 
@@ -193,6 +209,10 @@ def collect_metadata(args) -> dict:
         "platform": platform.platform(),
         "python": sys.version.split()[0],
         "args": vars(args),
+        "mwj_env": (
+            {"OBL_MWJ_SORT_THREADS": str(args.mwj_threads)}
+            if args.mwj_threads and args.mwj_threads > 0 else {}
+        ),
         "binaries": {"sgx_app": str(SGX_APP), "banking_onehop": str(ONEHOP_BIN)},
         "note": (
             "one-hop runs once per repetition (not per cell); its result is "
@@ -216,7 +236,12 @@ def main():
     p.add_argument("--warmup-runs", type=int, default=1,
                    help="Discarded warm-up runs per cell (default: 1)")
     p.add_argument("--onehop-threads", type=int, default=32,
-                   help="Threads passed to banking_onehop --threads (default: 32). sgx_app is single-threaded.")
+                   help="Threads passed to banking_onehop --threads (default: 32).")
+    p.add_argument("--mwj-threads", type=int, default=64,
+                   help="Workers in sgx_app's shared bitonic parallel_sort thread "
+                        "pool, passed via the OBL_MWJ_SORT_THREADS env var "
+                        "(default: 64). Set to 0 to leave the env unset; sgx_app "
+                        "then defaults to std::thread::hardware_concurrency().")
     p.add_argument("--skip-build", action="store_true",
                    help="Skip binary rebuild step")
     p.add_argument("--output-dir", default=str(RESULTS_DIR),
@@ -251,6 +276,7 @@ def main():
     print(f"  queries: {queries}")
     print(f"  systems: {systems}")
     print(f"  warm-up: {args.warmup_runs}   measurement: {args.measurement_runs}")
+    print(f"  mwj_env: {meta['mwj_env'] or '(unset — sgx_app uses hardware_concurrency)'}")
     print(f"  output : {out_dir}")
     print()
 
@@ -312,7 +338,9 @@ def main():
                             else:
                                 # rewrite is already cached; only time the MWJ stage.
                                 t0 = time.time()
-                                mwj_ms, mwj_rows = run_mwj(decomposed_for[query], hop_dir, log_file)
+                                mwj_ms, mwj_rows = run_mwj(
+                                    decomposed_for[query], hop_dir,
+                                    args.mwj_threads, log_file)
                                 wall = time.time() - t0
                                 cell_total_ms = onehop_ms + mwj_ms
                                 cell_onehop_ms = onehop_ms  # inherited from this rep
@@ -320,7 +348,8 @@ def main():
                                 cell_rows = mwj_rows
                         elif system == "full_mwj":
                             t0 = time.time()
-                            mwj_ms, mwj_rows = run_mwj(qpath, data_dir, log_file)
+                            mwj_ms, mwj_rows = run_mwj(
+                                qpath, data_dir, args.mwj_threads, log_file)
                             wall = time.time() - t0
                             cell_total_ms = mwj_ms
                             cell_mwj_ms = mwj_ms

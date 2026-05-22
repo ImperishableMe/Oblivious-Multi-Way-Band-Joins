@@ -14,7 +14,7 @@ CORE_SOURCES = \
     common/error.c \
     common/util.c 
 
-all: liboblivious standalone_join multiway_join
+all: liboblivious standalone_join multiway_join obliviator_khop_chained
 
 liboblivious:
 	$(MAKE) -C third_party/liboblivious
@@ -29,8 +29,13 @@ multiway_join: liboblivious
 	    -Lthird_party/liboblivious -l:liboblivious.a \
 	    -lm -o multiway_join
 
+obliviator_khop_chained: liboblivious
+	$(CC) $(CFLAGS) -DDATA_LENGTH=256 obliviator_khop_chained_main.c $(CORE_SOURCES) \
+	    -Lthird_party/liboblivious -l:liboblivious.a \
+	    -lm -o obliviator_khop_chained
+
 clean:
-	rm -f standalone_join multiway_join
+	rm -f standalone_join multiway_join obliviator_khop_chained
 	$(MAKE) -C third_party/liboblivious clean
 
 .PHONY: all clean liboblivious

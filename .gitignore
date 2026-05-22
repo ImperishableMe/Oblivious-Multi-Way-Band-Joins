@@ -28,6 +28,7 @@ obl-radix/baselines/*/multiway_join
 obl-radix/baselines/*/standalone_join
 obl-radix/baselines/*/obliviator_1hop
 obl-radix/baselines/*/obliviator_1hop_chained
+obl-radix/baselines/*/obliviator_khop_chained
 
 # Obliviator scratch dirs (converter outputs, test outputs)
 obl-radix/baselines/*/work_*/

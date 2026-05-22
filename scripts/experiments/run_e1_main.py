@@ -2,7 +2,7 @@
 """
 E1 main-result runner (Banking, chain queries only, reduced scope).
 
-Compares two systems on the five Banking chain queries at a single
+Compares three systems on the five Banking chain queries at a single
 dataset scale:
 
   1. NebulaDB
@@ -14,6 +14,15 @@ dataset scale:
   2. Full MWJ
        - `sgx_app` directly on the chain query (no decomposition).
      Per-cell latency = `mwj_ms`.
+  3. Obliviator chained
+       - 1-hop  : `obliviator_1hop_chained` (FK kernel, two pairwise joins).
+       - >= 2-hop : `obliviator_khop_chained` (NFK kernel, 2K pairwise joins).
+     Per-cell latency = the binary's reported `OBLIVIOUS WORK` (1-hop) or
+     `online_sec` (K-hop). Both binaries consume the same combined `src.txt`
+     produced by `convert_banking_1hop.py`, generated once per dataset.
+     Caveat: at threads>=2 the NFK kernel has a known pairing bug at
+     genuine-NFK steps (K>=2) — rowcount correct, tuple identities scrambled.
+     See docs/obliviator_baseline_status.md.
 
 The one-hop step is run **once per measurement repetition**, NOT per cell:
 the hop table is a per-dataset constant, identical regardless of which
@@ -64,8 +73,14 @@ REWRITER = PROJECT_DIR / "scripts" / "rewrite_chain_query.py"
 QUERY_DIR = PROJECT_DIR / "input" / "queries"
 DATA_ROOT = PROJECT_DIR / "input" / "plaintext"
 
+OBL_FK_DIR  = PROJECT_DIR / "obl-radix" / "baselines" / "obliviatorFK-TDX"
+OBL_NFK_DIR = PROJECT_DIR / "obl-radix" / "baselines" / "obliviatorNFK-TDX"
+OBL_1HOP_BIN = OBL_FK_DIR  / "obliviator_1hop_chained"
+OBL_KHOP_BIN = OBL_NFK_DIR / "obliviator_khop_chained"
+CONVERT_BANKING_1HOP = OBL_FK_DIR / "convert_banking_1hop.py"
+
 ALL_QUERIES = ["banking_1hop", "banking_2hop", "banking_3hop", "banking_4hop", "banking_5hop"]
-ALL_SYSTEMS = ["nebuladb", "full_mwj"]
+ALL_SYSTEMS = ["nebuladb", "full_mwj", "obliviator_chained"]
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +93,12 @@ ONEHOP_TIMING_RE = re.compile(r"TIMING_REPORTED\s+categories=\S+\s+total=([\d.]+
 MWJ_TIMING_RE    = re.compile(r"PHASE_TIMING:[^\n]*Total=([\d.]+)")
 # both:            "Result: 2 rows" (sgx_app); "Result: 1000 rows, 11 columns" (banking_onehop)
 RESULT_ROWS_RE   = re.compile(r"Result:\s+(\d+)\s+rows")
+# obliviator_1hop_chained: "  OBLIVIOUS WORK         : 0.786334 s   [...]"
+OBL_1HOP_TIME_RE = re.compile(r"^\s*OBLIVIOUS WORK\s+:\s+([\d.]+)\s+s", re.MULTILINE)
+OBL_1HOP_ROWS_RE = re.compile(r"^\s*final rows\s+:\s+(\d+)", re.MULTILINE)
+# obliviator_khop_chained: "  online_sec  (sum on-clock)  : 0.020014   [...]"
+OBL_KHOP_TIME_RE = re.compile(r"^\s*online_sec\s+\(sum on-clock\)\s+:\s+([\d.]+)", re.MULTILINE)
+OBL_KHOP_ROWS_RE = re.compile(r"^\s*final_rows\s+:\s+(\d+)", re.MULTILINE)
 
 
 def parse_onehop_total_ms(stdout: str) -> float:
@@ -100,6 +121,33 @@ def parse_result_rows(stdout: str) -> int:
     if not matches:
         raise RuntimeError("could not find 'Result: N rows' line")
     return int(matches[-1])
+
+
+def parse_obliviator_total_ms(stdout: str, K: int) -> float:
+    """Parse the obliviator chained binary's online-time line (seconds) -> ms.
+    K=1 uses obliviator_1hop_chained's `OBLIVIOUS WORK` label; K>=2 uses
+    obliviator_khop_chained's `online_sec  (sum on-clock)` label."""
+    if K == 1:
+        m = OBL_1HOP_TIME_RE.search(stdout)
+        label = "OBLIVIOUS WORK"
+    else:
+        m = OBL_KHOP_TIME_RE.search(stdout)
+        label = "online_sec  (sum on-clock)"
+    if not m:
+        raise RuntimeError(f"could not find '{label}' line in obliviator output")
+    return float(m.group(1)) * 1000.0
+
+
+def parse_obliviator_rows(stdout: str, K: int) -> int:
+    if K == 1:
+        m = OBL_1HOP_ROWS_RE.search(stdout)
+        label = "final rows"
+    else:
+        m = OBL_KHOP_ROWS_RE.search(stdout)
+        label = "final_rows"
+    if not m:
+        raise RuntimeError(f"could not find '{label}' line in obliviator output")
+    return int(m.group(1))
 
 
 def hop_count(query_name: str) -> int:
@@ -169,6 +217,35 @@ def run_mwj(query_path: Path, data_dir: Path, mwj_threads: int, log_file) -> tup
     return parse_mwj_total_ms(stdout), parse_result_rows(stdout)
 
 
+def generate_obliviator_src_txt(data_dir: Path, out_dir: Path, log_file) -> Path:
+    """Run convert_banking_1hop.py once to produce src.txt for the obliviator
+    chained binaries. The converter also writes a dst.txt (used by the
+    join-sort 1-hop variant, not by chained); it lands in the same tmpdir and
+    is discarded with it. Returns the path to src.txt."""
+    src_path = out_dir / "src.txt"
+    dst_path = out_dir / "dst.txt"
+    run_capture(
+        ["python3", CONVERT_BANKING_1HOP,
+         data_dir / "account.csv", data_dir / "txn.csv", src_path, dst_path],
+        log_file=log_file,
+    )
+    return src_path
+
+
+def run_obliviator(K: int, src_txt: Path, threads: int, log_file) -> tuple:
+    """Run obliviator_1hop_chained (K=1) or obliviator_khop_chained (K>=2).
+    Returns (online_ms, output_rows). Output CSV is written to a tempdir that
+    is discarded on exit."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out_csv = Path(tmp) / "obl_out.csv"
+        if K == 1:
+            cmd = [OBL_1HOP_BIN, str(threads), src_txt, out_csv]
+        else:
+            cmd = [OBL_KHOP_BIN, str(threads), str(K), src_txt, out_csv]
+        stdout = run_capture(cmd, log_file=log_file)
+    return parse_obliviator_total_ms(stdout, K), parse_obliviator_rows(stdout, K)
+
+
 # ---------------------------------------------------------------------------
 # Build helpers
 # ---------------------------------------------------------------------------
@@ -188,6 +265,19 @@ def build_binaries(log_file):
     log_file.flush()
     if proc.returncode != 0:
         raise RuntimeError(f"sgx_app build failed:\n{proc.stderr}")
+
+    print("[build] obliviator_1hop_chained (FK)...", flush=True)
+    run_capture(
+        ["make", "-C", OBL_FK_DIR, "-f", "Makefile.standalone",
+         "obliviator_1hop_chained"],
+        log_file=log_file,
+    )
+    print("[build] obliviator_khop_chained (NFK)...", flush=True)
+    run_capture(
+        ["make", "-C", OBL_NFK_DIR, "-f", "Makefile.standalone",
+         "obliviator_khop_chained"],
+        log_file=log_file,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -213,11 +303,18 @@ def collect_metadata(args) -> dict:
             {"OBL_MWJ_SORT_THREADS": str(args.mwj_threads)}
             if args.mwj_threads and args.mwj_threads > 0 else {}
         ),
-        "binaries": {"sgx_app": str(SGX_APP), "banking_onehop": str(ONEHOP_BIN)},
+        "binaries": {
+            "sgx_app": str(SGX_APP),
+            "banking_onehop": str(ONEHOP_BIN),
+            "obliviator_1hop_chained": str(OBL_1HOP_BIN),
+            "obliviator_khop_chained": str(OBL_KHOP_BIN),
+        },
         "note": (
             "one-hop runs once per repetition (not per cell); its result is "
             "reused for all >=2-hop NebulaDB cells in that rep and reported "
-            "as the latency of the 1-hop NebulaDB cell."
+            "as the latency of the 1-hop NebulaDB cell. obliviator src.txt "
+            "is generated once per dataset and reused across all reps and "
+            "queries (deterministic)."
         ),
     }
 
@@ -230,18 +327,26 @@ def main():
     p.add_argument("--queries", default=",".join(ALL_QUERIES),
                    help="Comma-separated query names (default: all five chains)")
     p.add_argument("--systems", default=",".join(ALL_SYSTEMS),
-                   help="Comma-separated systems (default: nebuladb,full_mwj)")
+                   help=f"Comma-separated systems (default: {','.join(ALL_SYSTEMS)})")
     p.add_argument("--measurement-runs", type=int, default=1,
                    help="Recorded measurement runs per cell (default: 1)")
     p.add_argument("--warmup-runs", type=int, default=1,
                    help="Discarded warm-up runs per cell (default: 1)")
-    p.add_argument("--onehop-threads", type=int, default=32,
-                   help="Threads passed to banking_onehop --threads (default: 32).")
+    p.add_argument("--onehop-threads", type=int, default=64,
+                   help="Threads passed to banking_onehop --threads (default: 64).")
     p.add_argument("--mwj-threads", type=int, default=64,
                    help="Workers in sgx_app's shared bitonic parallel_sort thread "
                         "pool, passed via the OBL_MWJ_SORT_THREADS env var "
                         "(default: 64). Set to 0 to leave the env unset; sgx_app "
                         "then defaults to std::thread::hardware_concurrency().")
+    p.add_argument("--obliviator-threads", type=int, default=64,
+                   help="Threads passed to obliviator_1hop_chained / "
+                        "obliviator_khop_chained (default: 64). Both binaries "
+                        "take this as their first CLI arg. At threads>=2 the "
+                        "NFK kernel (K>=2) has a documented pairing bug that "
+                        "keeps the row count correct but scrambles tuple "
+                        "identities at genuine-NFK steps — see "
+                        "docs/obliviator_baseline_status.md.")
     p.add_argument("--skip-build", action="store_true",
                    help="Skip binary rebuild step")
     p.add_argument("--output-dir", default=str(RESULTS_DIR),
@@ -262,6 +367,7 @@ def main():
 
     needs_onehop = "nebuladb" in systems
     needs_mwj = ("full_mwj" in systems) or ("nebuladb" in systems and any(hop_count(q) >= 2 for q in queries))
+    needs_obliviator = "obliviator_chained" in systems
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -303,6 +409,19 @@ def main():
             tmp_root = Path(tmp_root)
             hop_dir = tmp_root / "hop_data"
             hop_dir.mkdir()
+
+            # Generate src.txt once per dataset (deterministic; reused across
+            # all reps and queries for the obliviator chained binaries).
+            obliviator_src_txt = None
+            if needs_obliviator:
+                obl_dir = tmp_root / "obliviator_input"
+                obl_dir.mkdir()
+                print(f"[setup] generating obliviator src.txt from {data_dir} ...",
+                      flush=True)
+                t0 = time.time()
+                obliviator_src_txt = generate_obliviator_src_txt(
+                    data_dir, obl_dir, log_file)
+                print(f"  -> {obliviator_src_txt} ({time.time()-t0:.1f}s wall)")
 
             for rep_idx in range(total_reps):
                 is_warmup = rep_idx < args.warmup_runs
@@ -354,6 +473,14 @@ def main():
                             cell_total_ms = mwj_ms
                             cell_mwj_ms = mwj_ms
                             cell_rows = mwj_rows
+                        elif system == "obliviator_chained":
+                            t0 = time.time()
+                            obl_ms, obl_rows = run_obliviator(
+                                hk, obliviator_src_txt,
+                                args.obliviator_threads, log_file)
+                            wall = time.time() - t0
+                            cell_total_ms = obl_ms
+                            cell_rows = obl_rows
 
                         print(f"  [{query}] {system:9s} {label} -> total={cell_total_ms:.1f}ms"
                               f" rows={cell_rows}", flush=True)

@@ -1,0 +1,74 @@
+\documentclass[sigconf]{acmart}
+
+\usepackage{xspace}
+\usepackage{svg}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{cleveref}
+\usepackage{tcolorbox} 
+\usepackage{enumitem}
+
+%% \BibTeX command to typeset BibTeX logo in the docs
+\AtBeginDocument{%
+  \providecommand\BibTeX{{%
+    Bib\TeX}}}
+
+\newcommand\algoIndent[1]{%
+  \linebreak\hspace*{\dimexpr\algorithmicindent*#1}%
+}
+
+\newtheorem{definition}{Definition}
+\newtheorem*{definition*}{Definition}
+
+\crefformat{section}{\S#2#1#3}
+\crefformat{subsection}{\S#2#1#3}
+\crefformat{subsubsection}{\S#2#1#3}
+
+
+
+\newcommand{\rjm}[1]{{[\color{red} RJM: #1]}}
+\newcommand{\vision}[1]{{[\color{green} VISION: #1]}}
+\newcommand{\onehop}{\texttt{one-hop}\xspace}
+\newcommand{\Onehop}{\texttt{One-hop}\xspace}
+\newcommand{\system}{GoblDB\xspace}
+\newcommand{\ie}{i.e.,\xspace}
+\newcommand{\eg}{e.g.,\xspace}
+\newcommand{\etal}{et al.\xspace}
+\newcommand{\gdbs}{GDBs\xspace}
+\newcommand{\wei}{the WK Scheme\xspace}
+
+%%
+%% end of the preamble, start of the body of the document source.
+\begin{document}
+
+
+\title{\system: An Oblivious Property Graph Database}
+
+
+
+%%
+%% Keywords. The author(s) should pick words that accurately describe
+%% the work being presented. Separate the keywords with commas.
+% \keywords{Oblivious databases, graph databases, doubly oblivious, oblivious graph query processing, hardware enclaves}
+\maketitle
+
+\input{introduction}
+\input{background_and_problem_definition}
+\input{system_architecture}
+\input{one_hop}
+%\input{system_data_model}
+% \input{graph_query_processing}
+\input{rest}
+%\input{conclusion}
+
+% \section*{Acknowledgements}
+% We acknowledge the support of the Canada
+% Excellence Research Chairs (CERC) program. Nous remercions le Chaires d’excellence en recherche du Canada (CERC)
+% de son soutien. This project was made possible in-part through the support of the National Cybersecurity
+% Consortium and the Government of Canada (CSIN). We also acknowledge NSERC for grant RGPIN-2023-03448.
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}
+\endinput
+%%
+%% End of file `sample-sigconf.tex'.

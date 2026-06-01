@@ -1,0 +1,217 @@
+\vspace{-0.5em}
+\section{Graph Query Processing}
+\label{sec:graph_qp}
+
+Having described the system architecture and the storage model, we now
+discuss challenges introduced by executing typical graph database queries 
+obliviously.
+
+\vspace{-1em}
+\subsection{0-hop query}
+\label{sub:0-hop}
+
+We begin by examining the simplest type of query in graph databases involving a single 
+node label with one or more predicates on its properties. This section 
+highlights the challenges posed by non-oblivious query processing algorithms and provides insights 
+on how to morph these algorithms to ensure obliviousness. To illustrate, let's take a sample Cypher query:
+\texttt{MATCH u:user WHERE u.age $>$ 30 AND u.lives\_in = `LA' RETURN u.name}.
+
+Consider the following code that retrieves the properties relevant to the query
+and tests the predicates using an if-else statement.
+
+\noindent\hrulefill
+\begin{algorithmic}[1]
+        \State Assume $ages$, $lives\_in$, and $names$ are lists that store relevant properties after reading from the storage
+        \State $output \gets []$
+        \For {$i$ in range(0, $num\_users$)}
+            \If {$ages[i] > 30$ \&\& $lives\_in[i] == ``LA"$ } 
+                \State $output.append(names[i])$
+            \EndIf
+        \EndFor
+        \State \Return $output$
+\end{algorithmic}
+\noindent\hrulefill
+
+\noindent Executing the above code within an enclave reveals the node ids of users that
+satisfy the predicates to an adversary who can observe memory accesses because the 
+$output$ variable is accessed and modified only when the predicates are true. 
+One way to execute the above functionality obliviously is to use a ternary
+operator:
+
+\noindent\hrulefill
+\begin{algorithmic}[1]
+        \State $output \gets []$
+        \For {$i$ in range(0, $num\_users$)}
+            \State \parbox[t]{\linewidth}{$res \gets (ages[i] > 30$ \&\& $lives\_in[i] == ``LA"$)?\newline \null\hspace{9mm} $names[i]$ : $``dummy"$} 
+            \State $output.append(res)$
+        \EndFor
+        \State \Return obliviousCompact($output$)
+\end{algorithmic}
+\noindent\hrulefill
+
+This code modifies the $output$ for each user, ensuring identical 
+memory accesses for all node ids. The $output$ can then be 
+compacted obliviously using an \textit{oblivious compaction} 
+mechanism, such as~\cite{goodrich2011data, sasy2022fast}, to remove dummies before 
+returning the result to the client.
+Existing oblivious 
+databases~\cite{eskandarian2019oblidb, zheng2017opaque, mavrogiannakis2025obliviator, krastnikov2020efficient} employ 
+such strategies for processing relational queries. 
+
+\subsection{1-hop query}
+
+Having used the simple 0-hop query to provide intuitions on processing queries
+obliviously, this section discuss challenges and future research directions
+stemming from 1-hop queries. A 1-hop query spans two distinct node labels $n1$ and $n2$ (we discuss cyclic queries in~\cref{sub:cyclic})
+connected by an edge $e$ of the form: $n1 - e \rightarrow n2$, with predicates on any node
+or edge label.
+
+\noindent\textit{\textbf{1. Challenges with processing 1-hop query using
+existing relational operators.}} One way to process such queries is to consider the two nodes and the edge as relations and use 
+oblivious binary join operators~\cite{mavrogiannakis2025obliviator,krastnikov2020efficient, eskandarian2019oblidb,zheng2017opaque}: first join $n1$ with $e$, then join the
+output of that with $n2$. Because the edge relation exhibits primary-key-foreign-key relationship with both the node relations, the output of both the joins will
+be $|e|$, the number of edges. 
+
+Naively executing a sort-merge join, the most adopted join technique in oblivious settings
+~\cite{zheng2017opaque, eskandarian2019oblidb, krastnikov2020efficient, mavrogiannakis2025obliviator},
+reveals how many times each join key is repeated based on the pointer traversal pattern 
+in the merge step. Existing solutions counter this leakage by first concatenating the two 
+input tables and obliviously sorting it on the $<$join key, table id$>$ pair, which in our case, sorts a table of $|n_i| + |e|$ size. This sorted concatenated table
+helps identify the join keys present in both tables and how many times each key appears in
+the output based on the product of its count in each table.
+
+Applying any of these join algorithms~\cite{zheng2017opaque, eskandarian2019oblidb, krastnikov2020efficient, mavrogiannakis2025obliviator} to process a 1-hop query requires performing two joins, each involving an oblivious sort over tables of sizes 
+$|n1|+|e|$ and $|e|+|n2|$. Since oblivious sorting dominates the cost of oblivious joins with 
+a complexity of $O(nlog^2n)$ for a table of size $n$, this approach incurs significant 
+overhead when $|n|$ and $|e|$ scale to millions of nodes and billions of edges.
+% Recall from \cref{sub:storage-layer} that graph databases store the node and edge information already in sorted
+% format for better query efficiency.
+% But existing oblivious join 
+% operators do not take advantage of this because \textit{they all require merging the
+% input tables and obliviously sorting it on the join key to identify join keys
+% present in both tables}.
+This raises the first research question:
+
+\begin{tcolorbox}[colback=gray!7!white,coltitle=black,colframe=orange!50!white,title=\centering \textbf{Research question 1}]
+\centering
+\emph{Can we design a new oblivious binary join operator that identifies join
+keys present in both tables \textbf{without} concatenating and sorting the two input tables?}
+\end{tcolorbox}
+
+\noindent\textit{\textbf{Towards a solution}}: One way to identify join keys
+present in both tables is to hash the join keys of one table $T1$ and store it 
+in a hash map and probe the second table $T2$ by hashing the join keys and checking if
+the hashed value is present in the hash table (i.e., a hash join). This solution 
+identifies join keys
+present in both tables without requiring to concatenate and sort them. However, skew
+in the join key distribution reveals sensitive information to an adversary:
+if $T1$ has many repeated join keys, this will create hash collisions, revealing
+the skew in the data. Alternatively, repeated join keys in $T2$ will repeatedly
+probe the same hash bucket, also revealing the skew in the
+data. Thus, the oblivious join scheme should protect against such leakages by
+considering potential solutions such as key de-duplication and oblivious aggregation operations. 
+% Such a join operator will be applicable to many applications where
+% the two inputs to the operator come pre-sorted.
+
+\vspace{0.7em}
+\noindent\textit{\textbf{2. Challenges with relying on relational operators.}} 
+Even with a new efficient oblivious binary join protocol that removes the need
+to sort a large concatenated table, executing a 1-hop query using relational
+operators incurs high latency because the two joins must be executed \textit{sequentially}.
+% Additionally, the most efficient oblivious binary join~\cite{mavrogiannakis2025obliviator},
+% which is a sort-merge join algorithm, requires an intermediary sort of the size of the 
+% output, which in our case is
+% $|e|$. This sort is necessary to align the join keys of the two tables before the 
+% final merge phase~\cite{krastnikov2020efficient,mavrogiannakis2025obliviator}.
+% Hence, with two joins, this approach sorts two intermediary tables of size $|e|$,
+% \textit{sequentially}.
+This raises the next research question:
+
+\begin{tcolorbox}[colback=gray!7!white,coltitle=black,colframe=orange!50!white,title=\centering \textbf{Research question 2}]
+\centering
+\emph{Can we design a custom \textbf{parallelizable} oblivious query processing algorithm to serve 1-hop queries without relying on oblivious binary joins?}
+\end{tcolorbox}
+
+\noindent\textit{\textbf{Towards a solution}}: In designing a new oblivious algorithm
+to avoid the above sequential processing, we look at plaintext graph databases
+that process such queries from \textit{two directions} in parallel: $n1\rightarrow e$
+and $e \rightarrow n2$. At a high level, find all nodes ids
+of $n1$ that act as the source of an edge with id $e_i$, and node ids of $n2$ that
+is the destination of an edge $e_j$. This gives us two lists of edge ids; the 
+intersection of these ids is the output of the query (note that we can propagate node
+or edge properties along the way). However, naively executing this approach may leak 
+sensitive information such as
+% \rjm{I think you want to say "the number of nodes with an edge of type e", right?  Or do you me the list of nodes themselves are leaked?}  
+the number of unique nodes from $n1$ and $n2$ with an edge label $e$ and the edges in the final output. Hence, this creates the need for custom 1-hop operator 
+that traverses the forward and reverse edge lists in parallel to compute the output 
+without revealing any sensitive information.
+
+\vspace{-0.7em}
+\subsection{2-hop queries and beyond}
+
+Next, we discuss the challenges introduced by multi-hop queries
+spanning three or more nodes, connected by two or more
+edges.
+
+\noindent\textit{\textbf{Challenges with intermediary result size leakages}}. For
+1-hop queries, whether executed using oblivious relational operators or custom query 
+processing algorithms, the output or intermediary sizes are bounded by $|e|$, which
+is considered non-sensitive. However, expanding the system to support
+multi-hop queries introduces the challenge of hiding intermediary result sizes.
+Naively addressing this by applying worst-case padding — pad an intermediate result to its worse possible size — significantly degrades system performance. 
+For example,
+for a 2-hop query spanning edges $e_1$ and $e_2$, worst-case padded intermediary table
+will be of size $|e_1| \times |e_2|$.
+
+
+\begin{tcolorbox}[colback=gray!7!white,coltitle=black,colframe=orange!50!white,title=\centering \textbf{Research question 3}]
+\centering
+\emph{Can we develop more \textbf{efficient} mechanisms to hide or obfuscate intermediary result sizes without resorting to worst-case padding?}
+\end{tcolorbox}
+
+\noindent\textit{\textbf{Towards a solution}}: Computing the size of any table is 
+equivalent to computing the COUNT aggregate function on a table. Differential privacy (DP) \cite{DworkRoth2014} is an ideal technique for hiding the exact results of an aggregate query. Shrinkwrap \cite{Bater2018} was
+the seminal work that applied DP to hide or obfuscate intermediary result sizes of
+a SQL query consisting of multiple operators. However, it considered a privacy budget
+$\epsilon$ allocated to each query executed by the system. Thus, the \textit{global 
+privacy budget} increases significantly per executed query, potentially revealing more
+than anticipated amount of sensitive information. Alternatively, solutions such as 
+Turbo \cite{Kostopoulou2023} and cacheDP \cite{Mazmudar2022} cache the DP-derived noise for queries and reuse them when queries
+are repeated to reduce the consumption of the global privacy budget for each query. 
+However, the proposed techniques only apply for \textit{linear queries} where queries 
+span a single table. As discussed so far, queries in graph databases cover many nodes
+and edges, and the process of joining them amplifies query sensitivity, thereby increasing 
+the required noise budget. Hence, this challenge presents new research opportunities in 
+caching DP-noise for complex queries that span multiple entities or tables.
+
+\vspace{-0.7em}
+\subsection{Cyclic queries}
+\label{sub:cyclic}
+
+A common query pattern observed in property graph databases are cyclic
+queries of the form $n1 - e1 - n2 \- \cdots e_i - n1$.
+
+\noindent\textbf{\textit{Challenges with cyclic queries}}. While cyclic queries can be 
+executed with a 
+series of binary joins, such an approach often generates 
+exponentially large intermediate results~\cite{ngo2014skew}, significantly 
+degrading performance in oblivious settings due to their inherent computational overhead.
+For instance, consider the query: "users who are friends and have purchased the same product." This forms a cyclic pattern: (u1:User) - [:FRIEND] → (u2:User) - [:PURCHASE] → (:Product) ← [:PURCHASE] - (u1:User). A 
+binary join approach might first compute all User-Friend pairs (potentially $O(U^2)$ for $U$ users), then join with Purchases to find shared products. For example, with 1,000 users, each having 100 friends and 10 purchases, the User-Friend join alone produces 100,000 pairs, which, when joined with Purchases, results in 1,000,000 intermediate tuples—most of which are discarded later.
+
+\begin{tcolorbox}[colback=gray!7!white,coltitle=black,colframe=orange!50!white,title=\centering \textbf{Research question 4}]
+\centering
+\emph{Can we device oblivious join algorithms for complex cyclic joins that are
+asymptotically \textbf{faster} than a sequence of binary joins?}
+\end{tcolorbox}
+
+\noindent\textit{\textbf{Towards a solution}}:
+Worst case optimal joins (WCOJ)~\cite{ngo2018worst} handle cyclic queries more efficiently by evaluating multi-way intersections column-at-a-time rather than table-at-a-time, achieving the theoretical worst case output size defined by the AGM bound~\cite{atserias2008size} (e.g., $n^{3/2}$ for a cycle of 3). In the example above, processing the query using WCOJ 
+simultaneously tracks the user-friend relation and the intersecting purchases, which prunes non-matching paths early. While a few oblivious acyclic
+multi-way joins have been proposed in the past~\cite{arasu2013oblivious, chu2021differentially}, Hu and Wu~\cite{hu2025optimal} recently
+proposed the first oblivious WCOJ construction. However, their construction pads the output to a query-dependent worst-case
+size (i.e., $O(n^f)$ where $f$ indicates fractional edge cover), which we believe
+can be further reduced. Additionally, all the above discussed papers~\cite{arasu2013oblivious, chu2021differentially,hu2025optimal} are theoretical in nature with no implementation to show empirical results. Hence, developing practical oblivious
+WCOJs for a secure property graph database remains an open area of research. 
+% Property graphs benefit from WCOJ's ability to handle cyclic many-to-many relationships, it is common in recommendation systems (e.g. friends who liked the same items) or fraud detection (e.g. cycles of transactions).  
+

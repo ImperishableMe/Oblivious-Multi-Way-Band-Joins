@@ -1,0 +1,586 @@
+#!/usr/bin/env python3
+"""
+E2 data-scaling runner (Banking W1, single chain query, reduced scope).
+
+Compares two systems across Banking W1 dataset sizes for a single chain
+query (default `banking_3hop`; swappable via `--query banking_2hop` if the
+3-hop curve is intractable at the top end):
+
+  1. NebulaDB
+       - 1-hop  : `banking_onehop` alone (its output IS the 1-hop join).
+       - >= 2-hop : rewrite the chain query against the pre-built hop
+                    table -> `sgx_app` on the rewritten query.
+     Per-cell latency = `mwj_ms` for the rewritten-query run, plus the
+     amortized one-hop cost (inherited from the per-rep one-hop run).
+  2. Full MWJ
+       - `sgx_app` directly on the chain query (no decomposition).
+     Per-cell latency = `mwj_ms`.
+
+Full MWJ is skipped at sizes whose edge count exceeds `--full-mwj-max-edges`
+(default 1M). NebulaDB runs at every requested size.
+
+The one-hop step is run **once per (size, rep)**, NOT per cell: its hop.csv
+is the per-dataset constant fed to the NebulaDB MWJ stage, and its timing is
+the NebulaDB 1-hop cell value if `banking_1hop` is ever swapped in.
+
+Per (system, size) cell: `--warmup-runs` discarded + `--measurement-runs`
+recorded. Loop order: outer = repetition, inner = size, innermost = system.
+Strictly sequential; full machine for every run. Cells from the same rep
+are run back-to-back to keep one-hop matched run-by-run with the MWJ
+measurement it feeds.
+
+Per-run query results (hop.csv, sgx_app output) live in a temporary
+directory and are discarded after each rep. We do NOT persist query
+results from experiment runs.
+
+sgx_app threading: sgx_app reads OBL_MWJ_SORT_THREADS at first sort call
+(magic-static initializer in app/data_structures/table.cpp). The value
+sizes the shared thread pool used by the bitonic parallel_sort over
+entry_t. Defaults to std::thread::hardware_concurrency() when unset, so
+parallelism is on by default; the env var only narrows the worker count.
+This runner sets it to --mwj-threads (default 64). Pass 0 to leave the
+env unset and let sgx_app pick hardware_concurrency.
+
+Outputs (under results/e2_scaling/):
+  raw_runs.csv          every run, including warm-ups
+  summary.csv           measurement runs only, per cell:
+                        n_runs, median_total_ms, median_onehop_ms,
+                        median_mwj_ms, min/max/stddev_total_ms, output_rows
+  decomposed/*.sql      cached rewriter output (untimed)
+  run_metadata.json     commit, host, nproc, build flags, settings
+  binary_stdout.log     full stdout from every invocation
+
+Usage:
+  python3 scripts/experiments/run_e2_scaling.py
+  python3 scripts/experiments/run_e2_scaling.py --query banking_2hop
+  python3 scripts/experiments/run_e2_scaling.py --sizes 10k,200k --skip-build
+  python3 scripts/experiments/run_e2_scaling.py --measurement-runs 3
+"""
+
+import argparse
+import csv
+import json
+import os
+import platform
+import re
+import shutil
+import statistics
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+RESULTS_DIR = PROJECT_DIR / "results" / "e2_scaling"
+
+SGX_APP = PROJECT_DIR / "sgx_app"
+ONEHOP_BIN = PROJECT_DIR / "obligraph" / "build" / "banking_onehop"
+REWRITER = PROJECT_DIR / "scripts" / "rewrite_chain_query.py"
+GENERATOR = PROJECT_DIR / "scripts" / "generate_banking_scaled.py"
+QUERY_DIR = PROJECT_DIR / "input" / "queries"
+DATA_ROOT = PROJECT_DIR / "input" / "plaintext"
+
+SEED = 42
+EDGE_RATIO = 5  # txns per account; fixed by generate_banking_scaled.py
+
+# Order matters: smallest to largest so failures surface fast.
+SIZES = [
+    {"label":  "10k",  "accounts":    10_000, "dir_name": "banking_10k"},
+    {"label":  "20k",  "accounts":    20_000, "dir_name": "banking_20k"},
+    {"label": "100k",  "accounts":   100_000, "dir_name": "banking_100k"},
+    {"label": "200k",  "accounts":   200_000, "dir_name": "banking_200k"},
+    {"label":   "1M",  "accounts": 1_000_000, "dir_name": "banking_1M"},
+    {"label":   "2M",  "accounts": 2_000_000, "dir_name": "banking_2M"},
+]
+
+# DEFAULT_SYSTEMS run on a plain invocation. full_mwj_no_filter (unfiltered
+# full MWJ via `sgx_app --no-filter`) is opt-in: its output explodes with both
+# hop count and dataset size and OOMs at the larger sizes by design.
+DEFAULT_SYSTEMS = ["nebuladb", "full_mwj"]
+ALL_SYSTEMS = DEFAULT_SYSTEMS + ["full_mwj_no_filter"]
+# Both are full-MWJ variants gated by the --full-mwj-max-edges cap.
+FULL_MWJ_SYSTEMS = {"full_mwj", "full_mwj_no_filter"}
+ALL_QUERIES = ["banking_1hop", "banking_2hop", "banking_3hop",
+               "banking_4hop", "banking_5hop"]
+
+
+# ---------------------------------------------------------------------------
+# Stdout parsers (same regexes as E1 runner)
+# ---------------------------------------------------------------------------
+
+ONEHOP_TIMING_RE = re.compile(r"TIMING_REPORTED\s+categories=\S+\s+total=([\d.]+)ms")
+MWJ_TIMING_RE    = re.compile(r"PHASE_TIMING:[^\n]*Total=([\d.]+)")
+RESULT_ROWS_RE   = re.compile(r"Result:\s+(\d+)\s+rows")
+
+
+def parse_onehop_total_ms(stdout: str) -> float:
+    m = ONEHOP_TIMING_RE.search(stdout)
+    if not m:
+        raise RuntimeError("could not find TIMING_REPORTED line in banking_onehop output")
+    return float(m.group(1))
+
+
+def parse_mwj_total_ms(stdout: str) -> float:
+    """PHASE_TIMING Total (seconds) -> ms."""
+    m = MWJ_TIMING_RE.search(stdout)
+    if not m:
+        raise RuntimeError("could not find PHASE_TIMING line in sgx_app output")
+    return float(m.group(1)) * 1000.0
+
+
+def parse_result_rows(stdout: str) -> int:
+    matches = RESULT_ROWS_RE.findall(stdout)
+    if not matches:
+        raise RuntimeError("could not find 'Result: N rows' line")
+    return int(matches[-1])
+
+
+def hop_count(query_name: str) -> int:
+    return int(query_name.split("_")[1].rstrip("hop"))
+
+
+# ---------------------------------------------------------------------------
+# Subprocess helpers
+# ---------------------------------------------------------------------------
+
+def run_capture(cmd, *, log_file, env_extra=None) -> str:
+    log_file.write(f"\n+++ {' '.join(str(c) for c in cmd)}\n")
+    if env_extra:
+        log_file.write(f"    env_extra: {env_extra}\n")
+    log_file.flush()
+    proc_env = None
+    if env_extra:
+        proc_env = os.environ.copy()
+        proc_env.update({str(k): str(v) for k, v in env_extra.items()})
+    proc = subprocess.run(
+        [str(c) for c in cmd], capture_output=True, text=True, env=proc_env)
+    log_file.write(proc.stdout)
+    if proc.stderr:
+        log_file.write("\n--- stderr ---\n" + proc.stderr)
+    log_file.flush()
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"command failed (exit {proc.returncode}): {' '.join(str(c) for c in cmd)}\n"
+            f"--- stderr ---\n{proc.stderr}"
+        )
+    return proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# Stage runners
+# ---------------------------------------------------------------------------
+
+def run_onehop(data_dir: Path, out_dir: Path, threads: int, log_file) -> tuple:
+    """Run banking_onehop and place hop.csv in out_dir (tempdir-owned).
+    Returns (onehop_ms, rows). hop.csv is consumed by the NebulaDB MWJ
+    stage in the same rep and then discarded with the tempdir."""
+    hop_csv = out_dir / "hop.csv"
+    stdout = run_capture(
+        [ONEHOP_BIN, data_dir, hop_csv, "--threads", str(threads)],
+        log_file=log_file,
+    )
+    return parse_onehop_total_ms(stdout), parse_result_rows(stdout)
+
+
+def run_rewrite(query_path: Path, out_path: Path, log_file):
+    """Untimed: rewrite chain query against the hop table."""
+    run_capture(["python3", REWRITER, query_path, out_path], log_file=log_file)
+
+
+def run_mwj(query_path: Path, data_dir: Path, mwj_threads: int, log_file,
+            no_filter: bool = False) -> tuple:
+    """Run sgx_app once; tempdir-owned output csv is discarded after parse.
+    Returns (mwj_ms, output_rows). Sets OBL_MWJ_SORT_THREADS=mwj_threads in
+    the subprocess env to size sgx_app's shared bitonic parallel_sort thread
+    pool (read once via magic static in app/data_structures/table.cpp). Pass
+    0 to leave the env unset; sgx_app then defaults to hardware_concurrency.
+
+    When no_filter=True, appends --no-filter so sgx_app skips the WHERE-clause
+    selection pushdown and computes the full unfiltered multi-way join."""
+    env_extra = None
+    if mwj_threads and mwj_threads > 0:
+        env_extra = {"OBL_MWJ_SORT_THREADS": str(mwj_threads)}
+    with tempfile.TemporaryDirectory() as tmp:
+        out_csv = Path(tmp) / "out.csv"
+        cmd = [SGX_APP, query_path, data_dir, out_csv]
+        if no_filter:
+            cmd.append("--no-filter")
+        stdout = run_capture(cmd, log_file=log_file, env_extra=env_extra)
+    return parse_mwj_total_ms(stdout), parse_result_rows(stdout)
+
+
+# ---------------------------------------------------------------------------
+# Build + dataset prep
+# ---------------------------------------------------------------------------
+
+def build_binaries(log_file):
+    print("[build] obligraph/banking_onehop (Release)...", flush=True)
+    run_capture(
+        ["cmake", "--build", PROJECT_DIR / "obligraph" / "build",
+         "--target", "banking_onehop", "--config", "Release"],
+        log_file=log_file,
+    )
+    print("[build] sgx_app (make)...", flush=True)
+    proc = subprocess.run(["make"], cwd=PROJECT_DIR, capture_output=True, text=True)
+    log_file.write("\n+++ make (sgx_app)\n" + proc.stdout)
+    if proc.stderr:
+        log_file.write("\n--- stderr ---\n" + proc.stderr)
+    log_file.flush()
+    if proc.returncode != 0:
+        raise RuntimeError(f"sgx_app build failed:\n{proc.stderr}")
+
+
+def dataset_is_valid(data_dir: Path, accounts: int) -> bool:
+    """Cheap row-count check; trust seed=42 for content."""
+    acc_csv = data_dir / "account.csv"
+    txn_csv = data_dir / "txn.csv"
+    own_csv = data_dir / "owner.csv"
+    if not (acc_csv.exists() and txn_csv.exists() and own_csv.exists()):
+        return False
+    def lc(p): return sum(1 for _ in open(p))
+    return (
+        lc(acc_csv) == accounts + 1
+        and lc(txn_csv) == EDGE_RATIO * accounts + 1
+        and lc(own_csv) == accounts // EDGE_RATIO + 1
+    )
+
+
+def generate_dataset(spec, log_file):
+    data_dir = DATA_ROOT / spec["dir_name"]
+    if dataset_is_valid(data_dir, spec["accounts"]):
+        print(f"[gen]  {spec['label']:>5}: existing dataset matches expected sizes — skipping")
+        return
+    print(f"[gen]  {spec['label']:>5}: generating {spec['accounts']:,} accounts -> {data_dir}")
+    if data_dir.exists():
+        shutil.rmtree(data_dir)
+    t0 = time.time()
+    run_capture(
+        ["python3", GENERATOR, str(spec["accounts"]), str(data_dir), "--seed", str(SEED)],
+        log_file=log_file,
+    )
+    print(f"[gen]  {spec['label']:>5}: done in {time.time() - t0:.1f}s")
+
+
+# ---------------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------------
+
+def collect_metadata(args, sizes_run) -> dict:
+    def sh(cmd):
+        try:
+            return subprocess.check_output(cmd, cwd=PROJECT_DIR, text=True).strip()
+        except Exception:
+            return ""
+    return {
+        "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "git_commit": sh(["git", "rev-parse", "HEAD"]),
+        "git_branch": sh(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
+        "hostname": platform.node(),
+        "nproc": os.cpu_count(),
+        "platform": platform.platform(),
+        "python": sys.version.split()[0],
+        "args": vars(args),
+        "sizes_run": sizes_run,
+        "seed": SEED,
+        "edge_ratio": EDGE_RATIO,
+        "mwj_env": (
+            {"OBL_MWJ_SORT_THREADS": str(args.mwj_threads)}
+            if args.mwj_threads and args.mwj_threads > 0 else {}
+        ),
+        "binaries": {"sgx_app": str(SGX_APP), "banking_onehop": str(ONEHOP_BIN)},
+        "note": (
+            "one-hop runs once per (size, rep), not per cell. Per-run query "
+            "results (hop.csv, sgx_app output) are tempdir-owned and "
+            "discarded after parsing. full_mwj_no_filter runs sgx_app with "
+            "--no-filter (no WHERE-clause selection pushdown) and explodes with "
+            "dataset size; both full-MWJ variants are gated by "
+            "--full-mwj-max-edges. Any binary OOM/crash is caught per cell "
+            "(recorded output_rows=OOM, total_ms empty) and never aborts the "
+            "sweep; once a system fails at E edges, larger sizes are SKIPPED."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--query", default="banking_3hop", choices=ALL_QUERIES,
+                   help="Single chain query for the curve (default: banking_3hop). "
+                        "Swap to banking_2hop if 3-hop is intractable at the top sizes.")
+    p.add_argument("--sizes", default=",".join(s["label"] for s in SIZES),
+                   help="Comma-separated size labels, smallest-first. "
+                        f"Default: {','.join(s['label'] for s in SIZES)}")
+    p.add_argument("--systems", default=",".join(DEFAULT_SYSTEMS),
+                   help=f"Comma-separated systems (default: {','.join(DEFAULT_SYSTEMS)}; "
+                        f"allowed: {','.join(ALL_SYSTEMS)}). 'full_mwj_no_filter' is the "
+                        f"unfiltered full MWJ baseline (opt-in; explodes with size).")
+    p.add_argument("--full-mwj-max-edges", type=int, default=1_000_000,
+                   help="Skip the full-MWJ variants (full_mwj, full_mwj_no_filter) "
+                        "for sizes with more than this many edges (default: "
+                        "1,000,000). NebulaDB always runs at every size.")
+    p.add_argument("--measurement-runs", type=int, default=1,
+                   help="Recorded measurement runs per cell (default: 1)")
+    p.add_argument("--warmup-runs", type=int, default=1,
+                   help="Discarded warm-up runs per cell (default: 1)")
+    p.add_argument("--onehop-threads", type=int, default=32,
+                   help="Threads passed to banking_onehop --threads (default: 32).")
+    p.add_argument("--mwj-threads", type=int, default=64,
+                   help="Workers in sgx_app's shared bitonic parallel_sort thread "
+                        "pool, passed via the OBL_MWJ_SORT_THREADS env var "
+                        "(default: 64). Set to 0 to leave the env unset; sgx_app "
+                        "then defaults to std::thread::hardware_concurrency().")
+    p.add_argument("--skip-build", action="store_true",
+                   help="Skip binary rebuild step")
+    p.add_argument("--skip-generation", action="store_true",
+                   help="Skip dataset (re)generation; fail if any dataset is missing/wrong-size")
+    p.add_argument("--output-dir", default=str(RESULTS_DIR),
+                   help=f"Output directory (default: {RESULTS_DIR})")
+    args = p.parse_args()
+
+    # Resolve sizes
+    wanted_labels = [s.strip() for s in args.sizes.split(",") if s.strip()]
+    known = {s["label"]: s for s in SIZES}
+    unknown = [l for l in wanted_labels if l not in known]
+    if unknown:
+        sys.exit(f"unknown size labels: {unknown} (allowed: {list(known)})")
+    sizes = [known[l] for l in wanted_labels]
+
+    # Resolve systems
+    systems = [s.strip() for s in args.systems.split(",") if s.strip()]
+    for s in systems:
+        if s not in ALL_SYSTEMS:
+            sys.exit(f"unknown system: {s} (allowed: {ALL_SYSTEMS})")
+
+    # Resolve query
+    query = args.query
+    qpath = QUERY_DIR / f"{query}.sql"
+    if not qpath.is_file():
+        sys.exit(f"query not found: {qpath}")
+    hk = hop_count(query)
+
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log_path = out_dir / "binary_stdout.log"
+    raw_csv_path = out_dir / "raw_runs.csv"
+    summary_csv_path = out_dir / "summary.csv"
+    meta_path = out_dir / "run_metadata.json"
+
+    meta = collect_metadata(args, [s["label"] for s in sizes])
+
+    print(f"E2 runner: query={query} (hop_count={hk})")
+    print(f"  sizes  : {[s['label'] for s in sizes]}")
+    print(f"  systems: {systems}")
+    print(f"  warm-up: {args.warmup_runs}   measurement: {args.measurement_runs}")
+    print(f"  full_mwj cap (edges): {args.full_mwj_max_edges:,}")
+    print(f"  mwj_env: {meta['mwj_env'] or '(unset — sgx_app uses hardware_concurrency)'}")
+    print(f"  output : {out_dir}")
+    print()
+
+    rows = []
+    total_reps = args.warmup_runs + args.measurement_runs
+    needs_onehop = "nebuladb" in systems
+    needs_rewrite = needs_onehop and hk >= 2
+
+    # Per-system smallest edge count at which a binary OOM'd / crashed. Sizes are
+    # swept smallest-first, so a system that fails at E edges cannot succeed at
+    # any size with >= E edges — those are recorded SKIPPED instead of re-run.
+    failed_at_edges = {}
+
+    with open(log_path, "w") as log_file:
+        if not args.skip_build:
+            build_binaries(log_file)
+        else:
+            for bin_path, label in [(ONEHOP_BIN, "banking_onehop"), (SGX_APP, "sgx_app")]:
+                if not bin_path.exists():
+                    sys.exit(f"--skip-build but {label} missing: {bin_path}")
+
+        # Dataset generation / validation up-front, smallest-first.
+        for spec in sizes:
+            if args.skip_generation:
+                if not dataset_is_valid(DATA_ROOT / spec["dir_name"], spec["accounts"]):
+                    sys.exit(f"--skip-generation but {DATA_ROOT / spec['dir_name']} "
+                             f"is missing or wrong size")
+            else:
+                generate_dataset(spec, log_file)
+
+        # Rewrite (untimed, cached) — single query, single output.
+        decomposed_dir = out_dir / "decomposed"
+        decomposed_dir.mkdir(exist_ok=True)
+        decomposed_path = None
+        if needs_rewrite:
+            decomposed_path = decomposed_dir / f"{query}.sql"
+            run_rewrite(qpath, decomposed_path, log_file)
+
+        # Sweep
+        for rep_idx in range(total_reps):
+            is_warmup = rep_idx < args.warmup_runs
+            run_id = rep_idx - args.warmup_runs + 1  # 1..N when measured
+            label = "warm" if is_warmup else f"run{run_id}"
+            print(f"--- rep {rep_idx+1}/{total_reps} ({label}) ---", flush=True)
+
+            for spec in sizes:
+                data_dir = DATA_ROOT / spec["dir_name"]
+                edges = EDGE_RATIO * spec["accounts"]
+
+                # One-hop once per (size, rep). hop.csv lives in tempdir.
+                with tempfile.TemporaryDirectory() as tmp_root:
+                    hop_dir = Path(tmp_root)
+                    onehop_ms, onehop_rows = (None, None)
+                    if needs_onehop:
+                        print(f"  [{spec['label']:>4}] one-hop ...", end="", flush=True)
+                        t0 = time.time()
+                        onehop_ms, onehop_rows = run_onehop(
+                            data_dir, hop_dir, args.onehop_threads, log_file)
+                        print(f" total={onehop_ms:.1f}ms rows={onehop_rows} "
+                              f"({time.time()-t0:.1f}s wall)")
+
+                    for system in systems:
+                        cell_total_ms = None
+                        cell_onehop_ms = ""
+                        cell_mwj_ms = ""
+                        cell_rows = None
+
+                        # Skip reasons (recorded with empty total_ms so the gap is
+                        # visible and the summary excludes them):
+                        #   cap — full-MWJ variant above --full-mwj-max-edges
+                        #   oom — this system already OOM'd at a smaller-or-equal size
+                        cap_skip = (system in FULL_MWJ_SYSTEMS
+                                    and edges > args.full_mwj_max_edges)
+                        oom_skip = (system in failed_at_edges
+                                    and edges >= failed_at_edges[system])
+
+                        if cap_skip or oom_skip:
+                            reason = (f"cap, edges={edges:,} > {args.full_mwj_max_edges:,}"
+                                      if cap_skip else "OOM at smaller size")
+                            cell_rows = "SKIPPED"
+                            cell_total_ms = None
+                            print(f"  [{spec['label']:>4}] {system:18s} {label} -> "
+                                  f"SKIPPED ({reason})", flush=True)
+                        else:
+                            # Every binary call is OOM-tolerant: a crash / OOM-kill
+                            # (non-zero exit -> RuntimeError) is recorded as a failed
+                            # cell and the sweep keeps going rather than aborting.
+                            try:
+                                if system == "nebuladb":
+                                    if hk == 1:
+                                        cell_total_ms = onehop_ms
+                                        cell_onehop_ms = onehop_ms
+                                        cell_rows = onehop_rows
+                                    else:
+                                        mwj_ms, mwj_rows = run_mwj(
+                                            decomposed_path, hop_dir,
+                                            args.mwj_threads, log_file)
+                                        cell_total_ms = onehop_ms + mwj_ms
+                                        cell_onehop_ms = onehop_ms
+                                        cell_mwj_ms = mwj_ms
+                                        cell_rows = mwj_rows
+                                elif system == "full_mwj":
+                                    mwj_ms, mwj_rows = run_mwj(
+                                        qpath, data_dir, args.mwj_threads, log_file)
+                                    cell_total_ms = mwj_ms
+                                    cell_mwj_ms = mwj_ms
+                                    cell_rows = mwj_rows
+                                elif system == "full_mwj_no_filter":
+                                    mwj_ms, mwj_rows = run_mwj(
+                                        qpath, data_dir, args.mwj_threads,
+                                        log_file, no_filter=True)
+                                    cell_total_ms = mwj_ms
+                                    cell_mwj_ms = mwj_ms
+                                    cell_rows = mwj_rows
+                            except RuntimeError as e:
+                                log_file.write(f"\n!!! {system} failed at "
+                                               f"{spec['label']}: {e}\n")
+                                log_file.flush()
+                                failed_at_edges[system] = min(
+                                    failed_at_edges.get(system, edges), edges)
+                                cell_rows = "OOM"
+                                cell_total_ms = None
+
+                            total_str = (f"{cell_total_ms:.1f}ms" if cell_total_ms
+                                         is not None else str(cell_rows))
+                            print(f"  [{spec['label']:>4}] {system:18s} {label} -> "
+                                  f"total={total_str} rows={cell_rows}", flush=True)
+
+                        rows.append({
+                            "system": system,
+                            "query": query,
+                            "dataset": spec["dir_name"],
+                            "num_accounts": spec["accounts"],
+                            "num_edges": edges,
+                            "run_id": run_id,
+                            "is_warmup": int(is_warmup),
+                            "total_ms": cell_total_ms if cell_total_ms is not None else "",
+                            "onehop_ms": cell_onehop_ms,
+                            "mwj_ms": cell_mwj_ms,
+                            "output_rows": cell_rows if cell_rows is not None else "",
+                        })
+
+    # raw_runs.csv (everything)
+    fieldnames = ["system", "query", "dataset", "num_accounts", "num_edges",
+                  "run_id", "is_warmup", "total_ms", "onehop_ms", "mwj_ms",
+                  "output_rows"]
+    with open(raw_csv_path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+
+    # summary.csv (measurement runs only; skipped cells excluded)
+    by_cell = {}
+    for r in rows:
+        if r["is_warmup"]:
+            continue
+        if r["total_ms"] == "" or r["total_ms"] is None:
+            continue
+        key = (r["system"], r["query"], r["dataset"],
+               r["num_accounts"], r["num_edges"])
+        by_cell.setdefault(key, []).append(r)
+
+    def _med(vals):
+        vals = [v for v in vals if v not in ("", None)]
+        return statistics.median(vals) if vals else ""
+
+    summary_fields = [
+        "system", "query", "dataset", "num_accounts", "num_edges", "n_runs",
+        "median_total_ms", "median_onehop_ms", "median_mwj_ms",
+        "min_total_ms", "max_total_ms", "stddev_total_ms", "output_rows",
+    ]
+    with open(summary_csv_path, "w", newline="") as f:
+        sw = csv.DictWriter(f, fieldnames=summary_fields)
+        sw.writeheader()
+        for key, cell in sorted(by_cell.items(),
+                                key=lambda kv: (kv[0][3], kv[0][0])):
+            system, q, dataset, na, ne = key
+            totals = [c["total_ms"] for c in cell]
+            n = len(totals)
+            sw.writerow({
+                "system": system, "query": q, "dataset": dataset,
+                "num_accounts": na, "num_edges": ne,
+                "n_runs": n,
+                "median_total_ms": statistics.median(totals),
+                "median_onehop_ms": _med([c["onehop_ms"] for c in cell]),
+                "median_mwj_ms":    _med([c["mwj_ms"]    for c in cell]),
+                "min_total_ms": min(totals),
+                "max_total_ms": max(totals),
+                "stddev_total_ms": statistics.stdev(totals) if n >= 2 else 0.0,
+                "output_rows": cell[0]["output_rows"],
+            })
+
+    meta["ended_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    with open(meta_path, "w") as f:
+        json.dump(meta, f, indent=2)
+
+    print()
+    print(f"raw runs    -> {raw_csv_path}")
+    print(f"summary     -> {summary_csv_path}")
+    print(f"metadata    -> {meta_path}")
+    print(f"stdout log  -> {log_path}")
+
+
+if __name__ == "__main__":
+    main()

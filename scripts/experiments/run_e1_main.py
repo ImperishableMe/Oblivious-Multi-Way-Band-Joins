@@ -80,7 +80,12 @@ OBL_KHOP_BIN = OBL_NFK_DIR / "obliviator_khop_chained"
 CONVERT_BANKING_1HOP = OBL_FK_DIR / "convert_banking_1hop.py"
 
 ALL_QUERIES = ["banking_1hop", "banking_2hop", "banking_3hop", "banking_4hop", "banking_5hop"]
-ALL_SYSTEMS = ["nebuladb", "full_mwj", "obliviator_chained"]
+# DEFAULT_SYSTEMS run on a plain invocation. `full_mwj_no_filter` (the
+# unfiltered full MWJ baseline) is opt-in only: its output explodes
+# exponentially with hop count, so it is in the validation allowlist but NOT in
+# the default set.
+DEFAULT_SYSTEMS = ["nebuladb", "full_mwj", "obliviator_chained"]
+ALL_SYSTEMS = DEFAULT_SYSTEMS + ["full_mwj_no_filter"]
 
 
 # ---------------------------------------------------------------------------
@@ -200,20 +205,25 @@ def run_rewrite(query_path: Path, out_path: Path, log_file):
     run_capture(["python3", REWRITER, query_path, out_path], log_file=log_file)
 
 
-def run_mwj(query_path: Path, data_dir: Path, mwj_threads: int, log_file) -> tuple:
+def run_mwj(query_path: Path, data_dir: Path, mwj_threads: int, log_file,
+            no_filter: bool = False) -> tuple:
     """Run sgx_app once. Returns (mwj_ms, output_rows). Sets
     OBL_MWJ_SORT_THREADS=mwj_threads in the subprocess env to size sgx_app's
     shared bitonic parallel_sort thread pool (read once via magic static in
     app/data_structures/table.cpp). Pass 0 to leave the env unset; sgx_app
-    then defaults to std::thread::hardware_concurrency()."""
+    then defaults to std::thread::hardware_concurrency().
+
+    When no_filter=True, appends --no-filter so sgx_app skips the WHERE-clause
+    selection pushdown and computes the full unfiltered multi-way join."""
     env_extra = None
     if mwj_threads and mwj_threads > 0:
         env_extra = {"OBL_MWJ_SORT_THREADS": str(mwj_threads)}
     with tempfile.TemporaryDirectory() as tmp:
         out_csv = Path(tmp) / "out.csv"
-        stdout = run_capture(
-            [SGX_APP, query_path, data_dir, out_csv],
-            log_file=log_file, env_extra=env_extra)
+        cmd = [SGX_APP, query_path, data_dir, out_csv]
+        if no_filter:
+            cmd.append("--no-filter")
+        stdout = run_capture(cmd, log_file=log_file, env_extra=env_extra)
     return parse_mwj_total_ms(stdout), parse_result_rows(stdout)
 
 
@@ -314,7 +324,11 @@ def collect_metadata(args) -> dict:
             "reused for all >=2-hop NebulaDB cells in that rep and reported "
             "as the latency of the 1-hop NebulaDB cell. obliviator src.txt "
             "is generated once per dataset and reused across all reps and "
-            "queries (deterministic)."
+            "queries (deterministic). full_mwj_no_filter runs sgx_app with "
+            "--no-filter (no WHERE-clause selection pushdown), computing the "
+            "full unfiltered multi-way join; its output explodes with hop count "
+            "and may OOM by design — failed cells are recorded as output_rows="
+            "OOM and higher hops as SKIPPED."
         ),
     }
 
@@ -326,8 +340,10 @@ def main():
                    help="Dataset name under input/plaintext/ (default: banking_1M)")
     p.add_argument("--queries", default=",".join(ALL_QUERIES),
                    help="Comma-separated query names (default: all five chains)")
-    p.add_argument("--systems", default=",".join(ALL_SYSTEMS),
-                   help=f"Comma-separated systems (default: {','.join(ALL_SYSTEMS)})")
+    p.add_argument("--systems", default=",".join(DEFAULT_SYSTEMS),
+                   help=f"Comma-separated systems (default: {','.join(DEFAULT_SYSTEMS)}; "
+                        f"allowed: {','.join(ALL_SYSTEMS)}). 'full_mwj_no_filter' is the "
+                        f"unfiltered full MWJ baseline (opt-in; output explodes with hops).")
     p.add_argument("--measurement-runs", type=int, default=1,
                    help="Recorded measurement runs per cell (default: 1)")
     p.add_argument("--warmup-runs", type=int, default=1,
@@ -366,7 +382,7 @@ def main():
             sys.exit(f"unknown system: {s} (allowed: {ALL_SYSTEMS})")
 
     needs_onehop = "nebuladb" in systems
-    needs_mwj = ("full_mwj" in systems) or ("nebuladb" in systems and any(hop_count(q) >= 2 for q in queries))
+    needs_mwj = ("full_mwj" in systems) or ("full_mwj_no_filter" in systems) or ("nebuladb" in systems and any(hop_count(q) >= 2 for q in queries))
     needs_obliviator = "obliviator_chained" in systems
 
     out_dir = Path(args.output_dir)
@@ -388,6 +404,11 @@ def main():
 
     rows = []
     total_reps = args.warmup_runs + args.measurement_runs
+
+    # Unfiltered full MWJ output grows monotonically with hop count, so once
+    # full_mwj_no_filter OOMs/fails at hop K, every hop > K is hopeless. Remember
+    # the lowest failing hop (across all reps/queries) and skip anything >= it.
+    no_filter_failed_at_hop = None
 
     with open(log_path, "w") as log_file:
         if not args.skip_build:
@@ -473,6 +494,30 @@ def main():
                             cell_total_ms = mwj_ms
                             cell_mwj_ms = mwj_ms
                             cell_rows = mwj_rows
+                        elif system == "full_mwj_no_filter":
+                            # Unfiltered full MWJ: same chain query, --no-filter.
+                            # Output explodes with hop count and may OOM by design.
+                            if no_filter_failed_at_hop is not None and hk >= no_filter_failed_at_hop:
+                                cell_rows = "SKIPPED"
+                                cell_total_ms = None
+                            else:
+                                try:
+                                    mwj_ms, mwj_rows = run_mwj(
+                                        qpath, data_dir, args.mwj_threads,
+                                        log_file, no_filter=True)
+                                    cell_total_ms = mwj_ms
+                                    cell_mwj_ms = mwj_ms
+                                    cell_rows = mwj_rows
+                                except RuntimeError as e:
+                                    # OOM / crash: record, remember the hop, move on.
+                                    log_file.write(f"\n!!! full_mwj_no_filter failed "
+                                                   f"at {query}: {e}\n")
+                                    log_file.flush()
+                                    no_filter_failed_at_hop = (
+                                        hk if no_filter_failed_at_hop is None
+                                        else min(no_filter_failed_at_hop, hk))
+                                    cell_rows = "OOM"
+                                    cell_total_ms = None
                         elif system == "obliviator_chained":
                             t0 = time.time()
                             obl_ms, obl_rows = run_obliviator(
@@ -482,7 +527,9 @@ def main():
                             cell_total_ms = obl_ms
                             cell_rows = obl_rows
 
-                        print(f"  [{query}] {system:9s} {label} -> total={cell_total_ms:.1f}ms"
+                        total_str = (f"{cell_total_ms:.1f}ms" if cell_total_ms is not None
+                                     else str(cell_rows))
+                        print(f"  [{query}] {system:18s} {label} -> total={total_str}"
                               f" rows={cell_rows}", flush=True)
                         rows.append({
                             "system": system,
@@ -519,8 +566,18 @@ def main():
         ])
         sw.writeheader()
         for (system, query, dataset), cell in sorted(by_cell.items()):
-            totals = [c["total_ms"] for c in cell]
+            # Drop failed/skipped runs (total_ms is None for OOM/SKIPPED cells).
+            totals = [c["total_ms"] for c in cell if c["total_ms"] is not None]
             n = len(totals)
+            if n == 0:
+                # Every run for this cell failed/was skipped — emit the sentinel.
+                sw.writerow({
+                    "system": system, "query": query, "dataset": dataset,
+                    "n_runs": 0,
+                    "median_ms": "", "min_ms": "", "max_ms": "", "stddev_ms": "",
+                    "output_rows": cell[0]["output_rows"],
+                })
+                continue
             sw.writerow({
                 "system": system, "query": query, "dataset": dataset,
                 "n_runs": n,

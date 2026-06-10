@@ -15,21 +15,39 @@
 
 /* Print usage information */
 void print_usage(const char* program_name) {
-    std::cout << "Usage: " << program_name << " <query_file> <input_dir> <output_file>" << std::endl;
+    std::cout << "Usage: " << program_name << " <query_file> <input_dir> <output_file> [--no-filter]" << std::endl;
     std::cout << "  query_file  : SQL query file (.sql)" << std::endl;
     std::cout << "  input_dir   : Directory containing CSV table files" << std::endl;
     std::cout << "  output_file : Output file for join result" << std::endl;
+    std::cout << "  --no-filter : Disable WHERE-clause selection pushdown; compute the" << std::endl;
+    std::cout << "                full unfiltered multi-way join (output may explode)" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 4) {
+    // Manual arg parse: three required positionals plus the optional --no-filter flag.
+    std::vector<std::string> positionals;
+    bool disable_filter = false;
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--no-filter") {
+            disable_filter = true;
+        } else if (arg.size() >= 2 && arg.substr(0, 2) == "--") {
+            std::cerr << "Error: unknown flag: " << arg << std::endl;
+            print_usage(argv[0]);
+            return 1;
+        } else {
+            positionals.push_back(arg);
+        }
+    }
+
+    if (positionals.size() != 3) {
         print_usage(argv[0]);
         return 1;
     }
 
-    std::string query_file = argv[1];
-    std::string input_dir = argv[2];
-    std::string output_file = argv[3];
+    std::string query_file = positionals[0];
+    std::string input_dir = positionals[1];
+    std::string output_file = positionals[2];
 
     // Starting TDX oblivious join
 
@@ -102,15 +120,24 @@ int main(int argc, char* argv[]) {
             throw std::runtime_error("Failed to build join tree from query");
         }
 
-        // Step 5: Parse filter conditions from WHERE clause
+        // Step 5: Parse filter conditions from WHERE clause.
+        // When --no-filter is set we deliberately leave `filters` empty so the
+        // WHERE-clause selection pushdown (our optimization) is skipped and the
+        // full unfiltered multi-way join is computed. Join band/equality
+        // predicates are unaffected (they come from join_conditions, not filters).
         std::vector<FilterCondition> filters;
-        for (const auto& filter_str : parsed_query.filter_conditions) {
-            FilterCondition filter;
-            if (FilterCondition::parse(filter_str, filter)) {
-                filters.push_back(filter);
-            } else {
-                std::cerr << "Warning: Failed to parse filter condition: '"
-                          << filter_str << "'" << std::endl;
+        if (disable_filter) {
+            std::cout << "FILTER DISABLED (--no-filter): computing full unfiltered "
+                         "multi-way join" << std::endl;
+        } else {
+            for (const auto& filter_str : parsed_query.filter_conditions) {
+                FilterCondition filter;
+                if (FilterCondition::parse(filter_str, filter)) {
+                    filters.push_back(filter);
+                } else {
+                    std::cerr << "Warning: Failed to parse filter condition: '"
+                              << filter_str << "'" << std::endl;
+                }
             }
         }
 

@@ -326,9 +326,11 @@ def collect_metadata(args) -> dict:
             "is generated once per dataset and reused across all reps and "
             "queries (deterministic). full_mwj_no_filter runs sgx_app with "
             "--no-filter (no WHERE-clause selection pushdown), computing the "
-            "full unfiltered multi-way join; its output explodes with hop count "
-            "and may OOM by design — failed cells are recorded as output_rows="
-            "OOM and higher hops as SKIPPED."
+            "full unfiltered multi-way join; like obliviator_chained it computes "
+            "the unfiltered chain join and explodes with hop count. Any binary "
+            "OOM/crash is caught per cell (recorded as output_rows=OOM, "
+            "total_ms empty) and never aborts the sweep; once a system fails at "
+            "hop K its higher hops are recorded SKIPPED."
         ),
     }
 
@@ -405,10 +407,12 @@ def main():
     rows = []
     total_reps = args.warmup_runs + args.measurement_runs
 
-    # Unfiltered full MWJ output grows monotonically with hop count, so once
-    # full_mwj_no_filter OOMs/fails at hop K, every hop > K is hopeless. Remember
-    # the lowest failing hop (across all reps/queries) and skip anything >= it.
-    no_filter_failed_at_hop = None
+    # Per-system lowest hop at which a binary OOM'd / crashed. Systems whose
+    # output grows monotonically with hop count (obliviator_chained,
+    # full_mwj_no_filter — both compute the *unfiltered* full chain join) cannot
+    # succeed at a higher hop once they fail at a lower one, so we skip those
+    # rather than re-grinding to the same kill. Persisted across reps/queries.
+    failed_at_hop = {}
 
     with open(log_path, "w") as log_file:
         if not args.skip_build:
@@ -469,63 +473,62 @@ def main():
                         cell_mwj_ms = ""
                         cell_rows = None
 
-                        if system == "nebuladb":
-                            if hk == 1:
-                                # 1-hop NebulaDB = the per-rep one-hop run.
-                                cell_total_ms = onehop_ms
-                                cell_onehop_ms = onehop_ms
-                                cell_rows = onehop_rows
-                            else:
-                                # rewrite is already cached; only time the MWJ stage.
-                                t0 = time.time()
-                                mwj_ms, mwj_rows = run_mwj(
-                                    decomposed_for[query], hop_dir,
-                                    args.mwj_threads, log_file)
-                                wall = time.time() - t0
-                                cell_total_ms = onehop_ms + mwj_ms
-                                cell_onehop_ms = onehop_ms  # inherited from this rep
-                                cell_mwj_ms = mwj_ms
-                                cell_rows = mwj_rows
-                        elif system == "full_mwj":
-                            t0 = time.time()
-                            mwj_ms, mwj_rows = run_mwj(
-                                qpath, data_dir, args.mwj_threads, log_file)
-                            wall = time.time() - t0
-                            cell_total_ms = mwj_ms
-                            cell_mwj_ms = mwj_ms
-                            cell_rows = mwj_rows
-                        elif system == "full_mwj_no_filter":
-                            # Unfiltered full MWJ: same chain query, --no-filter.
-                            # Output explodes with hop count and may OOM by design.
-                            if no_filter_failed_at_hop is not None and hk >= no_filter_failed_at_hop:
-                                cell_rows = "SKIPPED"
-                                cell_total_ms = None
-                            else:
-                                try:
+                        # Short-circuit: a system that already OOM'd at a lower
+                        # hop will only OOM again here (output grows with hops),
+                        # so skip without re-running.
+                        if system in failed_at_hop and hk >= failed_at_hop[system]:
+                            cell_rows = "SKIPPED"
+                            cell_total_ms = None
+                        else:
+                            # Every binary invocation is OOM-tolerant: a crash /
+                            # OOM-kill (non-zero exit -> RuntimeError) is recorded
+                            # as a failed cell and the experiment keeps going,
+                            # rather than aborting the whole sweep.
+                            try:
+                                if system == "nebuladb":
+                                    if hk == 1:
+                                        # 1-hop NebulaDB = the per-rep one-hop run.
+                                        cell_total_ms = onehop_ms
+                                        cell_onehop_ms = onehop_ms
+                                        cell_rows = onehop_rows
+                                    else:
+                                        # rewrite already cached; only time the MWJ stage.
+                                        mwj_ms, mwj_rows = run_mwj(
+                                            decomposed_for[query], hop_dir,
+                                            args.mwj_threads, log_file)
+                                        cell_total_ms = onehop_ms + mwj_ms
+                                        cell_onehop_ms = onehop_ms  # inherited from this rep
+                                        cell_mwj_ms = mwj_ms
+                                        cell_rows = mwj_rows
+                                elif system == "full_mwj":
+                                    mwj_ms, mwj_rows = run_mwj(
+                                        qpath, data_dir, args.mwj_threads, log_file)
+                                    cell_total_ms = mwj_ms
+                                    cell_mwj_ms = mwj_ms
+                                    cell_rows = mwj_rows
+                                elif system == "full_mwj_no_filter":
+                                    # Unfiltered full MWJ: same chain query, --no-filter.
                                     mwj_ms, mwj_rows = run_mwj(
                                         qpath, data_dir, args.mwj_threads,
                                         log_file, no_filter=True)
                                     cell_total_ms = mwj_ms
                                     cell_mwj_ms = mwj_ms
                                     cell_rows = mwj_rows
-                                except RuntimeError as e:
-                                    # OOM / crash: record, remember the hop, move on.
-                                    log_file.write(f"\n!!! full_mwj_no_filter failed "
-                                                   f"at {query}: {e}\n")
-                                    log_file.flush()
-                                    no_filter_failed_at_hop = (
-                                        hk if no_filter_failed_at_hop is None
-                                        else min(no_filter_failed_at_hop, hk))
-                                    cell_rows = "OOM"
-                                    cell_total_ms = None
-                        elif system == "obliviator_chained":
-                            t0 = time.time()
-                            obl_ms, obl_rows = run_obliviator(
-                                hk, obliviator_src_txt,
-                                args.obliviator_threads, log_file)
-                            wall = time.time() - t0
-                            cell_total_ms = obl_ms
-                            cell_rows = obl_rows
+                                elif system == "obliviator_chained":
+                                    obl_ms, obl_rows = run_obliviator(
+                                        hk, obliviator_src_txt,
+                                        args.obliviator_threads, log_file)
+                                    cell_total_ms = obl_ms
+                                    cell_rows = obl_rows
+                            except RuntimeError as e:
+                                # OOM / crash: record it, remember the hop so
+                                # higher hops of this system are skipped, move on.
+                                log_file.write(f"\n!!! {system} failed at {query}: {e}\n")
+                                log_file.flush()
+                                failed_at_hop[system] = min(
+                                    failed_at_hop.get(system, hk), hk)
+                                cell_rows = "OOM"
+                                cell_total_ms = None
 
                         total_str = (f"{cell_total_ms:.1f}ms" if cell_total_ms is not None
                                      else str(cell_rows))

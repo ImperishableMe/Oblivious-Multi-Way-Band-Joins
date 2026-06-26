@@ -9,4 +9,4 @@ WHERE a1.account_id = t1.acc_from
   AND a5.account_id = t4.acc_to
   AND a5.account_id = t5.acc_from
   AND a6.account_id = t5.acc_to
-  AND a1.bank_id = 5;
+  AND a1.bank_id = 224866;

@@ -3,4 +3,4 @@ WHERE a1.account_id = t1.acc_from
   AND a2.account_id = t1.acc_to
   AND a2.account_id = t2.acc_from
   AND a3.account_id = t2.acc_to
-  AND a1.bank_id = 5;
+  AND a1.bank_id = 224866;

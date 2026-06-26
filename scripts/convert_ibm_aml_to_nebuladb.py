@@ -17,10 +17,18 @@ Our pipeline needs two int32 CSVs:
 Conversions performed:
   - Account hex strings are remapped to contiguous int [1, N].
   - Timestamps are converted to epoch days (Unix seconds // 86400).
-  - Amounts are stored as integer cents (round(Amount Paid * 100)).
+  - Amounts are stored as integer dollars (round(Amount Paid)), saturated to
+    the int32 attribute range. AML contains extreme synthetic amounts (up to
+    ~$1e12) that overflow int32 even as whole dollars; the tail is clamped to
+    JOIN_ATTR_MAX rather than failing the conversion. `amount` is never a join
+    key and is not referenced by the chain queries, so the clamp does not
+    affect chain results; the saturated tail stays "very large" so the
+    selectivity queries (amount > X) still classify those outliers correctly.
   - Categorical columns (Payment Currency, Payment Format) are mapped to
     integer codes based on first-seen order.
-  - All values are validated to fit within [-1_073_741_820, 1_073_741_820].
+  - All non-amount values are validated to fit within
+    [-1_073_741_820, 1_073_741_820] (a hard error on overflow); `amount` is
+    saturated to that range instead.
 
 Operates in a single streaming pass — safe for HI-Medium (32M txns) and
 HI-Large (180M txns).
@@ -67,6 +75,16 @@ def check_bounds(val: int, col_name: str) -> None:
     if not (JOIN_ATTR_MIN <= val <= JOIN_ATTR_MAX):
         raise ValueError(f"{col_name} value {val} outside int32 range "
                          f"[{JOIN_ATTR_MIN}, {JOIN_ATTR_MAX}]")
+
+
+def saturate(val: int) -> int:
+    """Clamp a value into the int32 attribute range. Used only for `amount`,
+    whose extreme synthetic tail in AML overflows int32."""
+    if val > JOIN_ATTR_MAX:
+        return JOIN_ATTR_MAX
+    if val < JOIN_ATTR_MIN:
+        return JOIN_ATTR_MIN
+    return val
 
 
 def main() -> int:
@@ -126,10 +144,11 @@ def main() -> int:
         return code
 
     laundering_count = 0
+    amount_clamped_count = 0
     min_epoch_day = None
     max_epoch_day = None
-    min_amount_cents: int | None = None
-    max_amount_cents: int | None = None
+    min_amount: int | None = None
+    max_amount: int | None = None
 
     with open(args.input_csv, "r", newline="") as fin, \
          open(txn_csv_path, "w", newline="") as ftxn:
@@ -172,12 +191,16 @@ def main() -> int:
             if max_epoch_day is None or txn_time > max_epoch_day:
                 max_epoch_day = txn_time
 
-            amount_cents = int(round(float(amount_paid_s) * 100))
-            check_bounds(amount_cents, "amount")
-            if min_amount_cents is None or amount_cents < min_amount_cents:
-                min_amount_cents = amount_cents
-            if max_amount_cents is None or amount_cents > max_amount_cents:
-                max_amount_cents = amount_cents
+            # Store whole dollars (cents would overflow int32 for AML's large
+            # synthetic transfers); saturate the extreme tail into range.
+            amount_raw = int(round(float(amount_paid_s)))
+            amount = saturate(amount_raw)
+            if amount != amount_raw:
+                amount_clamped_count += 1
+            if min_amount is None or amount < min_amount:
+                min_amount = amount
+            if max_amount is None or amount > max_amount:
+                max_amount = amount
 
             currency = encode(currency_map, pay_ccy_s)
             pay_fmt = encode(format_map, pay_fmt_s)
@@ -186,18 +209,18 @@ def main() -> int:
 
             txn_id += 1
             txn_writer.writerow([
-                txn_id, acc_from, acc_to, amount_cents, txn_time,
+                txn_id, acc_from, acc_to, amount, txn_time,
                 currency, pay_fmt, is_launder,
             ])
 
             # Reservoir sample the amount for percentile estimation.
             reservoir_seen += 1
             if len(reservoir) < RESERVOIR_SIZE:
-                reservoir.append(amount_cents)
+                reservoir.append(amount)
             else:
                 j = random.randint(0, reservoir_seen - 1)
                 if j < RESERVOIR_SIZE:
-                    reservoir[j] = amount_cents
+                    reservoir[j] = amount
 
             if txn_id % PROGRESS_EVERY == 0:
                 print(f"  ... {txn_id:,} transactions processed")
@@ -225,7 +248,9 @@ def main() -> int:
           f"(first few: {list(format_map.items())[:5]})")
     print(f"  txn_time range: [{min_epoch_day}, {max_epoch_day}] "
           f"(epoch days, span {max_epoch_day - min_epoch_day + 1 if min_epoch_day is not None else 0} days)")
-    print(f"  amount_cents range: [{min_amount_cents}, {max_amount_cents}]")
+    print(f"  amount (dollars) range: [{min_amount}, {max_amount}]")
+    print(f"  amounts saturated to int32 max: {amount_clamped_count:,} "
+          f"({100.0 * amount_clamped_count / max(txn_id, 1):.4f}% of txns)")
 
     # Top banks by account count — useful for picking the a1.bank_id anchor.
     print("\n  Top 20 banks by account count (pick one as bank_id anchor):")
@@ -240,7 +265,7 @@ def main() -> int:
         def pct(p: float) -> int:
             idx = min(int(p * len(reservoir)), len(reservoir) - 1)
             return reservoir[idx]
-        print("\n  Amount (cents) percentiles — pick thresholds for aml_sel_*:")
+        print("\n  Amount (dollars) percentiles — pick thresholds for aml_sel_*:")
         print(f"    ~80% pass (p20):  amount > {pct(0.20):>12,}   (aml_sel_low)")
         print(f"    ~60% pass (p40):  amount > {pct(0.40):>12,}   (aml_sel_med)")
         print(f"    ~40% pass (p60):  amount > {pct(0.60):>12,}   (aml_sel_high)")

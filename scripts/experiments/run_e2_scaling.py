@@ -119,6 +119,8 @@ AML_SIZES = [
      "accounts":   515_088, "edges":  5_078_345, "anchor_bank": 224866},
     {"label": "hi_medium", "dir_name": "ibm_aml_hi_medium",
      "accounts": 2_077_023, "edges": 31_898_238, "anchor_bank": 118871},
+    {"label": "hi_large",  "dir_name": "ibm_aml_hi_large",
+     "accounts": 2_116_168, "edges": 179_702_229, "anchor_bank": 111545},
 ]
 
 # DEFAULT_SYSTEMS run on a plain invocation. full_mwj_no_filter (unfiltered

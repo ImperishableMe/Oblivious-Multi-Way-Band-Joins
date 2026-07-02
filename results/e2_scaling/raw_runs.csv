@@ -8,5 +8,6 @@ nebuladb,aml_3hop,ibm_aml_hi_medium,2077023,31898238,1,0,592453.6810000001,3815.
 nebuladb,aml_4hop,ibm_aml_hi_medium,2077023,31898238,1,0,951709.704,3815.763,947893.941,3222046
 nebuladb,aml_5hop,ibm_aml_hi_medium,2077023,31898238,1,0,3217799.258,3815.763,3213983.495,81633572
 nebuladb,aml_2hop,ibm_aml_hi_large,2116168,179702229,1,0,1751695.436,28882.036,1722813.4,245424
-nebuladb,aml_3hop,ibm_aml_hi_large,2116168,179702229,1,0,,,,SKIPPED
-nebuladb,aml_4hop,ibm_aml_hi_large,2116168,179702229,1,0,,,,SKIPPED
+nebuladb,aml_3hop,ibm_aml_hi_large,2116168,179702229,1,0,3532416.51,27989.837,3504426.673,24587575
+nebuladb,aml_4hop,ibm_aml_hi_large,2116168,179702229,1,0,,,,OOM
+nebuladb,aml_5hop,ibm_aml_hi_large,2116168,179702229,1,0,,,,SKIPPED

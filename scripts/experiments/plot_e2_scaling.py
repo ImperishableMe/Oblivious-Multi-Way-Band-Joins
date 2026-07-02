@@ -8,11 +8,12 @@ end-to-end latency, grouped by chain length (hops), one bar per dataset
 (HI-Small, HI-Medium, HI-Large). Linear y-axis, seconds, with value labels.
 
 Only completed cells are plotted (rows with a numeric median_total_ms); OOM /
-SKIPPED cells are dropped automatically. HI-Large has only a 2-hop bar: its
-2-hop point was measured via the memory-reduced slim path
-(run_e2_scaling.py --slim-hi-large; column-trimmed hop table + sgx_app_slim),
-which is what let the previously-OOMing 2-hop complete. The 2-hop result
-cardinality is identical to the full hop table; higher hops were not run.
+SKIPPED cells are dropped automatically. HI-Large was measured via the
+memory-reduced slim path (run_e2_scaling.py --slim-hi-large; column-trimmed
+hop table + sgx_app_slim), which is what let the previously-OOMing chain run.
+Its 2-hop and 3-hop complete (bars shown); 4-hop OOMs and 5-hop is skipped, so
+HI-Large has no 4-/5-hop bar. Slim-path result cardinalities are identical to
+the full hop table.
 
 Usage:
   python3 scripts/experiments/plot_e2_scaling.py

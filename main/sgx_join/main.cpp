@@ -112,6 +112,14 @@ int main(int argc, char* argv[]) {
             aliased_tables.emplace(alias, std::move(table_copy));
         }
 
+        // aliased_tables now holds an independent deep copy for every alias the
+        // query uses, so the base tables are dead from here on. Free them to
+        // avoid carrying a redundant full copy of each input table (one extra
+        // copy of the materialized hop table — tens of GB at HI-Large scale —
+        // through the whole join). The number of aliases is public query
+        // structure, so this is oblivious-safe.
+        base_tables.clear();
+
         // Step 4: Build join tree using aliased tables
         JoinTreeBuilder builder;
         JoinTreeNodePtr join_tree = builder.build_from_query(parsed_query, aliased_tables);

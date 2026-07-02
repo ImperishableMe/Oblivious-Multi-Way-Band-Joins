@@ -1,8 +1,14 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-// Maximum number of attributes per entry
+// Maximum number of attributes per entry.
+// Overridable at compile time (-DMAX_ATTRIBUTES=N) so a memory-reduced build
+// (e.g. the slim HI-Large E2 run via `make sgx_app_slim`) can shrink the fixed
+// per-entry attribute array. The minimum safe value is the widest intermediate
+// the query plan produces; default is 64.
+#ifndef MAX_ATTRIBUTES
 #define MAX_ATTRIBUTES 64
+#endif
 
 // Window size for linear pass operations
 #define WINDOW_SIZE 2

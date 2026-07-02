@@ -17,6 +17,8 @@ enclave.signed.so
 
 # Executables
 sgx_app
+sgx_app_slim
+build_slim/
 encrypt_tables
 test_join
 sqlite_baseline

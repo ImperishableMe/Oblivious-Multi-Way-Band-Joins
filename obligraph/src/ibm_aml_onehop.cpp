@@ -65,6 +65,32 @@ static vector<string> splitComma(const string& s) {
     return out;
 }
 
+// Build the column type list for an import from the CSV header alone: every
+// column is declared int32 (the only type this workload uses) and named after
+// the header field. This lets one binary parse both the full 8-column txn.csv
+// and the slim 4-column txn.csv without recompiling — the column count and
+// names are public schema, so this is oblivious-safe. importEdge/NodeFromCSV
+// take the column *names* from the header anyway and only use this list for the
+// per-column types and the count.
+static vector<pair<string, string>> int32SchemaFromHeader(const string& path) {
+    ifstream in(path);
+    if (!in.is_open())
+        throw runtime_error("Cannot open file to read header: " + path);
+    string headerLine;
+    if (!getline(in, headerLine))
+        throw runtime_error("File has no header row: " + path);
+    // Strip a trailing CR so Windows-style line endings don't taint the last name.
+    if (!headerLine.empty() && headerLine.back() == '\r')
+        headerLine.pop_back();
+
+    vector<pair<string, string>> schema;
+    for (const string& name : splitComma(headerLine))
+        schema.emplace_back(name, "int32");
+    if (schema.empty())
+        throw runtime_error("Empty header row in: " + path);
+    return schema;
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         cerr << "Usage: " << argv[0] << " <data_dir> <output_csv> [--report CATS] [--threads N]\n"
@@ -110,19 +136,20 @@ int main(int argc, char* argv[]) {
             TimedScope ts("CSV read (account)", "IO");
             catalog.importNodeFromCSV(
                 dataDir + "/account.csv", ',',
-                {{"account_id", "int32"}, {"bank_id", "int32"}},
+                int32SchemaFromHeader(dataDir + "/account.csv"),
                 "account_id"
             );
         }
         {
             TimedScope ts("CSV read (txn)", "IO");
-            // 8 int32 columns = 32 bytes, within ROW_DATA_MAX_SIZE (48).
+            // Schema is derived from the txn.csv header so the same binary parses
+            // both the full 8-column txn (txn_id,acc_from,acc_to,amount,txn_time,
+            // currency,payment_format,is_laundering) and the slim 4-column txn
+            // (txn_id,acc_from,acc_to,amount). 8 int32 cols = 32 B, 4 = 16 B,
+            // both within ROW_DATA_MAX_SIZE (48). acc_from/acc_to remain the keys.
             catalog.importEdgeFromCSV(
                 dataDir + "/txn.csv", ',',
-                {{"txn_id", "int32"}, {"acc_from", "int32"}, {"acc_to", "int32"},
-                 {"amount", "int32"}, {"txn_time", "int32"},
-                 {"currency", "int32"}, {"payment_format", "int32"},
-                 {"is_laundering", "int32"}},
+                int32SchemaFromHeader(dataDir + "/txn.csv"),
                 "account", "txn", "account",
                 "acc_from", "acc_to"
             );

@@ -9,6 +9,23 @@
 DEBUG ?= 0
 SLIM_ENTRY ?= 0
 
+# Out-of-tree build support: when BUILD_DIR is set (e.g. the slim build),
+# object files are written under $(BUILD_DIR)/ instead of alongside the sources,
+# so a build with different -D flags cannot contaminate the default build's
+# objects (and vice-versa). Empty BUILD_DIR reproduces the original behavior
+# exactly: objects live next to their sources.
+BUILD_DIR ?=
+ifeq ($(BUILD_DIR),)
+    OBJ_PREFIX :=
+else
+    OBJ_PREFIX := $(BUILD_DIR)/
+endif
+
+# Optional compile-time override of MAX_ATTRIBUTES (the fixed per-entry
+# attribute-array capacity in common/constants.h). Empty => use the default (64).
+# The slim build sets this to shrink the per-entry footprint.
+MAX_ATTRIBUTES ?=
+
 # Common compiler flags
 COMMON_FLAGS := -Wall -Wextra -Wno-attributes -mavx2 -DUSE_AVX2
 
@@ -17,6 +34,11 @@ ifeq ($(DEBUG), 1)
 	COMMON_FLAGS += -O0 -g -DDEBUG
 else
 	COMMON_FLAGS += -O3 -DNDEBUG
+endif
+
+# Apply the MAX_ATTRIBUTES override (if any) to every translation unit.
+ifneq ($(MAX_ATTRIBUTES),)
+	COMMON_FLAGS += -DMAX_ATTRIBUTES=$(MAX_ATTRIBUTES)
 endif
 
 ######## App Settings ########
@@ -78,8 +100,8 @@ endif
 # Link flags (just pthread, no SGX libraries)
 App_Link_Flags := -lpthread
 
-# All object files
-App_Objects := $(App_Cpp_Files:.cpp=.o) $(App_C_Files:.c=.o)
+# All object files (routed through $(OBJ_PREFIX) for out-of-tree builds)
+App_Objects := $(addprefix $(OBJ_PREFIX), $(App_Cpp_Files:.cpp=.o) $(App_C_Files:.c=.o))
 
 App_Name := sgx_app
 
@@ -92,24 +114,43 @@ all: $(App_Name)
 
 build: all
 
+# Memory-reduced build for the slim HI-Large E2 run. Recurses with a separate
+# object tree (build_slim/) and a shrunken MAX_ATTRIBUTES so the default
+# ./sgx_app and its objects are left completely untouched. Guarded by an empty
+# BUILD_DIR so the recipe exists only at the top level — inside the recursive
+# sub-make (BUILD_DIR=build_slim) `sgx_app_slim` is produced by the link rule
+# instead, with no "overriding recipe" conflict.
+ifeq ($(BUILD_DIR),)
+.PHONY: sgx_app_slim
+sgx_app_slim:
+	@$(MAKE) BUILD_DIR=build_slim MAX_ATTRIBUTES=40 App_Name=sgx_app_slim
+	@echo "Slim build complete: ./sgx_app_slim (MAX_ATTRIBUTES=40)"
+endif
+
 ######## App Build ########
 
-# Compile C++ source files
-main/%.o: main/%.cpp
+# Compile C++ source files. The $(OBJ_PREFIX) prefix routes objects into
+# $(BUILD_DIR) for out-of-tree builds; with OBJ_PREFIX empty these reduce to the
+# original in-tree rules. `mkdir -p $(@D)` is a no-op for the default build.
+$(OBJ_PREFIX)main/%.o: main/%.cpp
+	@mkdir -p $(@D)
 	@$(CXX) $(App_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
-app/%.o: app/%.cpp
+$(OBJ_PREFIX)app/%.o: app/%.cpp
+	@mkdir -p $(@D)
 	@$(CXX) $(App_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
 # Compile C++ source files from obligraph (parallel sort primitives)
-obligraph/src/%.o: obligraph/src/%.cpp
+$(OBJ_PREFIX)obligraph/src/%.o: obligraph/src/%.cpp
+	@mkdir -p $(@D)
 	@$(CXX) $(App_Compile_CXXFlags) -c $< -o $@
 	@echo "CXX  <=  $<"
 
 # Compile C source files from core_logic
-app/core_logic/%.o: app/core_logic/%.c
+$(OBJ_PREFIX)app/core_logic/%.o: app/core_logic/%.c
+	@mkdir -p $(@D)
 	@$(CC) $(App_Compile_CFlags) -c $< -o $@
 	@echo "CC   <=  $<"
 
@@ -183,6 +224,8 @@ tests: test_join sqlite_baseline test_waksman_shuffle test_waksman_distribution
 clean:
 	@rm -f $(App_Name)
 	@rm -f $(App_Objects)
+	@rm -f sgx_app_slim
+	@rm -rf build_slim
 	@rm -f test_join sqlite_baseline test_waksman_shuffle test_waksman_distribution
 	@rm -f $(Test_Join_Objects) $(Sqlite_Baseline_Objects) $(Test_Waksman_Objects) $(Test_Waksman_Dist_Objects)
 	@rm -f app/core_logic/**/*.o

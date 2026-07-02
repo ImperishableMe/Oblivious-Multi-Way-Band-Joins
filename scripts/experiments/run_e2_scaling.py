@@ -88,6 +88,9 @@ PROJECT_DIR = Path(__file__).resolve().parents[2]
 RESULTS_DIR = PROJECT_DIR / "results" / "e2_scaling"
 
 SGX_APP = PROJECT_DIR / "sgx_app"
+# Memory-reduced MWJ binary (MAX_ATTRIBUTES=40), built by `make sgx_app_slim`.
+# Used only for the slim HI-Large path when --slim-hi-large is set.
+SGX_APP_SLIM = PROJECT_DIR / "sgx_app_slim"
 OBLIGRAPH_BUILD = PROJECT_DIR / "obligraph" / "build"
 REWRITER = PROJECT_DIR / "scripts" / "rewrite_chain_query.py"
 GENERATOR = PROJECT_DIR / "scripts" / "generate_banking_scaled.py"
@@ -120,7 +123,11 @@ AML_SIZES = [
     {"label": "hi_medium", "dir_name": "ibm_aml_hi_medium",
      "accounts": 2_077_023, "edges": 31_898_238, "anchor_bank": 118871},
     {"label": "hi_large",  "dir_name": "ibm_aml_hi_large",
-     "accounts": 2_116_168, "edges": 179_702_229, "anchor_bank": 111545},
+     "accounts": 2_116_168, "edges": 179_702_229, "anchor_bank": 111545,
+     # Opt-in (--slim-hi-large) memory-reduced variant: a column-trimmed txn
+     # table (slim dir) joined by the reduced-capacity ./sgx_app_slim binary, so
+     # the >=2-hop chain fits in RAM. account.csv is unchanged (symlinked).
+     "dir_name_slim": "ibm_aml_hi_large_slim"},
 ]
 
 # DEFAULT_SYSTEMS run on a plain invocation. full_mwj_no_filter (unfiltered
@@ -282,7 +289,7 @@ def run_rewrite(query_path: Path, out_path: Path, log_file):
 
 
 def run_mwj(query_path: Path, data_dir: Path, mwj_threads: int, log_file,
-            no_filter: bool = False, timeout=None) -> tuple:
+            no_filter: bool = False, timeout=None, sgx_app_bin: Path = SGX_APP) -> tuple:
     """Run sgx_app once; tempdir-owned output csv is discarded after parse.
     Returns (mwj_ms, output_rows). Sets OBL_MWJ_SORT_THREADS=mwj_threads in
     the subprocess env to size sgx_app's shared bitonic parallel_sort thread
@@ -290,13 +297,16 @@ def run_mwj(query_path: Path, data_dir: Path, mwj_threads: int, log_file,
     0 to leave the env unset; sgx_app then defaults to hardware_concurrency.
 
     When no_filter=True, appends --no-filter so sgx_app skips the WHERE-clause
-    selection pushdown and computes the full unfiltered multi-way join."""
+    selection pushdown and computes the full unfiltered multi-way join.
+
+    sgx_app_bin selects the MWJ binary (default ./sgx_app); the slim HI-Large
+    path passes ./sgx_app_slim instead."""
     env_extra = None
     if mwj_threads and mwj_threads > 0:
         env_extra = {"OBL_MWJ_SORT_THREADS": str(mwj_threads)}
     with tempfile.TemporaryDirectory() as tmp:
         out_csv = Path(tmp) / "out.csv"
-        cmd = [SGX_APP, query_path, data_dir, out_csv]
+        cmd = [sgx_app_bin, query_path, data_dir, out_csv]
         if no_filter:
             cmd.append("--no-filter")
         stdout = run_capture(cmd, log_file=log_file, env_extra=env_extra,
@@ -334,21 +344,25 @@ def prepare_query(spec, query, decomposed_dir, log_file) -> dict:
 # Build + dataset prep
 # ---------------------------------------------------------------------------
 
-def build_binaries(onehop_target: str, log_file):
+def build_binaries(onehop_target: str, log_file, build_slim: bool = False):
     print(f"[build] obligraph/{onehop_target} (Release)...", flush=True)
     run_capture(
         ["cmake", "--build", OBLIGRAPH_BUILD,
          "--target", onehop_target, "--config", "Release"],
         log_file=log_file,
     )
-    print("[build] sgx_app (make)...", flush=True)
-    proc = subprocess.run(["make"], cwd=PROJECT_DIR, capture_output=True, text=True)
-    log_file.write("\n+++ make (sgx_app)\n" + proc.stdout)
-    if proc.stderr:
-        log_file.write("\n--- stderr ---\n" + proc.stderr)
-    log_file.flush()
-    if proc.returncode != 0:
-        raise RuntimeError(f"sgx_app build failed:\n{proc.stderr}")
+    targets = [(["make"], "sgx_app")]
+    if build_slim:
+        targets.append((["make", "sgx_app_slim"], "sgx_app_slim"))
+    for cmd, name in targets:
+        print(f"[build] {name} (make)...", flush=True)
+        proc = subprocess.run(cmd, cwd=PROJECT_DIR, capture_output=True, text=True)
+        log_file.write(f"\n+++ {' '.join(cmd)} ({name})\n" + proc.stdout)
+        if proc.stderr:
+            log_file.write("\n--- stderr ---\n" + proc.stderr)
+        log_file.flush()
+        if proc.returncode != 0:
+            raise RuntimeError(f"{name} build failed:\n{proc.stderr}")
 
 
 def edge_count(spec) -> int:
@@ -487,6 +501,12 @@ def main():
                         "(default: 0 = no limit). A cell that exceeds it is "
                         "recorded as TIMEOUT and, like an OOM, skips that "
                         "dataset's higher hops. Use for the large AML datasets.")
+    p.add_argument("--slim-hi-large", action="store_true",
+                   help="For the AML hi_large size only: use the column-trimmed "
+                        "slim dataset (ibm_aml_hi_large_slim) and the "
+                        "reduced-capacity ./sgx_app_slim binary, so the >=2-hop "
+                        "chain fits in RAM. Generate the slim dataset first with "
+                        "scripts/make_slim_hi_large.py. No effect on other sizes.")
     p.add_argument("--skip-build", action="store_true",
                    help="Skip binary rebuild step")
     p.add_argument("--skip-generation", action="store_true",
@@ -509,6 +529,28 @@ def main():
         sizes = [known[l] for l in wanted_labels]
     else:
         sizes = list(wf["sizes"])
+
+    # --slim-hi-large: swap any selected spec that defines a slim variant onto
+    # the trimmed dataset + reduced-capacity binary. Done on a per-spec copy so
+    # the shared WORKLOADS size table is never mutated. Only specs carrying
+    # "dir_name_slim" are affected (currently just AML hi_large).
+    if args.slim_hi_large:
+        slim_specs = []
+        applied = []
+        for spec in sizes:
+            if "dir_name_slim" in spec:
+                slim = dict(spec)
+                slim["dir_name"] = spec["dir_name_slim"]
+                slim["_sgx_app"] = SGX_APP_SLIM
+                slim_specs.append(slim)
+                applied.append(spec["label"])
+            else:
+                slim_specs.append(spec)
+        if not applied:
+            sys.exit("--slim-hi-large set but none of the selected sizes "
+                     f"{[s['label'] for s in sizes]} has a slim variant "
+                     "(expected e.g. hi_large)")
+        sizes = slim_specs
 
     # Resolve systems
     if args.systems:
@@ -569,10 +611,13 @@ def main():
 
     with open(log_path, "w") as log_file:
         if not args.skip_build:
-            build_binaries(wf["onehop_target"], log_file)
+            build_binaries(wf["onehop_target"], log_file,
+                           build_slim=args.slim_hi_large)
         else:
-            for bin_path, lbl in [(wf["onehop_bin"], wf["onehop_target"]),
-                                  (SGX_APP, "sgx_app")]:
+            required = [(wf["onehop_bin"], wf["onehop_target"]), (SGX_APP, "sgx_app")]
+            if args.slim_hi_large:
+                required.append((SGX_APP_SLIM, "sgx_app_slim"))
+            for bin_path, lbl in required:
                 if not bin_path.exists():
                     sys.exit(f"--skip-build but {lbl} missing: {bin_path}")
 
@@ -664,7 +709,8 @@ def main():
                                             mwj_ms, mwj_rows = run_mwj(
                                                 prep["decomposed"], hop_dir,
                                                 args.mwj_threads, log_file,
-                                                timeout=cell_timeout)
+                                                timeout=cell_timeout,
+                                                sgx_app_bin=spec.get("_sgx_app", SGX_APP))
                                             cell_total_ms = onehop_ms + mwj_ms
                                             cell_onehop_ms = onehop_ms
                                             cell_mwj_ms = mwj_ms
@@ -673,7 +719,8 @@ def main():
                                         mwj_ms, mwj_rows = run_mwj(
                                             prep["base"], data_dir,
                                             args.mwj_threads, log_file,
-                                            timeout=cell_timeout)
+                                            timeout=cell_timeout,
+                                            sgx_app_bin=spec.get("_sgx_app", SGX_APP))
                                         cell_total_ms = mwj_ms
                                         cell_mwj_ms = mwj_ms
                                         cell_rows = mwj_rows
@@ -681,7 +728,8 @@ def main():
                                         mwj_ms, mwj_rows = run_mwj(
                                             prep["base"], data_dir,
                                             args.mwj_threads, log_file,
-                                            no_filter=True, timeout=cell_timeout)
+                                            no_filter=True, timeout=cell_timeout,
+                                            sgx_app_bin=spec.get("_sgx_app", SGX_APP))
                                         cell_total_ms = mwj_ms
                                         cell_mwj_ms = mwj_ms
                                         cell_rows = mwj_rows

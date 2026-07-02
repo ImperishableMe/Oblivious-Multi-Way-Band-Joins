@@ -5,10 +5,14 @@ Plot the E2 NebulaDB AML scaling experiment.
 Reads results/e2_scaling/summary.csv (produced by run_e2_scaling.py) and
 writes results/e2_scaling/e2_scaling.png -- a grouped bar chart of NebulaDB
 end-to-end latency, grouped by chain length (hops), one bar per dataset
-(HI-Small, HI-Medium). Linear y-axis, seconds, with value labels.
+(HI-Small, HI-Medium, HI-Large). Linear y-axis, seconds, with value labels.
 
 Only completed cells are plotted (rows with a numeric median_total_ms); OOM /
-SKIPPED cells (e.g. HI-Large) are dropped automatically.
+SKIPPED cells are dropped automatically. HI-Large has only a 2-hop bar: its
+2-hop point was measured via the memory-reduced slim path
+(run_e2_scaling.py --slim-hi-large; column-trimmed hop table + sgx_app_slim),
+which is what let the previously-OOMing 2-hop complete. The 2-hop result
+cardinality is identical to the full hop table; higher hops were not run.
 
 Usage:
   python3 scripts/experiments/plot_e2_scaling.py
@@ -29,6 +33,7 @@ DEFAULT_SUMMARY = PROJECT_DIR / "results" / "e2_scaling" / "summary.csv"
 DATASETS = [
     ("ibm_aml_hi_small", "HI-Small (5.1M edges)", "tab:blue"),
     ("ibm_aml_hi_medium", "HI-Medium (31.9M edges)", "tab:orange"),
+    ("ibm_aml_hi_large", "HI-Large (179.7M edges)", "tab:green"),
 ]
 
 

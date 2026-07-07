@@ -7,8 +7,4 @@ WHERE a1.account_id = t1.acc_from
   AND a5.account_id = t3.acc_to
   AND a4.account_id = t4.acc_from
   AND a5.account_id = t4.acc_to
-  AND a5.bank_id = 5
-  AND t1.amount > 50000
-  AND t2.amount > 50000
-  AND t3.amount > 50000
-  AND t4.amount > 50000;
+  AND a5.bank_id = 142553;

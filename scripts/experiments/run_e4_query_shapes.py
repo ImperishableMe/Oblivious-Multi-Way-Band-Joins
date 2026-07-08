@@ -27,14 +27,17 @@ Systems (the three canonical ones; the filtered full_mwj is not run):
   2. full_mwj_no_filter ("Full MWJ")
        sgx_app --no-filter directly on the shape query.
   3. obliviator_chained
-       obliviator_khop_chained on the chain queries only (its kernel is a
-       path pipeline); non-chain shapes are recorded UNSUPPORTED — the
-       chained-kernel baseline structurally cannot express them.
+       obliviator_khop_chained with its shape argument: chain queries run the
+       path pipeline; fan-in/fan-out run the keep-key hub variants (validated
+       tuple-exact at threads=1 by tests/test_obliviator_shapes.py). The tree
+       shape needs a multi-key repack the kernel does not have, so it is
+       recorded UNSUPPORTED.
 
 Failure handling: any per-cell OOM/crash/timeout is recorded (output_rows =
 OOM/TIMEOUT) and never aborts the sweep. For the two unfiltered systems
-(obliviator_chained, full_mwj_no_filter) whose output grows with edge count,
-a failure at E edges skips every query with >= E edges (SKIPPED).
+(obliviator_chained, full_mwj_no_filter) whose output grows with edge count
+within a shape family, a failure at E edges skips every query of the SAME
+shape with >= E edges (SKIPPED); other shapes still get their own attempt.
 
 Correctness is checked separately by tests/test_e4_shape_correctness.py.
 
@@ -78,6 +81,11 @@ DATA_ROOT = PROJECT_DIR / "input" / "plaintext"
 OBL_NFK_DIR = PROJECT_DIR / "obl-radix" / "baselines" / "obliviatorNFK-TDX"
 OBL_KHOP_BIN = OBL_NFK_DIR / "obliviator_khop_chained"
 CONVERT_AML_1HOP = PROJECT_DIR / "obl-radix" / "baselines" / "obliviatorFK-TDX" / "convert_aml_1hop.py"
+
+# AML W4 payload widths for obliviator_khop_chained (account .data = "id,bank";
+# txn .data = "txn_id,acc_to,amount,txn_time").
+OBL_ACCT_COLS = 2
+OBL_TXN_COLS = 4
 
 DEFAULT_DATASET = "ibm_aml_hi_small"
 
@@ -237,12 +245,15 @@ def generate_obliviator_src_txt(data_dir: Path, out_dir: Path, log_file) -> Path
     return src_path
 
 
-def run_obliviator(K: int, src_txt: Path, threads: int, log_file,
+def run_obliviator(K: int, shape: str, src_txt: Path, threads: int, log_file,
                    timeout=None) -> tuple:
-    """Run obliviator_khop_chained (all E4 chains have K >= 2)."""
+    """Run obliviator_khop_chained (all E4 queries have K >= 2 edges).
+    shape is chain/fanin/fanout — passed through to the binary along with
+    the AML payload widths."""
     with tempfile.TemporaryDirectory() as tmp:
         out_csv = Path(tmp) / "obl_out.csv"
-        cmd = [OBL_KHOP_BIN, str(threads), str(K), src_txt, out_csv]
+        cmd = [OBL_KHOP_BIN, str(threads), str(K), src_txt, out_csv,
+               str(OBL_ACCT_COLS), str(OBL_TXN_COLS), shape]
         stdout = run_capture(cmd, log_file=log_file, timeout=timeout)
     return parse_obliviator_total_ms(stdout), parse_obliviator_rows(stdout)
 
@@ -310,11 +321,13 @@ def collect_metadata(args) -> dict:
             "E4 varies join-graph topology at one dataset scale; the 4-edge "
             "quartet (4-hop chain, fan-in, fan-out, tree) is size-matched. "
             "one-hop runs once per repetition and its cost is inherited by "
-            "every nebuladb cell in that rep. obliviator_chained only runs "
-            "chain shapes (its kernel is a path pipeline); non-chain shapes "
-            "are recorded UNSUPPORTED. For the unfiltered systems "
-            "(obliviator_chained, full_mwj_no_filter) a failure at E edges "
-            "skips all queries with >= E edges (SKIPPED)."
+            "every nebuladb cell in that rep. obliviator_chained runs chain, "
+            "fanin, and fanout via the kernel's shape argument (AML payload "
+            "widths 2,4); the tree shape needs a multi-key repack the kernel "
+            "does not have and is recorded UNSUPPORTED. For the unfiltered "
+            "systems (obliviator_chained, full_mwj_no_filter) a failure at "
+            "E edges skips queries of the SAME shape with >= E edges "
+            "(SKIPPED); other shapes still get their own attempt."
         ),
     }
 
@@ -402,8 +415,10 @@ def main():
     rows = []
     total_reps = args.warmup_runs + args.measurement_runs
 
-    # Per-system smallest edge count at which an unfiltered system failed;
-    # queries with >= that many edges are then SKIPPED for it.
+    # Per-(system, shape) smallest edge count at which an unfiltered system
+    # failed; queries of the same shape with >= that many edges are then
+    # SKIPPED for it. Keyed by shape so a chain failure doesn't suppress the
+    # independent fan-in/fan-out attempts.
     failed_at_edges = {}
 
     with open(log_path, "w") as log_file:
@@ -462,12 +477,13 @@ def main():
                         cell_mwj_ms = ""
                         cell_rows = None
 
-                        if system == "obliviator_chained" and shape != "chain":
-                            # The chained kernel is a path pipeline; it cannot
-                            # express branching topologies.
+                        if system == "obliviator_chained" and shape == "tree":
+                            # chain/fanin/fanout run via the kernel's shape
+                            # argument; tree needs a multi-key repack the
+                            # kernel does not have.
                             cell_rows = "UNSUPPORTED"
-                        elif (system in failed_at_edges
-                              and edges >= failed_at_edges[system]):
+                        elif ((system, shape) in failed_at_edges
+                              and edges >= failed_at_edges[(system, shape)]):
                             cell_rows = "SKIPPED"
                         else:
                             # OOM-tolerant: a crash / OOM-kill / timeout is
@@ -492,7 +508,7 @@ def main():
                                     cell_rows = mwj_rows
                                 elif system == "obliviator_chained":
                                     obl_ms, obl_rows = run_obliviator(
-                                        edges, obliviator_src_txt,
+                                        edges, shape, obliviator_src_txt,
                                         args.obliviator_threads, log_file,
                                         timeout=obliviator_timeout)
                                     cell_total_ms = obl_ms
@@ -502,8 +518,9 @@ def main():
                                 log_file.write(f"\n!!! {system} {kind} at {query}: {e}\n")
                                 log_file.flush()
                                 if system in UNFILTERED_SYSTEMS:
-                                    failed_at_edges[system] = min(
-                                        failed_at_edges.get(system, edges), edges)
+                                    failed_at_edges[(system, shape)] = min(
+                                        failed_at_edges.get((system, shape), edges),
+                                        edges)
                                 cell_rows = kind
                                 cell_total_ms = None
 

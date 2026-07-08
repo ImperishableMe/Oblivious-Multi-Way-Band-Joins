@@ -541,6 +541,16 @@ def main():
             continue
         by_cell.setdefault((r["system"], r["query"], r["dataset"]), []).append(r)
 
+    # A cell whose measured runs were all SKIPPED may have actually failed in
+    # an earlier (e.g. warm-up) rep — the skip only suppresses re-grinding a
+    # known failure. Report the original failure kind for that cell, not
+    # SKIPPED, so the summary distinguishes "this query failed" (OOM/TIMEOUT)
+    # from "not attempted because a smaller query failed" (SKIPPED).
+    fail_kind = {}
+    for r in rows:
+        if r["output_rows"] in ("OOM", "TIMEOUT"):
+            fail_kind[(r["system"], r["query"], r["dataset"])] = r["output_rows"]
+
     with open(summary_csv_path, "w", newline="") as f:
         sw = csv.DictWriter(f, fieldnames=[
             "system", "query", "shape", "edges", "dataset", "n_runs",
@@ -552,11 +562,14 @@ def main():
             totals = [c["total_ms"] for c in cell if c["total_ms"] is not None]
             n = len(totals)
             if n == 0:
+                token = cell[0]["output_rows"]
+                if token == "SKIPPED":
+                    token = fail_kind.get((system, query, dataset), token)
                 sw.writerow({
                     "system": system, "query": query, "shape": shape,
                     "edges": edges, "dataset": dataset, "n_runs": 0,
                     "median_ms": "", "min_ms": "", "max_ms": "", "stddev_ms": "",
-                    "output_rows": cell[0]["output_rows"],
+                    "output_rows": token,
                 })
                 continue
             sw.writerow({

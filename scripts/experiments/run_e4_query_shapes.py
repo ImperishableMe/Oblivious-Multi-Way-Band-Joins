@@ -103,7 +103,9 @@ DEFAULT_QUERIES = list(QUERY_SHAPES)
 
 DEFAULT_SYSTEMS = ["nebuladb", "full_mwj_no_filter", "obliviator_chained"]
 # Systems whose output grows with edge count (they compute the *unfiltered*
-# join): once one fails at E edges, every query with >= E edges is skipped.
+# join): once one fails at E edges, every query of the SAME shape with
+# >= E edges is skipped. Other shapes are independent patterns and still
+# get their own attempt.
 UNFILTERED_SYSTEMS = {"obliviator_chained", "full_mwj_no_filter"}
 
 

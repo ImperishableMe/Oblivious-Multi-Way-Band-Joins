@@ -261,18 +261,23 @@ queries because extending it beyond chains requires a non-trivial wrapper.
 \toprule
 \textbf{Query} & \textbf{Edges} & {\textbf{Unfiltered size}} & \textbf{Filtered size} & \textbf{\system} & \textbf{Full MWJ} & \textbf{Obliviator} \\
 \midrule
-1-hop & 1 & 5.1M & & & &\\
-2-hop  & 2 & 355M & & 43\,s & OOM &\\
-3-hop & 3 & 6.6B & & 84\,s & OOM &\\
-4-hop & 4 & 134B & & 137\,s & OOM &\\
-fan-in & 4 & 1.7T & 8M & 254\,s & OOM &\\
-fan-out & 4 & $9.2{\times}10^{20}$ & 9.7M & 281\,s & OOM &\\
-tree & 4 & $6.9{\times}10^{14}$ & 4.2M & 194\,s & OOM &\\
+1-hop & 1 & 5.1M & --- & 0.35\,s & 97\,s & 0.44\,s\\
+2-hop  & 2 & 355M & 8.0K & 43\,s & OOM & 1255\,s\\
+3-hop & 3 & 6.6B & 78K & 84\,s & OOM & $>$1\,h\\
+4-hop & 4 & 134B & 1.0M & 137\,s & OOM & $>$1\,h$^\dagger$\\
+fan-in & 4 & 1.7T & 8.0M & 254\,s & OOM & n/a\\
+fan-out & 4 & $9.2{\times}10^{20}$ & 9.7M & 281\,s & OOM & n/a\\
+tree & 4 & $6.9{\times}10^{14}$ & 4.2M & 194\,s & OOM & n/a\\
 \bottomrule
 \end{tabular}
-\caption{Query topologies on AML HI-Small. ``Unfiltered rows'' is the
+\caption{Query topologies on AML HI-Small. ``Unfiltered size'' is the
 exact size of the intermediate a join-then-filter system must materialize.
-Full MWJ exhausts the machine's RAM on every topology; Obliviator....}
+Full MWJ exhausts the machine's RAM on every query beyond 1-hop;
+Obliviator supports only chain queries (n/a on fan-in, fan-out, and tree)
+and exceeds the one-hour budget at 3-hop; $\dagger$ marks the 4-hop
+instance not attempted because the strictly smaller 3-hop instance already
+timed out. The 1-hop query carries no anchor filter --- all three systems
+compute the same 5.1M-row one-hop join, so no filtered size is reported.}
 \end{table*}
 
 % \Cref{tab:shapes} shows the results. \system completes every topology in

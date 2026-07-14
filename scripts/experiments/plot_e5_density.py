@@ -2,14 +2,13 @@
 """
 E5 output-sensitivity plot (docs/e5_output_sensitivity.md).
 
-Reads the summary.csv written by run_e5_density.py and renders two panels:
-
-  (a) Setup — per density variant, unfiltered vs anchor-filtered 2-hop output
-      rows (log scale, grouped bars). Input size is identical everywhere; only
-      the outputs diverge.
-  (b) Result — latency vs unfiltered 2-hop output rows, log-log, one line per
-      system. Baselines are expected to track the unfiltered output (slope ~1
-      guide shown); Graphite stays flat.
+Reads the summary.csv written by run_e5_density.py and renders a single panel:
+latency vs unfiltered 2-hop output rows, log-log, one line per system.
+Baselines are expected to track the unfiltered output (slope ~1 guide shown);
+Graphite stays flat. The experimental setup (identical input everywhere, only
+the hub fraction p — and hence the unfiltered output — changes, while the
+filtered output stays tiny) is stated in the figure caption; each x tick
+carries its variant's p so the knob remains visible in the plot itself.
 
 System presentation names per CLAUDE.md ("Experiment Comparison Systems"):
 nebuladb -> Graphite, obliviator_chained -> Obliviator chained,
@@ -33,7 +32,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_SUMMARY = PROJECT_DIR / "results" / "e5_density" / "summary.csv"
@@ -46,8 +44,6 @@ SYSTEMS = [
     ("obliviator_chained", "Obliviator chained", "#1baf7a"),
     ("full_mwj_no_filter", "Full MWJ", "#eda100"),
 ]
-
-UNFILTERED_BAR = "#b3b1a7"  # neutral: the outputs panel is setup, not identity
 
 INK = "#0b0b0b"
 MUTED = "#898781"
@@ -104,40 +100,8 @@ def main():
     order = sorted(variants, key=lambda d: variants[d]["p"])
     by_cell = {(c["system"], c["dataset"]): c for c in cells}
 
-    fig, (ax_a, ax_b) = plt.subplots(
-        1, 2, figsize=(9.6, 3.6), dpi=200, gridspec_kw={"width_ratios": [1, 1.35]})
+    fig, ax = plt.subplots(figsize=(5.6, 3.6), dpi=200)
     fig.patch.set_facecolor("white")
-
-    # ------------------------------------------------------------------ (a)
-    ax = ax_a
-    ax.set_facecolor("white")
-    bar_w = 0.38
-    for di, d in enumerate(order):
-        v = variants[d]
-        for off, val, color in ((-bar_w / 2, v["unfiltered"], UNFILTERED_BAR),
-                                (bar_w / 2, max(v["filtered"], 1), "#2a78d6")):
-            ax.bar(di + off, val, width=bar_w * 0.92, color=color,
-                   edgecolor="white", linewidth=0.6, zorder=3)
-            ax.annotate(fmt_rows(val), (di + off, val), xytext=(0, 3),
-                        textcoords="offset points", ha="center", va="bottom",
-                        fontsize=7, color=INK, zorder=4)
-    ax.set_yscale("log")
-    ymax = max(v["unfiltered"] for v in variants.values())
-    ax.set_ylim(1, ymax * 8)
-    ax.set_ylabel("2-hop output rows (log scale)", fontsize=9, color=INK)
-    ax.set_xticks(range(len(order)))
-    ax.set_xticklabels([f"{d}\np={variants[d]['p']:g}" for d in order],
-                       fontsize=8, color=INK)
-    edges = variants[order[0]]["edges"]
-    ax.set_title(f"(a) Same input ({fmt_rows(edges)} edges), diverging outputs",
-                 fontsize=9.5, color=INK)
-    ax.legend(handles=[Patch(facecolor=UNFILTERED_BAR, label="unfiltered join"),
-                       Patch(facecolor="#2a78d6", label="after filter")],
-              fontsize=7.5, frameon=False, ncol=2, loc="upper center",
-              bbox_to_anchor=(0.5, -0.18))
-
-    # ------------------------------------------------------------------ (b)
-    ax = ax_b
     ax.set_facecolor("white")
     max_val = 0.0
 
@@ -222,32 +186,31 @@ def main():
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_ylim(floor_s, max_val * 6)
-    # One tick per variant; suppress minor log ticks that collide at this span.
+    # One tick per variant, annotated with its hub fraction so the density
+    # knob stays visible; suppress minor log ticks that collide at this span.
     variant_xs = [variants[d]["unfiltered"] for d in order]
     ax.set_xticks(variant_xs)
-    ax.set_xticklabels([fmt_rows(x) for x in variant_xs])
+    ax.set_xticklabels([f"{fmt_rows(variants[d]['unfiltered'])}\n"
+                        f"p={variants[d]['p']:g}" for d in order])
     ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
     ax.xaxis.set_minor_locator(matplotlib.ticker.NullLocator())
     ax.set_xlabel("Unfiltered 2-hop output rows (log scale)", fontsize=9,
                   color=INK)
     ax.set_ylabel("Latency (s, log scale)", fontsize=9, color=INK)
-    ax.set_title("(b) Latency vs unfiltered output size", fontsize=9.5,
-                 color=INK)
     ax.legend(handles=[Line2D([], [], color=c, marker="o", markersize=5,
                               linewidth=2, markeredgecolor="white", label=n)
                        for _, n, c in SYSTEMS],
               fontsize=7.5, frameon=False, loc="lower left")
 
-    for ax in (ax_a, ax_b):
-        ax.yaxis.grid(True, color=GRID, linewidth=0.7, zorder=0)
-        ax.set_axisbelow(True)
-        for spine in ("top", "right"):
-            ax.spines[spine].set_visible(False)
-        for spine in ("left", "bottom"):
-            ax.spines[spine].set_color(BASELINE)
-        ax.tick_params(colors=MUTED, labelsize=8)
-        for lbl in ax.get_xticklabels() + ax.get_yticklabels():
-            lbl.set_color(INK)
+    ax.yaxis.grid(True, color=GRID, linewidth=0.7, zorder=0)
+    ax.set_axisbelow(True)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    for spine in ("left", "bottom"):
+        ax.spines[spine].set_color(BASELINE)
+    ax.tick_params(colors=MUTED, labelsize=8)
+    for lbl in ax.get_xticklabels() + ax.get_yticklabels():
+        lbl.set_color(INK)
 
     fig.tight_layout()
     for ext in ("png", "pdf"):

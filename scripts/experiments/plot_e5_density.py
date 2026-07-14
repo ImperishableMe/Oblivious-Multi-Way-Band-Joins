@@ -4,8 +4,8 @@ E5 output-sensitivity plot (docs/e5_output_sensitivity.md).
 
 Reads the summary.csv written by run_e5_density.py and renders a single panel:
 latency vs unfiltered 2-hop output rows, log-log, one line per system.
-Baselines are expected to track the unfiltered output (slope ~1 guide shown);
-Graphite stays flat. The experimental setup (identical input everywhere, only
+Baselines are expected to track the unfiltered output; Graphite stays flat.
+The experimental setup (identical input everywhere, only
 the hub fraction p — and hence the unfiltered output — changes, while the
 filtered output stays tiny) is stated in the figure caption; each x tick
 carries its variant's p so the knob remains visible in the plot itself.
@@ -135,22 +135,6 @@ def main():
     max_val = max(max_val, floor_s)
 
     fail_texts_drawn = set()  # one "OOM"/bound label per (variant, kind)
-
-    # Slope-1 guide (cost proportional to unfiltered output), anchored to the
-    # Full MWJ series when present.
-    guide_key = ("full_mwj_no_filter"
-                 if series.get("full_mwj_no_filter", ([],))[0]
-                 else "obliviator_chained")
-    gx, gy = series.get(guide_key, ([], [], []))[:2]
-    if len(gx) >= 2:
-        x0, x1 = gx[0], gx[-1]
-        y0 = gy[0]
-        ax.plot([x0, x1], [y0, y0 * x1 / x0], linestyle=(0, (4, 3)),
-                color=BASELINE, linewidth=1.2, zorder=1)
-        xm = (x0 * x1) ** 0.5
-        ax.annotate("slope 1 (∝ output)", (xm, y0 * xm / x0),
-                    xytext=(6, -14), textcoords="offset points",
-                    ha="left", fontsize=7, color=MUTED)
 
     for si, (key, disp, color) in enumerate(SYSTEMS):
         xs, ys, fails = series[key]

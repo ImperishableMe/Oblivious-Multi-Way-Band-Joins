@@ -257,9 +257,8 @@ chain.
 share an identical input (1M accounts, 5M edges) and differ only in the
 hub fraction $p$, which grows the unfiltered 2-hop join from 26M to 362M
 rows while the filtered output of the anchored query stays below 2K rows.
-\system is flat across the sweep; baseline latency tracks the unfiltered
-intermediate (slope ${\approx}1$ on the log--log axes) until Full MWJ
-runs out of memory.}
+\system is flat across the sweep; baseline latency grows in proportion to
+the unfiltered intermediate until Full MWJ runs out of memory.}
 \label{fig:density}
 \end{figure}
 

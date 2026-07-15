@@ -1,0 +1,24 @@
+\section{Implementation}
+\label{sec:implementation}
+
+We briefly describe how \system realizes the oblivious primitives of
+\cref{sub:obl-primitives}. \cmpset is implemented with branchless
+conditional-move instructions; rows are laid out in 64-byte blocks, so
+obliviously selecting or swapping an entire row compiles to a single SIMD
+masked-blend instruction. All higher-level operators are built on this
+primitive: \textsc{OSort} is a bitonic sorting
+network~\cite{batcher1968sorting}, \textsc{OCompact} is
+ORCompact~\cite{sasy2022fast}, and \oht follows
+H2O2RAM~\cite{zheng2025h2o2ram}, employing a planner that selects among
+linear scan, bucket hash, stashless Cuckoo hash, and two-tier hash based on
+the public table size and lookup count. Notably, \textsc{Dedup} and
+\textsc{Redup} require no generic sort-and-compaction: since edge lists are
+stored sorted by endpoint, each is a single linear pass that uses \cmpset
+to obliviously suppress a duplicate row (replacing it with a dummy) or
+restore a suppressed one (copying the preceding row forward). Finally,
+\system parallelizes all of its operators, but every parallel schedule is
+derived exclusively from public parameters --- the fixed structure of the
+sorting and compaction networks, the chunking of linear passes by public
+table sizes, and the concurrent execution of the source and destination
+branches of \onehop --- so parallel execution reveals nothing beyond the
+sequential trace.

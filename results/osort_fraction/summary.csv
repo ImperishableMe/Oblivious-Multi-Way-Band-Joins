@@ -1,0 +1,4 @@
+dataset,query,output_rows,total_s,sort_total_s,sort_count,sort_fraction,bottom_up_s,bottom_up_sort_s,bottom_up_sorts,top_down_s,top_down_sort_s,top_down_sorts,distribute_expand_s,distribute_expand_sort_s,distribute_expand_sorts,align_concat_s,align_concat_sort_s,align_concat_sorts
+banking_1k,banking_2hop --no-filter,4823,2.239845,2.188544,37,0.9771,0.720343,0.716960,12,0.724217,0.721045,12,0.302855,0.285789,5,0.492425,0.464749,8
+banking_200k,banking_2hop --no-filter,4181443,98.343552,12.439177,37,0.1265,7.455617,2.352881,12,7.374317,2.349220,12,40.494389,0.408405,5,43.019225,7.328671,8
+banking_1M,banking_2hop --no-filter,23264179,593.445076,79.860938,37,0.1346,42.491637,15.761614,12,42.613388,15.798280,12,263.533505,1.653129,5,244.806539,46.647915,8

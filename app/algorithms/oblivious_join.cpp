@@ -37,23 +37,45 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, const std::vector<FilterCondi
     auto start_time = Clock::now();
     auto phase_start = Clock::now();
 
+    // Per-phase oblivious-sort attribution: every sort funnels through
+    // Table::shuffle_merge_sort, so snapshotting its process-wide totals
+    // between phases yields each phase's sort time and count.
+    Table::reset_sort_stats();
+    double sort_snap_s = 0.0;
+    size_t sort_snap_n = 0;
+    auto take_sort_delta = [&sort_snap_s, &sort_snap_n](double& dt, size_t& dn) {
+        double now_s = Table::get_sort_time_seconds();
+        size_t now_n = Table::get_sort_count();
+        dt = now_s - sort_snap_s;
+        dn = now_n - sort_snap_n;
+        sort_snap_s = now_s;
+        sort_snap_n = now_n;
+    };
+    double bottom_up_sort_time, top_down_sort_time, distribute_expand_sort_time,
+           align_concat_sort_time;
+    size_t bottom_up_sorts, top_down_sorts, distribute_expand_sorts,
+           align_concat_sorts;
+
     // Phase 1: Bottom-Up - Compute local multiplicities (with filters applied)
     phase_start = Clock::now();
     BottomUpPhase::Execute(root, filters);
     auto bottom_up_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t bottom_up_size = GetTotalTreeSize(root);
+    take_sort_delta(bottom_up_sort_time, bottom_up_sorts);
 
     // Phase 2: Top-Down - Compute final multiplicities
     phase_start = Clock::now();
     TopDownPhase::Execute(root);
     auto top_down_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t top_down_size = GetTotalTreeSize(root);
+    take_sort_delta(top_down_sort_time, top_down_sorts);
 
     // Phase 3: Distribute-Expand - Replicate tuples
     phase_start = Clock::now();
     DistributeExpand::Execute(root);
     auto distribute_expand_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t distribute_expand_size = GetTotalTreeSize(root);
+    take_sort_delta(distribute_expand_sort_time, distribute_expand_sorts);
 
     // Phase 4: Align-Concat - Construct result
     AlignConcat::ResetSortingMetrics();  // Reset metrics before execution
@@ -61,6 +83,7 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, const std::vector<FilterCondi
     Table result = AlignConcat::Execute(root);
     auto align_concat_time = std::chrono::duration<double>(Clock::now() - phase_start).count();
     size_t align_concat_size = result.size();  // Final result size
+    take_sort_delta(align_concat_sort_time, align_concat_sorts);
 
     // Calculate total time
     auto total_time = std::chrono::duration<double>(Clock::now() - start_time).count();
@@ -77,6 +100,16 @@ Table ObliviousJoin::Execute(JoinTreeNodePtr root, const std::vector<FilterCondi
            bottom_up_size, top_down_size, distribute_expand_size, align_concat_size);
     printf("ALIGN_CONCAT_SORTS: Total=%.6fs, Accumulator=%.6fs, Child=%.6fs\n",
            sort_time, acc_sort_time, child_sort_time);
+    double total_sort_time = Table::get_sort_time_seconds();
+    printf("SORT_TIMING: Bottom-Up=%.6f/%zu Top-Down=%.6f/%zu "
+           "Distribute-Expand=%.6f/%zu Align-Concat=%.6f/%zu "
+           "Total=%.6f/%zu Fraction=%.4f\n",
+           bottom_up_sort_time, bottom_up_sorts,
+           top_down_sort_time, top_down_sorts,
+           distribute_expand_sort_time, distribute_expand_sorts,
+           align_concat_sort_time, align_concat_sorts,
+           total_sort_time, Table::get_sort_count(),
+           total_time > 0.0 ? total_sort_time / total_time : 0.0);
 
     return result;
 }

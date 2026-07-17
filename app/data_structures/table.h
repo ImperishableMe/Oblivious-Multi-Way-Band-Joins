@@ -141,6 +141,17 @@ public:
     void shuffle_merge_sort(OpEcall op_type);
 
     /**
+     * Process-wide oblivious-sort accounting. Every shuffle_merge_sort call
+     * accumulates its wall-clock time and increments the call count; callers
+     * (ObliviousJoin::Execute) snapshot the totals between phases to attribute
+     * sort time. Callers of shuffle_merge_sort are sequential, so plain
+     * (non-atomic) accumulation is sufficient.
+     */
+    static void reset_sort_stats();
+    static double get_sort_time_seconds();
+    static size_t get_sort_count();
+
+    /**
      * DistributePass: Process pairs at given distance
      * @param distance Distance between pairs to process
      * @param op_type Operation type for core function

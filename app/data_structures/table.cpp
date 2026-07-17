@@ -4,6 +4,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <thread>
+#include <chrono>
 #include "debug_util.h"
 #include "../core_logic/core.h"
 #include "../core_logic/algorithms/oblivious_waksman.h"
@@ -461,8 +462,28 @@ bool Table::is_valid_shuffle_size(size_t n) {
     return n > 0 && (n & (n - 1)) == 0;
 }
 
+// Process-wide oblivious-sort accounting (see table.h). Sequential callers,
+// so plain accumulation suffices.
+static double g_sort_time_seconds = 0.0;
+static size_t g_sort_count = 0;
+
+void Table::reset_sort_stats() {
+    g_sort_time_seconds = 0.0;
+    g_sort_count = 0;
+}
+
+double Table::get_sort_time_seconds() {
+    return g_sort_time_seconds;
+}
+
+size_t Table::get_sort_count() {
+    return g_sort_count;
+}
+
 void Table::shuffle_merge_sort(OpEcall op_type) {
     if (entries.size() <= 1) return;
+
+    auto sort_start = std::chrono::high_resolution_clock::now();
 
     comparator_func_t cmp = get_merge_comparator(op_type);
     if (!cmp) {
@@ -496,5 +517,9 @@ void Table::shuffle_merge_sort(OpEcall op_type) {
                        const_cast<entry_t*>(&b)) != 0;
         },
         sort_threads);
+
+    g_sort_time_seconds += std::chrono::duration<double>(
+        std::chrono::high_resolution_clock::now() - sort_start).count();
+    g_sort_count += 1;
 }
 

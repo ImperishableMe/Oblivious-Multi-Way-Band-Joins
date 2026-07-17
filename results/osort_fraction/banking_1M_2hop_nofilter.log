@@ -1,0 +1,7 @@
+FILTER DISABLED (--no-filter): computing full unfiltered multi-way join
+Result: 23264179 rows
+PHASE_TIMING: Bottom-Up=42.491637 Top-Down=42.613388 Distribute-Expand=263.533505 Align-Concat=244.806539 Total=593.445076
+PHASE_SIZES: Bottom-Up=13000000 Top-Down=13000000 Distribute-Expand=116320895 Align-Concat=23264179
+ALIGN_CONCAT_SORTS: Total=46.647926s, Accumulator=30.831480s, Child=15.816446s
+SORT_TIMING: Bottom-Up=15.761614/12 Top-Down=15.798280/12 Distribute-Expand=1.653129/5 Align-Concat=46.647915/8 Total=79.860938/37 Fraction=0.1346
+Result: 23264179 rows

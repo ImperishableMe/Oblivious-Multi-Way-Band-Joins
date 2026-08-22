@@ -40,6 +40,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import known_failures
 import run_e3_cross_dataset as e3
 
 PROJECT_DIR = e3.PROJECT_DIR
@@ -182,8 +183,8 @@ def write_summary_csv(rows, path: Path):
         by_cell.setdefault((r["system"], r["dataset"]), []).append(r)
     fields = ["system", "dataset", "hub_fraction", "query", "accounts", "edges",
               "unfiltered_2hop_rows", "filtered_2hop_rows", "n_runs",
-              "median_ms", "min_ms", "max_ms", "stddev_ms", "output_rows",
-              "rows_match"]
+              "median_ms", "mean_ms", "min_ms", "max_ms", "stddev_ms",
+              "output_rows", "rows_match"]
     with open(path, "w", newline="") as f:
         sw = csv.DictWriter(f, fieldnames=fields)
         sw.writeheader()
@@ -194,11 +195,13 @@ def write_summary_csv(rows, path: Path):
                      "output_rows", "rows_match"]}
             totals = [c["total_ms"] for c in cell if c["total_ms"] is not None]
             if not totals:
-                sw.writerow({**base, "n_runs": 0, "median_ms": "", "min_ms": "",
-                             "max_ms": "", "stddev_ms": ""})
+                sw.writerow({**base, "n_runs": 0, "median_ms": "",
+                             "mean_ms": "", "min_ms": "", "max_ms": "",
+                             "stddev_ms": ""})
                 continue
             sw.writerow({**base, "n_runs": len(totals),
                          "median_ms": statistics.median(totals),
+                         "mean_ms": statistics.fmean(totals),
                          "min_ms": min(totals), "max_ms": max(totals),
                          "stddev_ms": (statistics.stdev(totals)
                                        if len(totals) >= 2 else 0.0)})
@@ -231,7 +234,10 @@ def collect_metadata(args) -> dict:
             "filtered 2-hop row counts come from each variant's stats.json "
             "and are cross-checked against every cell's output_rows "
             "(rows_match column; obliviator is perf-only). Graphite latency "
-            "= onehop_ms + mwj_ms of the same rep. See "
+            "= onehop_ms + mwj_ms of the same rep. With --known-failures, "
+            "cells listed in that CSV are asserted from their previously "
+            "observed outcome and never executed; the file's date_observed "
+            "and commit columns record when each outcome was measured. See "
             "docs/e5_output_sensitivity.md."
         ),
     }
@@ -251,10 +257,18 @@ def main():
     p.add_argument("--systems", default=",".join(ALL_SYSTEMS),
                    help=f"Comma-separated systems (default and allowed: "
                         f"{','.join(ALL_SYSTEMS)})")
-    p.add_argument("--measurement-runs", type=int, default=1,
-                   help="Recorded measurement runs per cell (default: 1)")
+    p.add_argument("--measurement-runs", type=int, default=3,
+                   help="Recorded measurement runs per cell (default: 3 — "
+                        "enough for a median with min/max whiskers)")
     p.add_argument("--warmup-runs", type=int, default=0,
                    help="Discarded warm-up runs per cell (default: 0)")
+    p.add_argument("--known-failures", default=None,
+                   help="CSV of cells already observed to fail (see "
+                        "results/known_failures/e5_density_5M.csv). Listed "
+                        "cells are recorded with their previous outcome and "
+                        "never executed — a Full MWJ OOM crawls to hundreds "
+                        "of GB before the kernel kills it, and yields no "
+                        "timing either way.")
     p.add_argument("--onehop-threads", type=int, default=64,
                    help="Threads for the one-hop driver (default: 64)")
     p.add_argument("--mwj-threads", type=int, default=64,
@@ -297,12 +311,25 @@ def main():
         if s not in ALL_SYSTEMS:
             sys.exit(f"unknown system: {s} (allowed: {ALL_SYSTEMS})")
 
+    known_fail = {}
+    if args.known_failures:
+        known_fail = known_failures.load(args.known_failures)
+        known_failures.validate(known_fail, ALL_SYSTEMS,
+                                [d["label"] for d in all_datasets],
+                                args.known_failures)
+
     cell_timeout = args.cell_timeout or None
     obl_timeout = args.obliviator_timeout or None
     data_root = Path(args.data_root)
 
     needs_onehop = "nebuladb" in systems
-    needs_obliviator = "obliviator_chained" in systems
+    # Skip the src.txt conversion for variants whose obliviator cell will not
+    # run — it is pure setup cost for a cell we are asserting, not measuring.
+    obl_datasets = [d["label"] for d in datasets
+                    if "obliviator_chained" in systems
+                    and not known_failures.outcome_for(
+                        known_fail, "obliviator_chained", d["label"])]
+    needs_obliviator = bool(obl_datasets)
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -318,7 +345,11 @@ def main():
     print(f"  data    : {data_root}")
     print(f"  output  : {out_dir}")
     print(f"  timeouts: cell={cell_timeout}s obliviator={obl_timeout}s")
+    print(f"  runs    : {args.warmup_runs} warm-up + "
+          f"{args.measurement_runs} measured per cell")
     print()
+    known_failures.announce(known_fail, args.known_failures, systems,
+                            [d["label"] for d in datasets])
 
     rows = []
     total_reps = args.warmup_runs + args.measurement_runs
@@ -366,7 +397,8 @@ def main():
 
             obl_src_txt = {}
             if needs_obliviator:
-                for spec in datasets:
+                for spec in [d for d in datasets
+                             if d["label"] in set(obl_datasets)]:
                     obl_dir = tmp_root / f"obl_{spec['label']}"
                     obl_dir.mkdir()
                     print(f"[setup] obliviator src.txt for {spec['label']}...",
@@ -404,8 +436,14 @@ def main():
                         cell_onehop_ms = ""
                         cell_mwj_ms = ""
                         cell_rows = None
+                        prior = known_failures.outcome_for(known_fail, system,
+                                                           spec["label"])
                         try:
-                            if system == "nebuladb":
+                            if prior:
+                                # Asserted from the inventory, not measured.
+                                cell_rows = prior
+                                cell_total_ms = None
+                            elif system == "nebuladb":
                                 mwj_ms, mwj_rows = e3.run_mwj(
                                     rewritten_sql, hop_dir,
                                     args.mwj_threads, log_file,
@@ -457,9 +495,10 @@ def main():
                         total_str = (f"{cell_total_ms:.1f}ms"
                                      if cell_total_ms is not None
                                      else str(cell_rows))
+                        suffix = " (known failure, not run)" if prior else ""
                         print(f"  [{spec['label']}] {system:20s} {label} -> "
                               f"total={total_str} rows={cell_rows} "
-                              f"match={rows_match}", flush=True)
+                              f"match={rows_match}{suffix}", flush=True)
                         rows.append({
                             "system": system,
                             "dataset": spec["label"],

@@ -1,0 +1,7 @@
+system,cell,outcome,date_observed,commit,note
+full_mwj_no_filter,aml_2hop,OOM,2026-07-11,e8aadd755d6417347279b2795c3defa00b44c8ad,355.1M unfiltered rows on HI-Small exhausts 471 GB under the 3600 s budget.
+full_mwj_no_filter,aml_3hop,SKIPPED,2026-07-11,e8aadd755d6417347279b2795c3defa00b44c8ad,Gated behind the 2-hop chain OOM: 6.58B unfiltered rows is strictly larger.
+full_mwj_no_filter,aml_4hop,SKIPPED,2026-07-11,e8aadd755d6417347279b2795c3defa00b44c8ad,Gated behind the 2-hop chain OOM: 133.6B unfiltered rows is strictly larger.
+full_mwj_no_filter,aml_fanin,OOM,2026-07-11,e8aadd755d6417347279b2795c3defa00b44c8ad,1.74e12 unfiltered rows; branching compounds hub degree multiplicatively (sum deg^4).
+full_mwj_no_filter,aml_fanout,OOM,2026-07-11,e8aadd755d6417347279b2795c3defa00b44c8ad,9.23e20 unfiltered rows; the intermediate alone would need roughly 1e23 bytes.
+full_mwj_no_filter,aml_tree,OOM,2026-07-11,e8aadd755d6417347279b2795c3defa00b44c8ad,6.88e14 unfiltered rows (sum in*out*g_2).

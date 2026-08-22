@@ -43,7 +43,7 @@ Correctness is checked separately by tests/test_e4_shape_correctness.py.
 
 Outputs (under results/e4_query_shapes/):
   raw_runs.csv          every run, including warm-ups
-  summary.csv           measurement runs only, per cell: n, median, min, max, stddev, output_rows
+  summary.csv           measurement runs only, per cell: n, median, mean, min, max, stddev, output_rows
   run_metadata.json     commit, host, nproc, settings
   binary_stdout.log     full stdout from every invocation
   decomposed/           the rewritten per-shape SQL actually run by nebuladb
@@ -66,6 +66,9 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import known_failures
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 RESULTS_DIR = PROJECT_DIR / "results" / "e4_query_shapes"
@@ -329,7 +332,11 @@ def collect_metadata(args) -> dict:
             "does not have and is recorded UNSUPPORTED. For the unfiltered "
             "systems (obliviator_chained, full_mwj_no_filter) a failure at "
             "E edges skips queries of the SAME shape with >= E edges "
-            "(SKIPPED); other shapes still get their own attempt."
+            "(SKIPPED); other shapes still get their own attempt. With "
+            "--known-failures, cells listed in that CSV are asserted from "
+            "their previously observed outcome and never executed; the "
+            "file's date_observed and commit columns record when each "
+            "outcome was measured."
         ),
     }
 
@@ -346,10 +353,18 @@ def main():
     p.add_argument("--systems", default=",".join(DEFAULT_SYSTEMS),
                    help=f"Comma-separated systems (default and allowed: "
                         f"{','.join(DEFAULT_SYSTEMS)}).")
-    p.add_argument("--measurement-runs", type=int, default=1,
-                   help="Recorded measurement runs per cell (default: 1)")
-    p.add_argument("--warmup-runs", type=int, default=1,
-                   help="Discarded warm-up runs per cell (default: 1)")
+    p.add_argument("--measurement-runs", type=int, default=3,
+                   help="Recorded measurement runs per cell (default: 3 — "
+                        "enough for a median with min/max whiskers)")
+    p.add_argument("--warmup-runs", type=int, default=0,
+                   help="Discarded warm-up runs per cell (default: 0)")
+    p.add_argument("--known-failures", default=None,
+                   help="CSV of cells already observed to fail (see "
+                        "results/known_failures/e4_query_shapes.csv). Listed "
+                        "cells are recorded with their previous outcome and "
+                        "never executed — Full MWJ's unfiltered intermediate "
+                        "runs to 1e12-1e20 rows on the branching shapes, so "
+                        "no attempt can produce a timing.")
     p.add_argument("--onehop-threads", type=int, default=64,
                    help="Threads passed to the one-hop driver (default: 64).")
     p.add_argument("--mwj-threads", type=int, default=64,
@@ -393,9 +408,18 @@ def main():
         if s not in DEFAULT_SYSTEMS:
             sys.exit(f"unknown system: {s} (allowed: {DEFAULT_SYSTEMS})")
 
+    known_fail = {}
+    if args.known_failures:
+        known_fail = known_failures.load(args.known_failures)
+        known_failures.validate(known_fail, DEFAULT_SYSTEMS,
+                                list(QUERY_SHAPES), args.known_failures)
+
     needs_onehop = "nebuladb" in systems
+    # An obliviator chain cell that will not run needs no binary behind it.
     needs_obliviator = "obliviator_chained" in systems and any(
-        QUERY_SHAPES[q][0] == "chain" for q in queries)
+        QUERY_SHAPES[q][0] == "chain"
+        and not known_failures.outcome_for(known_fail, "obliviator_chained", q)
+        for q in queries)
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -413,6 +437,7 @@ def main():
     print(f"  mwj_env: {meta['mwj_env'] or '(unset — sgx_app uses hardware_concurrency)'}")
     print(f"  output : {out_dir}")
     print()
+    known_failures.announce(known_fail, args.known_failures, systems, queries)
 
     rows = []
     total_reps = args.warmup_runs + args.measurement_runs
@@ -479,7 +504,12 @@ def main():
                         cell_mwj_ms = ""
                         cell_rows = None
 
-                        if system == "obliviator_chained" and shape == "tree":
+                        prior = known_failures.outcome_for(known_fail, system,
+                                                           query)
+                        if prior:
+                            # Asserted from the inventory, not measured.
+                            cell_rows = prior
+                        elif system == "obliviator_chained" and shape == "tree":
                             # chain/fanin/fanout run via the kernel's shape
                             # argument; tree needs a multi-key repack the
                             # kernel does not have.
@@ -528,8 +558,9 @@ def main():
 
                         total_str = (f"{cell_total_ms:.1f}ms" if cell_total_ms is not None
                                      else str(cell_rows))
+                        suffix = " (known failure, not run)" if prior else ""
                         print(f"  [{query}] {system:20s} {label} -> total={total_str}"
-                              f" rows={cell_rows}", flush=True)
+                              f" rows={cell_rows}{suffix}", flush=True)
                         rows.append({
                             "system": system,
                             "query": query,
@@ -573,7 +604,8 @@ def main():
     with open(summary_csv_path, "w", newline="") as f:
         sw = csv.DictWriter(f, fieldnames=[
             "system", "query", "shape", "edges", "dataset", "n_runs",
-            "median_ms", "min_ms", "max_ms", "stddev_ms", "output_rows",
+            "median_ms", "mean_ms", "min_ms", "max_ms", "stddev_ms",
+            "output_rows",
         ])
         sw.writeheader()
         for (system, query, dataset), cell in sorted(by_cell.items()):
@@ -587,14 +619,15 @@ def main():
                 sw.writerow({
                     "system": system, "query": query, "shape": shape,
                     "edges": edges, "dataset": dataset, "n_runs": 0,
-                    "median_ms": "", "min_ms": "", "max_ms": "", "stddev_ms": "",
-                    "output_rows": token,
+                    "median_ms": "", "mean_ms": "", "min_ms": "", "max_ms": "",
+                    "stddev_ms": "", "output_rows": token,
                 })
                 continue
             sw.writerow({
                 "system": system, "query": query, "shape": shape,
                 "edges": edges, "dataset": dataset, "n_runs": n,
                 "median_ms": statistics.median(totals),
+                "mean_ms": statistics.fmean(totals),
                 "min_ms": min(totals),
                 "max_ms": max(totals),
                 "stddev_ms": statistics.stdev(totals) if n >= 2 else 0.0,

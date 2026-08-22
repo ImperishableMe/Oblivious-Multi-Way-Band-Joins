@@ -48,7 +48,7 @@ so experiments read the canonical datasets without duplicating them.
 
 Outputs (under <output-dir>):
   raw_runs.csv          every run, including warm-ups
-  summary.csv           measurement runs only, per cell: n, median, min, max, stddev, output_rows
+  summary.csv           measurement runs only, per cell: n, median, mean, min, max, stddev, output_rows
   decomposed/           anchored base + rewritten queries (inspectable, untimed)
   run_metadata.json     commit, host, nproc, settings
   binary_stdout.log     full stdout from every invocation
@@ -75,6 +75,9 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import known_failures
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 
@@ -429,7 +432,8 @@ def write_summary_csv(rows, path: Path):
     with open(path, "w", newline="") as f:
         sw = csv.DictWriter(f, fieldnames=[
             "system", "dataset", "workload", "query", "edges", "n_runs",
-            "median_ms", "min_ms", "max_ms", "stddev_ms", "output_rows",
+            "median_ms", "mean_ms", "min_ms", "max_ms", "stddev_ms",
+            "output_rows",
         ])
         sw.writeheader()
         for (system, dataset), cell in sorted(by_cell.items()):
@@ -438,12 +442,14 @@ def write_summary_csv(rows, path: Path):
                     "edges": cell[0]["edges"]}
             totals = [c["total_ms"] for c in cell if c["total_ms"] is not None]
             if not totals:
-                sw.writerow({**base, "n_runs": 0, "median_ms": "", "min_ms": "",
-                             "max_ms": "", "stddev_ms": "",
+                sw.writerow({**base, "n_runs": 0, "median_ms": "",
+                             "mean_ms": "", "min_ms": "", "max_ms": "",
+                             "stddev_ms": "",
                              "output_rows": cell[0]["output_rows"]})
                 continue
             sw.writerow({**base, "n_runs": len(totals),
                          "median_ms": statistics.median(totals),
+                         "mean_ms": statistics.fmean(totals),
                          "min_ms": min(totals), "max_ms": max(totals),
                          "stddev_ms": (statistics.stdev(totals)
                                        if len(totals) >= 2 else 0.0),
@@ -481,7 +487,12 @@ def collect_metadata(args) -> dict:
             "next-hop key column is correct on every workload. Any binary "
             "OOM/crash/timeout is recorded per cell (output_rows=OOM/TIMEOUT, "
             "total_ms empty) and never aborts the sweep; datasets are "
-            "independent, no cross-dataset skipping."
+            "independent, no cross-dataset skipping. With --known-failures, "
+            "cells listed in that CSV are asserted from their previously "
+            "observed outcome and never executed — they carry no timing to "
+            "measure, and their per-attempt cost (an hour for the obliviator "
+            "hi_large timeout) buys nothing at n>1. The file's date_observed "
+            "and commit columns record when each outcome was measured."
         ),
     }
 
@@ -500,11 +511,18 @@ def main():
     p.add_argument("--systems", default=",".join(ALL_SYSTEMS),
                    help=f"Comma-separated systems (default and allowed: "
                         f"{','.join(ALL_SYSTEMS)})")
-    p.add_argument("--measurement-runs", type=int, default=1,
-                   help="Recorded measurement runs per cell (default: 1)")
+    p.add_argument("--measurement-runs", type=int, default=3,
+                   help="Recorded measurement runs per cell (default: 3 — "
+                        "enough for a median with min/max whiskers)")
     p.add_argument("--warmup-runs", type=int, default=0,
                    help="Discarded warm-up runs per cell (default: 0 — cells "
                         "are minutes-to-hours long at 2-hop)")
+    p.add_argument("--known-failures", default=None,
+                   help="CSV of cells already observed to fail (see "
+                        "results/known_failures/e3_cross_dataset.csv). Listed "
+                        "cells are recorded with their previous outcome and "
+                        "never executed — re-grinding them costs an hour per "
+                        "obliviator timeout and yields no timing either way.")
     p.add_argument("--onehop-threads", type=int, default=64,
                    help="Threads for the one-hop driver (default: 64)")
     p.add_argument("--mwj-threads", type=int, default=64,
@@ -550,12 +568,26 @@ def main():
         sys.exit(f"obliviator_chained requires 2 <= hop <= 5 (got {K}); "
                  f"drop it from --systems for other hop counts")
 
+    known = {}
+    if args.known_failures:
+        known = known_failures.load(args.known_failures)
+        known_failures.validate(known, ALL_SYSTEMS,
+                                [d["label"] for d in DATASETS],
+                                args.known_failures)
+
     cell_timeout = args.cell_timeout or None
     obl_timeout = args.obliviator_timeout or None
     data_root = Path(args.data_root)
 
     needs_onehop = "nebuladb" in systems
-    needs_obliviator = "obliviator_chained" in systems
+    # A dataset needs obliviator setup only if its obliviator cell will
+    # actually run; the hi_large src.txt alone is ~8 GB to convert, so a
+    # known-failed cell must not drag its preparation along.
+    obl_datasets = [d["label"] for d in datasets
+                    if "obliviator_chained" in systems
+                    and not known_failures.outcome_for(
+                        known, "obliviator_chained", d["label"])]
+    needs_obliviator = bool(obl_datasets)
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -571,7 +603,11 @@ def main():
     print(f"  data    : {data_root}")
     print(f"  output  : {out_dir}")
     print(f"  timeouts: cell={cell_timeout}s obliviator={obl_timeout}s")
+    print(f"  runs    : {args.warmup_runs} warm-up + "
+          f"{args.measurement_runs} measured per cell")
     print()
+    known_failures.announce(known, args.known_failures, systems,
+                            [d["label"] for d in datasets])
 
     rows = []
     total_reps = args.warmup_runs + args.measurement_runs
@@ -634,7 +670,8 @@ def main():
             # across reps).
             obl_src_txt = {}
             if needs_obliviator:
-                for spec in datasets:
+                for spec in [d for d in datasets
+                             if d["label"] in set(obl_datasets)]:
                     wf = WORKLOADS[spec["workload"]]
                     obl_data_dir = data_root / spec.get("obl_dir_name",
                                                         spec["dir_name"])
@@ -678,8 +715,14 @@ def main():
                         cell_onehop_ms = ""
                         cell_mwj_ms = ""
                         cell_rows = None
+                        prior = known_failures.outcome_for(known, system,
+                                                           spec["label"])
                         try:
-                            if system == "nebuladb":
+                            if prior:
+                                # Asserted from the inventory, not measured.
+                                cell_rows = prior
+                                cell_total_ms = None
+                            elif system == "nebuladb":
                                 mwj_ms, mwj_rows = run_mwj(
                                     prep["rewritten"], hop_dir,
                                     args.mwj_threads, log_file,
@@ -715,8 +758,10 @@ def main():
                         total_str = (f"{cell_total_ms:.1f}ms"
                                      if cell_total_ms is not None
                                      else str(cell_rows))
+                        suffix = " (known failure, not run)" if prior else ""
                         print(f"  [{spec['label']}] {system:20s} {label} -> "
-                              f"total={total_str} rows={cell_rows}", flush=True)
+                              f"total={total_str} rows={cell_rows}{suffix}",
+                              flush=True)
                         rows.append({
                             "system": system,
                             "dataset": spec["label"],

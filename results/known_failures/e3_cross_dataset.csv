@@ -1,0 +1,4 @@
+system,cell,outcome,date_observed,commit,note
+full_mwj_no_filter,hi_small,OOM,2026-07-07,1db0d288cef8e8c03459d16bc30c3f0f6606b3b2,Unfiltered 2-hop intermediate is 355.1M rows (sum in*out); exhausts 471 GB before completing.
+full_mwj_no_filter,hi_large,OOM,2026-07-07,1db0d288cef8e8c03459d16bc30c3f0f6606b3b2,179.7M edges; unfiltered 2-hop intermediate is far past the 471 GB budget even on the slim txn table.
+obliviator_chained,hi_large,TIMEOUT,2026-07-07,1db0d288cef8e8c03459d16bc30c3f0f6606b3b2,Exceeded the 3600 s obliviator budget; the chained kernel materializes each hop at true cardinality.

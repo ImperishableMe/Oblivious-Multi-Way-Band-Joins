@@ -1,0 +1,3 @@
+system,cell,outcome,date_observed,commit,note
+full_mwj_no_filter,medium,OOM,2026-07-08,5adf974dc2397a129b66102e2ce6181bcb462fd3,hub_fraction 0.20; 123.6M unfiltered 2-hop rows exhausts 471 GB. Full MWJ completes uniform (26.1M) and low (49.5M) at this tier.
+full_mwj_no_filter,high,OOM,2026-07-08,5adf974dc2397a129b66102e2ce6181bcb462fd3,hub_fraction 0.35; 362.1M unfiltered 2-hop rows exhausts 471 GB.

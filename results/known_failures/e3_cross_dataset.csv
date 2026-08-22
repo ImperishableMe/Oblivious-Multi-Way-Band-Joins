@@ -1,4 +1,8 @@
 system,cell,outcome,date_observed,commit,note
 full_mwj_no_filter,hi_small,OOM,2026-07-07,1db0d288cef8e8c03459d16bc30c3f0f6606b3b2,Unfiltered 2-hop intermediate is 355.1M rows (sum in*out); exhausts 471 GB before completing.
+full_mwj_no_filter,snb_sf30,OOM,2026-07-14,06383ca0f2b3178588f6b77ee3e0ce3902f1ef28,Dense small-world graph (avg degree 73); 3.3B unfiltered 2-hop rows from only 12.0M edges.
+full_mwj_no_filter,hi_medium,OOM,2026-07-07,5adf974dc2397a129b66102e2ce6181bcb462fd3,31.9M edges with heavy-tailed hub degrees; unfiltered 2-hop intermediate exceeds 471 GB.
 full_mwj_no_filter,hi_large,OOM,2026-07-07,1db0d288cef8e8c03459d16bc30c3f0f6606b3b2,179.7M edges; unfiltered 2-hop intermediate is far past the 471 GB budget even on the slim txn table.
+obliviator_chained,snb_sf30,TIMEOUT,2026-07-14,06383ca0f2b3178588f6b77ee3e0ce3902f1ef28,Exceeded the 3600 s obliviator budget; density inflates every hop-to-hop intermediate.
+obliviator_chained,hi_medium,TIMEOUT,2026-07-07,5adf974dc2397a129b66102e2ce6181bcb462fd3,Exceeded the 3600 s obliviator budget; the chained kernel materializes each hop at true cardinality.
 obliviator_chained,hi_large,TIMEOUT,2026-07-07,1db0d288cef8e8c03459d16bc30c3f0f6606b3b2,Exceeded the 3600 s obliviator budget; the chained kernel materializes each hop at true cardinality.

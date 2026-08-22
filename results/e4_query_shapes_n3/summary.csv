@@ -1,0 +1,13 @@
+system,query,shape,edges,dataset,n_runs,median_ms,mean_ms,min_ms,max_ms,stddev_ms,output_rows
+full_mwj_no_filter,aml_2hop,chain,2,ibm_aml_hi_small,0,,,,,,OOM
+full_mwj_no_filter,aml_3hop,chain,3,ibm_aml_hi_small,0,,,,,,SKIPPED
+full_mwj_no_filter,aml_4hop,chain,4,ibm_aml_hi_small,0,,,,,,SKIPPED
+full_mwj_no_filter,aml_fanin,fanin,4,ibm_aml_hi_small,0,,,,,,OOM
+full_mwj_no_filter,aml_fanout,fanout,4,ibm_aml_hi_small,0,,,,,,OOM
+full_mwj_no_filter,aml_tree,tree,4,ibm_aml_hi_small,0,,,,,,OOM
+nebuladb,aml_2hop,chain,2,ibm_aml_hi_small,3,43163.299,43214.024,43005.685,43473.088,237.79436562080568,7983
+nebuladb,aml_3hop,chain,3,ibm_aml_hi_small,3,83366.294,83275.70033333333,82950.56,83510.24699999999,290.63343548588983,78141
+nebuladb,aml_4hop,chain,4,ibm_aml_hi_small,3,137782.099,137616.205,136888.23,138178.286,660.8341207980912,1040913
+nebuladb,aml_fanin,fanin,4,ibm_aml_hi_small,3,253015.186,252867.11733333333,252393.01200000002,253193.154,420.1190933263168,8005900
+nebuladb,aml_fanout,fanout,4,ibm_aml_hi_small,3,279265.502,278072.464,275510.572,279441.31799999997,2220.404418391382,9674351
+nebuladb,aml_tree,tree,4,ibm_aml_hi_small,3,193947.925,193639.83,192591.11299999998,194380.45200000002,933.6088104763304,4223700

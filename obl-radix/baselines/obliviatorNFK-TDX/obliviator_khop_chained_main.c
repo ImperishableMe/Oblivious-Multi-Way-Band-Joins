@@ -1,16 +1,37 @@
 /* obliviator_khop_chained_main.c — Obliviator NFK-based K-hop, chained.
  *
- * Banking K-hop: account a1 ⋈ txn t1 ⋈ account a2 ⋈ … ⋈ txn tK ⋈ account a_{K+1}
- *   K ∈ {2, 3, 4, 5}.  K=1 is handled by obliviator_1hop_chained (FK kernel).
+ * Supports three acyclic query shapes over the same pairwise-join loop
+ * (2K joins, one base table folded into the running intermediate per step):
  *
- * Sequential chain of 2K pairwise joins, all on the NFK kernel:
+ * chain (default):
+ *   account a1 ⋈ txn t1 ⋈ account a2 ⋈ … ⋈ txn tK ⋈ account a_{K+1}
+ *   K ∈ {2, 3, 4, 5}.  K=1 is handled by obliviator_1hop_chained (FK kernel).
  *   step 0 : a1   ⋈ t1   on a1.account_id = t1.acc_from   (FK-shape, NFK kernel)
  *   step 1 : prev ⋈ a2   on prev.acc_to   = a2.account_id (FK-shape, NFK kernel)
  *   step 2 : prev ⋈ t2   on prev.a2.id    = t2.acc_from   (true NFK)
  *   step 3 : prev ⋈ a3   on prev.acc_to   = a3.account_id (FK-shape, NFK kernel)
- *   step 4 : prev ⋈ t3   on prev.a3.id    = t3.acc_from   (true NFK)
  *   …
  *   step 2K-1 (last) : prev ⋈ a_{K+1}     (FK-shape, NFK kernel)
+ *
+ * fanout:
+ *   one hub account sends K transactions: a1 ⋈ t1..tK on acc_from, each tk
+ *   ⋈ its destination account a_{k+1}. Same alternating loop; the only
+ *   difference from chain is the repack key after each account join: it
+ *   RETURNS to the hub id (column 0 of the concat) instead of advancing to
+ *   the just-joined account. Output = ordered K-tuples of txns per hub.
+ *   step 0 : a1   ⋈ t1  on a1.account_id = t1.acc_from   (FK-shape)
+ *   step 1 : prev ⋈ a2  on prev.t1.acc_to = a2.account_id (FK-shape)
+ *   step 2 : prev ⋈ t2  on prev.HUB.id    = t2.acc_from   (true NFK)
+ *   step 3 : prev ⋈ a3  on prev.t2.acc_to = a3.account_id (FK-shape)
+ *   …
+ *
+ * fanin:
+ *   one hub account receives K transactions. Identical to fanout except the
+ *   txn side joins on acc_to: at load time (off-clock, uniformly for every
+ *   txn row) the txn's .key (acc_from) is swapped with its 2nd data column
+ *   (acc_to), so the kernel key is acc_to and acc_from rides in the payload
+ *   for the spoke-account joins. The swap is input preparation independent
+ *   of row values' distribution, so obliviousness is unaffected.
  *
  * NFK is correct on FK-shaped joins (cross-product degenerates to 1:N when one
  * side's keys are unique). Using NFK everywhere lets us write one driver that
@@ -54,7 +75,9 @@
  *
  * CLI:
  *   ./obliviator_khop_chained <num_threads> <K> <src.txt> <output.csv> \
- *                             [<acct_cols> <txn_cols>]
+ *                             [<acct_cols> <txn_cols> [<shape>]]
+ *   <shape> ∈ {chain, fanin, fanout} (default chain). For fan shapes K is
+ *   the number of spoke transactions on the hub.
  *
  * <src.txt> is the same combined account+txn file consumed by
  * obliviator_1hop_chained (produced by the workload's convert_*_1hop.py):
@@ -88,25 +111,65 @@ extern double scalable_oblivious_join_to_array(elem_t *arr, int length1, int len
 #define MAX_HOPS 5
 #define MIN_HOPS 2
 
+enum query_shape { SHAPE_CHAIN, SHAPE_FANIN, SHAPE_FANOUT };
+
 /* Column index of the next-join-key in the cumulative concat after each step,
  * indexed by step number (0..2*MAX_HOPS-1). Filled at startup from the
- * workload's payload widths (acct_cols, txn_cols); the last step uses -1.
- * For the banking defaults (3,4) this reproduces the historical table
- * 4,7,11,14,18,21,25,28,32,-1. */
+ * workload's payload widths (acct_cols, txn_cols) and the query shape; the
+ * last step uses -1. For the banking chain defaults (3,4) this reproduces
+ * the historical table 4,7,11,14,18,21,25,28,32,-1.
+ *
+ * Even steps (just joined txn t_k) key the next join on the txn payload's
+ * 2nd column — acc_to for chain/fanout, acc_from for fanin (swapped into
+ * that slot at load time) — to attach t_k's partner account. Odd steps
+ * (just joined an account) differ by shape: chain ADVANCES the key to the
+ * just-joined account's id; the fan shapes RETURN to the hub id, which is
+ * always column 0 of the concat (the first account joined at step 0). */
 static int NEXT_KEY_COL[2 * MAX_HOPS];
 
-static void fill_next_key_cols(int num_steps, int acct_cols, int txn_cols) {
-    int total = acct_cols; /* the chain starts as a1's columns */
+static void fill_next_key_cols(int num_steps, int acct_cols, int txn_cols,
+                               enum query_shape shape) {
+    int total = acct_cols; /* the concat starts as the first account's columns */
     for (int step = 0; step < num_steps; step++) {
         if (step % 2 == 0) {
             total += txn_cols;                        /* joined txn t_k     */
-            NEXT_KEY_COL[step] = total - txn_cols + 1; /* t_k.acc_to (2nd)  */
+            NEXT_KEY_COL[step] = total - txn_cols + 1; /* t_k 2nd payload col */
         } else {
             total += acct_cols;                       /* joined account a_j */
-            NEXT_KEY_COL[step] = total - acct_cols;    /* a_j.account_id    */
+            NEXT_KEY_COL[step] = (shape == SHAPE_CHAIN)
+                ? total - acct_cols                    /* a_j.account_id     */
+                : 0;                                   /* hub id (fan shapes) */
         }
     }
     NEXT_KEY_COL[num_steps - 1] = -1; /* last step: output goes to emit */
+}
+
+/* Fan-in input prep (off-clock): swap each txn's .key (acc_from) with its 2nd
+ * data column (acc_to), so the kernel joins txns on acc_to (hub side) while
+ * acc_from rides in the payload for the spoke-account joins. Applied
+ * uniformly to every row — data-independent, so obliviousness is unaffected. */
+static void rekey_txns_for_fanin(elem_t *txns, int n_txn) {
+    char tmp[DATA_LENGTH];
+    for (int i = 0; i < n_txn; i++) {
+        char *d = txns[i].data;
+        char *c1 = strchr(d, ',');
+        if (!c1) {
+            fprintf(stderr, "fanin rekey: txn row %d has no 2nd column\n", i);
+            exit(2);
+        }
+        char *f1 = c1 + 1;              /* start of acc_to */
+        char *c2 = strchr(f1, ',');     /* end of acc_to (or NULL if last col) */
+        long long acc_to = strtoll(f1, NULL, 10);
+        int w = c2
+            ? snprintf(tmp, sizeof(tmp), "%.*s,%d%s", (int)(c1 - d), d, txns[i].key, c2)
+            : snprintf(tmp, sizeof(tmp), "%.*s,%d", (int)(c1 - d), d, txns[i].key);
+        if (w < 0 || w >= (int)sizeof(tmp)) {
+            fprintf(stderr, "fanin rekey: txn row %d overflows DATA_LENGTH\n", i);
+            exit(2);
+        }
+        memcpy(d, tmp, (size_t)w + 1);
+        txns[i].key = (int)acc_to;
+    }
 }
 
 static void *start_thread_work(void *arg) { (void)arg; thread_start_work(); return NULL; }
@@ -276,26 +339,39 @@ static void emit_worker(void *voidargs) {
 }
 
 /* ----- header builder ----------------------------------------------------
- * Constructs the output CSV header for a K-hop chain:
- *   a1.account_id,a1.balance,a1.owner_id,
- *   t1.txn_id,t1.acc_to,t1.amount,t1.txn_time,
- *   a2.account_id,a2.balance,a2.owner_id,
- *   …
- *   a_{K+1}.account_id,a_{K+1}.balance,a_{K+1}.owner_id\n
+ * Constructs the output CSV header (banking column names; for other
+ * workloads the names are cosmetic — pre-existing behavior).
+ *
+ * chain / fanout — the concat order is a1,t1,a2,t2,…,a_{K+1}, and the
+ * chain naming reads correctly for both (fanout: a1 is the hub, a_{k+1} is
+ * the destination of spoke t_k):
+ *   a1.account_id,…,t1.txn_id,t1.acc_to,…,a2.account_id,…
+ *
+ * fanin — the hub (receiver) is joined first and each txn's 2nd payload
+ * column is acc_from (swapped at load), so the header names the hub, then
+ * spoke txn t_k followed by its source account a_k:
+ *   hub.account_id,…,t1.txn_id,t1.acc_from,…,a1.account_id,…
  */
-static void build_header(char *buf, size_t cap, int K) {
+static void build_header(char *buf, size_t cap, int K, enum query_shape shape) {
+    bool fanin = (shape == SHAPE_FANIN);
     char *p = buf;
     size_t left = cap;
     for (int hop = 1; hop <= K + 1; hop++) {
         if (hop > 1) {
             int tidx = hop - 1;
-            int w = snprintf(p, left, "t%d.txn_id,t%d.acc_to,t%d.amount,t%d.txn_time,",
-                             tidx, tidx, tidx, tidx);
+            int w = snprintf(p, left, "t%d.txn_id,t%d.%s,t%d.amount,t%d.txn_time,",
+                             tidx, tidx, fanin ? "acc_from" : "acc_to", tidx, tidx);
             if (w < 0 || (size_t)w >= left) die("header buffer too small");
             p += w; left -= w;
         }
-        int w = snprintf(p, left, "a%d.account_id,a%d.balance,a%d.owner_id",
-                         hop, hop, hop);
+        int w;
+        if (fanin && hop == 1) {
+            w = snprintf(p, left, "hub.account_id,hub.balance,hub.owner_id");
+        } else {
+            int aidx = fanin ? hop - 1 : hop;
+            w = snprintf(p, left, "a%d.account_id,a%d.balance,a%d.owner_id",
+                         aidx, aidx, aidx);
+        }
         if (w < 0 || (size_t)w >= left) die("header buffer too small");
         p += w; left -= w;
         if (hop < K + 1) {
@@ -310,15 +386,17 @@ static void build_header(char *buf, size_t cap, int K) {
 
 /* ----- main -------------------------------------------------------------- */
 int main(int argc, char **argv) {
-    if (argc != 5 && argc != 7) {
+    if (argc != 5 && argc != 7 && argc != 8) {
         fprintf(stderr,
-                "usage: %s <num_threads> <K> <src.txt> <output.csv> [<acct_cols> <txn_cols>]\n"
-                "  K is the hop count (number of transactions in the chain).\n"
+                "usage: %s <num_threads> <K> <src.txt> <output.csv> [<acct_cols> <txn_cols> [<shape>]]\n"
+                "  K is the hop count (number of transactions in the chain,\n"
+                "  or of spoke transactions on the hub for the fan shapes).\n"
                 "  Valid range: %d..%d. For K=1 use obliviator_1hop_chained.\n"
                 "  acct_cols/txn_cols are the comma-column counts of the account\n"
                 "  and txn .data payloads (defaults 3 and 4 = banking W1;\n"
                 "  AML W4: 2 4; SNAP patents W3: 2 2). acc_to must be the txn\n"
-                "  payload's 2nd column.\n",
+                "  payload's 2nd column.\n"
+                "  shape is chain (default), fanin, or fanout.\n",
                 argv[0], MIN_HOPS, MAX_HOPS);
         return 1;
     }
@@ -327,12 +405,26 @@ int main(int argc, char **argv) {
     const char *src_path = argv[3];
     const char *out_csv  = argv[4];
     int acct_cols = 3, txn_cols = 4; /* banking W1 shape */
-    if (argc == 7) {
+    enum query_shape shape = SHAPE_CHAIN;
+    if (argc >= 7) {
         acct_cols = atoi(argv[5]);
         txn_cols  = atoi(argv[6]);
         if (acct_cols < 1 || txn_cols < 2) {
             fprintf(stderr, "error: acct_cols must be >= 1 and txn_cols >= 2 "
                             "(got %d, %d)\n", acct_cols, txn_cols);
+            return 1;
+        }
+    }
+    if (argc == 8) {
+        if (strcmp(argv[7], "chain") == 0) {
+            shape = SHAPE_CHAIN;
+        } else if (strcmp(argv[7], "fanin") == 0) {
+            shape = SHAPE_FANIN;
+        } else if (strcmp(argv[7], "fanout") == 0) {
+            shape = SHAPE_FANOUT;
+        } else {
+            fprintf(stderr, "error: unknown shape '%s' (chain|fanin|fanout)\n",
+                    argv[7]);
             return 1;
         }
     }
@@ -355,7 +447,7 @@ int main(int argc, char **argv) {
     total_num_threads = num_threads;
 
     int num_steps = 2 * K;
-    fill_next_key_cols(num_steps, acct_cols, txn_cols);
+    fill_next_key_cols(num_steps, acct_cols, txn_cols, shape);
 
     if (scalable_oblivious_join_init((int)num_threads) != 0) die("join init failed");
     thread_system_init();
@@ -373,6 +465,8 @@ int main(int argc, char **argv) {
         printf("Threads: 1\n");
     }
     printf("Kernel:  NFK  (non-foreign-key, general equi-join)\n");
+    printf("Shape:   %s\n", shape == SHAPE_CHAIN ? "chain"
+                            : shape == SHAPE_FANIN ? "fanin" : "fanout");
     printf("Hops:    K=%d  (%d pairwise steps)\n", K, num_steps);
     printf("Payload: acct_cols=%d txn_cols=%d\n", acct_cols, txn_cols);
 
@@ -394,6 +488,13 @@ int main(int argc, char **argv) {
     memcpy(accounts_master, loaded, (size_t)n_acc * sizeof(*accounts_master));
     memcpy(txns_master, loaded + n_acc, (size_t)n_txn * sizeof(*txns_master));
     free(loaded);
+
+    if (shape == SHAPE_FANIN) {
+        double rekey_s = now_sec();
+        rekey_txns_for_fanin(txns_master, n_txn);
+        printf("Fan-in rekey: txns now keyed by acc_to, acc_from in payload "
+               "(%.3f s, off-clock)\n", now_sec() - rekey_s);
+    }
 
     /* ============================================================
      * On-clock: 2K pairwise NFK joins, chained.
@@ -531,7 +632,7 @@ int main(int argc, char **argv) {
      * Emit (parallel format → off-clock disk write).
      * ============================================================ */
     char header[2048];
-    build_header(header, sizeof(header), K);
+    build_header(header, sizeof(header), K, shape);
 
     const size_t row_cap = 2 * DATA_LENGTH + 4;  /* "<arr1.data>,<arr2.data>\n" */
 

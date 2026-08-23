@@ -1,0 +1,60 @@
+{
+  "started_at": "2026-07-11T07:50:40+0000",
+  "git_commit": "e8aadd755d6417347279b2795c3defa00b44c8ad",
+  "git_branch": "worktree-e4-query-shapes",
+  "hostname": "tdx-guest",
+  "nproc": 120,
+  "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "args": {
+    "dataset": "ibm_aml_hi_small",
+    "queries": "aml_2hop,aml_3hop,aml_4hop,aml_fanin,aml_fanout,aml_tree",
+    "systems": "nebuladb,full_mwj_no_filter",
+    "measurement_runs": 1,
+    "warmup_runs": 1,
+    "onehop_threads": 64,
+    "mwj_threads": 64,
+    "obliviator_threads": 64,
+    "cell_timeout": 3600,
+    "obliviator_timeout": null,
+    "skip_build": true,
+    "output_dir": "results/e4_query_shapes_v2"
+  },
+  "mwj_env": {
+    "OBL_MWJ_SORT_THREADS": "64"
+  },
+  "binaries": {
+    "sgx_app": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/.claude/worktrees/e4-query-shapes/sgx_app",
+    "onehop": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/.claude/worktrees/e4-query-shapes/obligraph/build/ibm_aml_onehop",
+    "obliviator_khop_chained": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/.claude/worktrees/e4-query-shapes/obl-radix/baselines/obliviatorNFK-TDX/obliviator_khop_chained",
+    "obliviator_converter": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/.claude/worktrees/e4-query-shapes/obl-radix/baselines/obliviatorFK-TDX/convert_aml_1hop.py"
+  },
+  "query_shapes": {
+    "aml_2hop": {
+      "shape": "chain",
+      "edges": 2
+    },
+    "aml_3hop": {
+      "shape": "chain",
+      "edges": 3
+    },
+    "aml_4hop": {
+      "shape": "chain",
+      "edges": 4
+    },
+    "aml_fanin": {
+      "shape": "fanin",
+      "edges": 4
+    },
+    "aml_fanout": {
+      "shape": "fanout",
+      "edges": 4
+    },
+    "aml_tree": {
+      "shape": "tree",
+      "edges": 4
+    }
+  },
+  "note": "E4 varies join-graph topology at one dataset scale; the 4-edge quartet (4-hop chain, fan-in, fan-out, tree) is size-matched. one-hop runs once per repetition and its cost is inherited by every nebuladb cell in that rep. obliviator_chained runs chain, fanin, and fanout via the kernel's shape argument (AML payload widths 2,4); the tree shape needs a multi-key repack the kernel does not have and is recorded UNSUPPORTED. For the unfiltered systems (obliviator_chained, full_mwj_no_filter) a failure at E edges skips queries of the SAME shape with >= E edges (SKIPPED); other shapes still get their own attempt.",
+  "ended_at": "2026-07-11T10:29:52+0000"
+}

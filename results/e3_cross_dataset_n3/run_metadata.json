@@ -1,0 +1,27 @@
+{
+  "started_at": "2026-08-22T19:45:09+0000",
+  "git_commit": "7ce3a404ac03d2ce982202c90fedd30b1c7faacb",
+  "git_branch": "main",
+  "hostname": "tdx-guest",
+  "nproc": 120,
+  "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "args": {
+    "hop": 2,
+    "datasets": null,
+    "systems": "nebuladb,obliviator_chained,full_mwj_no_filter",
+    "measurement_runs": 3,
+    "warmup_runs": 0,
+    "known_failures": "results/known_failures/e3_cross_dataset.csv",
+    "onehop_threads": 64,
+    "mwj_threads": 64,
+    "obliviator_threads": 64,
+    "cell_timeout": 7200,
+    "obliviator_timeout": 3600,
+    "data_root": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/input/plaintext",
+    "output_dir": "results/e3_cross_dataset_n3",
+    "skip_build": false
+  },
+  "note": "E3 cross-dataset: one fixed chain query, all datasets, the three canonical systems (Graphite=nebuladb, Obliviator chained, Full MWJ=full_mwj_no_filter; sgx_app --no-filter). Graphite >=2-hop latency = onehop_ms + mwj_ms of the same rep. hi_large uses the slim txn table + sgx_app_slim for the Graphite/Full MWJ cells; the obliviator converter reads the full hi_large txn.csv (slim drops txn_time). obliviator_khop_chained receives the workload payload shape (banking 3 4, AML 2 4, patents 2 2, snb 2 3) so the next-hop key column is correct on every workload. Any binary OOM/crash/timeout is recorded per cell (output_rows=OOM/TIMEOUT, total_ms empty) and never aborts the sweep; datasets are independent, no cross-dataset skipping. With --known-failures, cells listed in that CSV are asserted from their previously observed outcome and never executed \u2014 they carry no timing to measure, and their per-attempt cost (an hour for the obliviator hi_large timeout) buys nothing at n>1. The file's date_observed and commit columns record when each outcome was measured.",
+  "ended_at": "2026-08-23T02:07:24+0000"
+}

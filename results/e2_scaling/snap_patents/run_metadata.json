@@ -1,0 +1,40 @@
+{
+  "started_at": "2026-07-03T05:22:42+0000",
+  "git_commit": "24c515933a361a312930a158ffda93f875c0f226",
+  "git_branch": "main",
+  "hostname": "tdx-guest",
+  "nproc": 120,
+  "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "workload": "snap",
+  "args": {
+    "workload": "snap",
+    "queries": null,
+    "query": null,
+    "sizes": null,
+    "systems": null,
+    "full_mwj_max_edges": 1000000,
+    "measurement_runs": 1,
+    "warmup_runs": 1,
+    "onehop_threads": 32,
+    "mwj_threads": 64,
+    "cell_timeout": 2400,
+    "skip_build": true,
+    "skip_generation": false,
+    "output_dir": "results/e2_scaling/snap_patents"
+  },
+  "sizes_run": [
+    "patents"
+  ],
+  "seed": 42,
+  "edge_ratio": 5,
+  "mwj_env": {
+    "OBL_MWJ_SORT_THREADS": "64"
+  },
+  "binaries": {
+    "sgx_app": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/sgx_app",
+    "onehop": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obligraph/build/snap_patents_onehop"
+  },
+  "note": "one-hop runs once per (size, rep), not per cell, and is reused across all chain queries (hops) at that size since the hop table is the same. Per-run query results (hop.csv, sgx_app output) are tempdir-owned and discarded after parsing. AML chain queries are anchored per dataset (a1.bank_id substituted from the size table). full_mwj_no_filter runs sgx_app with --no-filter and explodes with dataset size; both full-MWJ variants are gated by --full-mwj-max-edges. Any binary OOM/crash/timeout is caught per cell (recorded output_rows=OOM/TIMEOUT, total_ms empty) and never aborts the sweep; once a system fails at hop K for a dataset, that dataset's higher hops are SKIPPED, and once a full-MWJ system fails at E edges, larger sizes are SKIPPED.",
+  "ended_at": "2026-07-03T06:21:48+0000"
+}

@@ -43,6 +43,12 @@ output/
 debug/
 traces/
 
+# ...but every experiment run's metadata is provenance, not scratch: it is the
+# only record of the commit, host, core count, thread settings, timeouts and
+# exact arguments a reported number was produced under. Without this negation
+# the blanket *.json above silently drops it from every sweep.
+!results/**/run_metadata.json
+
 # Editor and IDE files
 .vscode/
 .idea/

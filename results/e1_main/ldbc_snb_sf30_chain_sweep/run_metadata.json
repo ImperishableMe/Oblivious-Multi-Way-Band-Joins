@@ -1,0 +1,37 @@
+{
+  "started_at": "2026-07-12T14:52:45+0000",
+  "git_commit": "8482b01d26e649d45b572a7a0ef1cece1ea432c7",
+  "git_branch": "main",
+  "hostname": "tdx-guest",
+  "nproc": 120,
+  "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "workload": "snb",
+  "args": {
+    "workload": "snb",
+    "dataset": "ldbc_snb_sf30",
+    "queries": "snb_1hop,snb_2hop,snb_3hop,snb_4hop",
+    "systems": "nebuladb,obliviator_chained,full_mwj_no_filter",
+    "measurement_runs": 1,
+    "warmup_runs": 0,
+    "onehop_threads": 64,
+    "mwj_threads": 64,
+    "obliviator_threads": 64,
+    "cell_timeout": 10800,
+    "obliviator_timeout": 900,
+    "skip_build": true,
+    "output_dir": "results/e1_main/ldbc_snb_sf30_chain_sweep"
+  },
+  "mwj_env": {
+    "OBL_MWJ_SORT_THREADS": "64"
+  },
+  "binaries": {
+    "sgx_app": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/sgx_app",
+    "onehop": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obligraph/build/ldbc_snb_onehop",
+    "obliviator_1hop_chained": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obl-radix/baselines/obliviatorFK-TDX/obliviator_1hop_chained",
+    "obliviator_khop_chained": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obl-radix/baselines/obliviatorNFK-TDX/obliviator_khop_chained",
+    "obliviator_converter": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obl-radix/baselines/obliviatorFK-TDX/convert_snb_1hop.py"
+  },
+  "note": "one-hop runs once per repetition (not per cell); its result is reused for all >=2-hop NebulaDB cells in that rep and reported as the latency of the 1-hop NebulaDB cell. obliviator src.txt is generated once per dataset and reused across all reps and queries (deterministic). full_mwj_no_filter runs sgx_app with --no-filter (no WHERE-clause selection pushdown), computing the full unfiltered multi-way join; like obliviator_chained it computes the unfiltered chain join and explodes with hop count. Any binary OOM/crash is caught per cell (recorded as output_rows=OOM, total_ms empty) and never aborts the sweep; once a system fails at hop K its higher hops are recorded SKIPPED.",
+  "ended_at": "2026-07-12T15:14:42+0000"
+}

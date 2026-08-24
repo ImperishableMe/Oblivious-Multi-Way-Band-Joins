@@ -237,7 +237,7 @@ python3 scripts/generate_banking_scaled.py 5000 output3 --seed 99999  # Differen
 
 ## License
 
-[MIT License](LICENSE)
+[MIT License](LICENSE), covering the code authored in this repository.
 
 ## Citation
 

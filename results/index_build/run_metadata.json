@@ -1,0 +1,63 @@
+{
+  "experiment": "index_build",
+  "timestamp": "2026-08-25T11:59:03+0000",
+  "elapsed_s": 1391.1,
+  "git_commit": "cc0f719a0bddbb7b8a65509d231e45159999c0d9",
+  "git_branch": "main",
+  "hostname": "tdx-guest",
+  "nproc": 120,
+  "threads": 64,
+  "measurement_runs": 3,
+  "warmup_runs": 1,
+  "cell_timeout_s": 14400,
+  "data_root": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/input/plaintext",
+  "build": "cmake Release (-O3 -DNDEBUG)",
+  "hash_plan_cache": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obligraph/build/hash_map.bin72",
+  "datasets": [
+    {
+      "label": "banking_1M",
+      "dir": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/input/plaintext/banking_1M",
+      "binary": "banking_onehop",
+      "nodes": 1000000,
+      "edges": 5000000
+    },
+    {
+      "label": "hi_small",
+      "dir": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/input/plaintext/ibm_aml_hi_small",
+      "binary": "ibm_aml_onehop",
+      "nodes": 515088,
+      "edges": 5078345
+    },
+    {
+      "label": "snb_sf30",
+      "dir": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/input/plaintext/ldbc_snb_sf30",
+      "binary": "ldbc_snb_onehop",
+      "nodes": 165430,
+      "edges": 12035314
+    },
+    {
+      "label": "patents",
+      "dir": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/input/plaintext/snap_patents",
+      "binary": "snap_patents_onehop",
+      "nodes": 3774768,
+      "edges": 16518948
+    },
+    {
+      "label": "hi_medium",
+      "dir": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/input/plaintext/ibm_aml_hi_medium",
+      "binary": "ibm_aml_onehop",
+      "nodes": 2077023,
+      "edges": 31898238
+    },
+    {
+      "label": "hi_large",
+      "dir": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/input/plaintext/ibm_aml_hi_large_slim",
+      "binary": "ibm_aml_onehop",
+      "nodes": 2116168,
+      "edges": 179702229
+    }
+  ],
+  "notes": "Reported index build = index_count x the measured buildNodeIndex: one index per probe side, where the driver builds one and deep-copies it. Result CSV written to /dev/null (IO category, excluded from totals). Measured runs are warm-planner: buildNodeIndex caches its hash plan in hash_map.bin72, and the discarded warm-up pays any cold-plan or cold-page-cache cost. Warm-up rows are kept in raw_runs.csv.",
+  "index_count": 2,
+  "resummarized_at": "2026-08-25T11:59:31+0000"
+}

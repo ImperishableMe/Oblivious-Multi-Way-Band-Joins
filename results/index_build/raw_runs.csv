@@ -1,0 +1,505 @@
+dataset,workload,nodes,edges,threads,run_id,is_warmup,stage,category,time_ms,in_wall_clock
+banking_1M,banking,1000000,5000000,64,1,1,CSV read (account),IO,355.680,1
+banking_1M,banking,1000000,5000000,64,1,1,CSV read (txn),IO,4121.210,1
+banking_1M,banking,1000000,5000000,64,1,1,buildNodeIndex,OFFLINE,946.020,1
+banking_1M,banking,1000000,5000000,64,1,1,index copy (src),OFFLINE,146.180,1
+banking_1M,banking,1000000,5000000,64,1,1,initProbeSide (dst),OFFLINE,138.030,0
+banking_1M,banking,1000000,5000000,64,1,1,initProbeSide (src),OFFLINE,158.470,0
+banking_1M,banking,1000000,5000000,64,1,1,initProbeSide (wall),OFFLINE,159.290,1
+banking_1M,banking,1000000,5000000,64,1,1,deduplicateRows (dst),ONLINE,6.530,0
+banking_1M,banking,1000000,5000000,64,1,1,deduplicateRows (src),ONLINE,6.930,0
+banking_1M,banking,1000000,5000000,64,1,1,probe dst,ONLINE,226.800,0
+banking_1M,banking,1000000,5000000,64,1,1,probe src,ONLINE,231.580,0
+banking_1M,banking,1000000,5000000,64,1,1,reduplicateRows (dst),ONLINE,12.150,0
+banking_1M,banking,1000000,5000000,64,1,1,reduplicateRows (src),ONLINE,12.660,0
+banking_1M,banking,1000000,5000000,64,1,1,unionWith (dst),ONLINE,6.160,0
+banking_1M,banking,1000000,5000000,64,1,1,unionWith (src),ONLINE,7.270,0
+banking_1M,banking,1000000,5000000,64,1,1,src branch (total),ONLINE,258.470,0
+banking_1M,banking,1000000,5000000,64,1,1,parallel_sort (dst),ONLINE,122.290,0
+banking_1M,banking,1000000,5000000,64,1,1,dst branch (total),ONLINE,373.990,0
+banking_1M,banking,1000000,5000000,64,1,1,parallel branches (wall),ONLINE,392.730,1
+banking_1M,banking,1000000,5000000,64,1,1,unionWith (final),ONLINE,5.770,1
+banking_1M,banking,1000000,5000000,64,1,1,CSV write,IO,2258.760,1
+banking_1M,banking,1000000,5000000,64,2,0,CSV read (account),IO,348.020,1
+banking_1M,banking,1000000,5000000,64,2,0,CSV read (txn),IO,3999.710,1
+banking_1M,banking,1000000,5000000,64,2,0,buildNodeIndex,OFFLINE,897.520,1
+banking_1M,banking,1000000,5000000,64,2,0,index copy (src),OFFLINE,145.570,1
+banking_1M,banking,1000000,5000000,64,2,0,initProbeSide (dst),OFFLINE,133.630,0
+banking_1M,banking,1000000,5000000,64,2,0,initProbeSide (src),OFFLINE,153.530,0
+banking_1M,banking,1000000,5000000,64,2,0,initProbeSide (wall),OFFLINE,154.230,1
+banking_1M,banking,1000000,5000000,64,2,0,deduplicateRows (src),ONLINE,5.860,0
+banking_1M,banking,1000000,5000000,64,2,0,deduplicateRows (dst),ONLINE,6.830,0
+banking_1M,banking,1000000,5000000,64,2,0,probe src,ONLINE,225.140,0
+banking_1M,banking,1000000,5000000,64,2,0,probe dst,ONLINE,231.800,0
+banking_1M,banking,1000000,5000000,64,2,0,reduplicateRows (src),ONLINE,12.460,0
+banking_1M,banking,1000000,5000000,64,2,0,reduplicateRows (dst),ONLINE,11.490,0
+banking_1M,banking,1000000,5000000,64,2,0,unionWith (src),ONLINE,8.050,0
+banking_1M,banking,1000000,5000000,64,2,0,src branch (total),ONLINE,251.540,0
+banking_1M,banking,1000000,5000000,64,2,0,unionWith (dst),ONLINE,4.840,0
+banking_1M,banking,1000000,5000000,64,2,0,parallel_sort (dst),ONLINE,130.160,0
+banking_1M,banking,1000000,5000000,64,2,0,dst branch (total),ONLINE,385.160,0
+banking_1M,banking,1000000,5000000,64,2,0,parallel branches (wall),ONLINE,401.710,1
+banking_1M,banking,1000000,5000000,64,2,0,unionWith (final),ONLINE,8.910,1
+banking_1M,banking,1000000,5000000,64,2,0,CSV write,IO,2250.800,1
+banking_1M,banking,1000000,5000000,64,3,0,CSV read (account),IO,345.860,1
+banking_1M,banking,1000000,5000000,64,3,0,CSV read (txn),IO,3997.150,1
+banking_1M,banking,1000000,5000000,64,3,0,buildNodeIndex,OFFLINE,926.190,1
+banking_1M,banking,1000000,5000000,64,3,0,index copy (src),OFFLINE,146.020,1
+banking_1M,banking,1000000,5000000,64,3,0,initProbeSide (dst),OFFLINE,132.390,0
+banking_1M,banking,1000000,5000000,64,3,0,initProbeSide (src),OFFLINE,154.340,0
+banking_1M,banking,1000000,5000000,64,3,0,initProbeSide (wall),OFFLINE,155.110,1
+banking_1M,banking,1000000,5000000,64,3,0,deduplicateRows (dst),ONLINE,5.810,0
+banking_1M,banking,1000000,5000000,64,3,0,deduplicateRows (src),ONLINE,7.800,0
+banking_1M,banking,1000000,5000000,64,3,0,probe src,ONLINE,224.350,0
+banking_1M,banking,1000000,5000000,64,3,0,probe dst,ONLINE,230.560,0
+banking_1M,banking,1000000,5000000,64,3,0,reduplicateRows (src),ONLINE,11.150,0
+banking_1M,banking,1000000,5000000,64,3,0,reduplicateRows (dst),ONLINE,12.560,0
+banking_1M,banking,1000000,5000000,64,3,0,unionWith (src),ONLINE,6.630,0
+banking_1M,banking,1000000,5000000,64,3,0,src branch (total),ONLINE,249.950,0
+banking_1M,banking,1000000,5000000,64,3,0,unionWith (dst),ONLINE,4.760,0
+banking_1M,banking,1000000,5000000,64,3,0,parallel_sort (dst),ONLINE,110.160,0
+banking_1M,banking,1000000,5000000,64,3,0,dst branch (total),ONLINE,363.900,0
+banking_1M,banking,1000000,5000000,64,3,0,parallel branches (wall),ONLINE,379.610,1
+banking_1M,banking,1000000,5000000,64,3,0,unionWith (final),ONLINE,6.590,1
+banking_1M,banking,1000000,5000000,64,3,0,CSV write,IO,2252.180,1
+banking_1M,banking,1000000,5000000,64,4,0,CSV read (account),IO,350.440,1
+banking_1M,banking,1000000,5000000,64,4,0,CSV read (txn),IO,3991.070,1
+banking_1M,banking,1000000,5000000,64,4,0,buildNodeIndex,OFFLINE,911.730,1
+banking_1M,banking,1000000,5000000,64,4,0,index copy (src),OFFLINE,145.110,1
+banking_1M,banking,1000000,5000000,64,4,0,initProbeSide (dst),OFFLINE,127.270,0
+banking_1M,banking,1000000,5000000,64,4,0,initProbeSide (src),OFFLINE,151.840,0
+banking_1M,banking,1000000,5000000,64,4,0,initProbeSide (wall),OFFLINE,152.600,1
+banking_1M,banking,1000000,5000000,64,4,0,deduplicateRows (dst),ONLINE,5.340,0
+banking_1M,banking,1000000,5000000,64,4,0,deduplicateRows (src),ONLINE,5.860,0
+banking_1M,banking,1000000,5000000,64,4,0,probe dst,ONLINE,221.750,0
+banking_1M,banking,1000000,5000000,64,4,0,probe src,ONLINE,225.150,0
+banking_1M,banking,1000000,5000000,64,4,0,reduplicateRows (dst),ONLINE,13.140,0
+banking_1M,banking,1000000,5000000,64,4,0,reduplicateRows (src),ONLINE,12.410,0
+banking_1M,banking,1000000,5000000,64,4,0,unionWith (dst),ONLINE,5.470,0
+banking_1M,banking,1000000,5000000,64,4,0,unionWith (src),ONLINE,8.770,0
+banking_1M,banking,1000000,5000000,64,4,0,src branch (total),ONLINE,252.210,0
+banking_1M,banking,1000000,5000000,64,4,0,parallel_sort (dst),ONLINE,128.380,0
+banking_1M,banking,1000000,5000000,64,4,0,dst branch (total),ONLINE,374.130,0
+banking_1M,banking,1000000,5000000,64,4,0,parallel branches (wall),ONLINE,389.240,1
+banking_1M,banking,1000000,5000000,64,4,0,unionWith (final),ONLINE,4.750,1
+banking_1M,banking,1000000,5000000,64,4,0,CSV write,IO,2259.190,1
+hi_small,aml,515088,5078345,64,1,1,CSV read (account),IO,152.670,1
+hi_small,aml,515088,5078345,64,1,1,CSV read (txn),IO,4297.050,1
+hi_small,aml,515088,5078345,64,1,1,buildNodeIndex,OFFLINE,472.560,1
+hi_small,aml,515088,5078345,64,1,1,index copy (src),OFFLINE,84.220,1
+hi_small,aml,515088,5078345,64,1,1,initProbeSide (dst),OFFLINE,162.990,0
+hi_small,aml,515088,5078345,64,1,1,initProbeSide (src),OFFLINE,179.230,0
+hi_small,aml,515088,5078345,64,1,1,initProbeSide (wall),OFFLINE,180.000,1
+hi_small,aml,515088,5078345,64,1,1,deduplicateRows (src),ONLINE,4.600,0
+hi_small,aml,515088,5078345,64,1,1,deduplicateRows (dst),ONLINE,5.640,0
+hi_small,aml,515088,5078345,64,1,1,probe dst,ONLINE,166.720,0
+hi_small,aml,515088,5078345,64,1,1,probe src,ONLINE,168.810,0
+hi_small,aml,515088,5078345,64,1,1,reduplicateRows (src),ONLINE,10.340,0
+hi_small,aml,515088,5078345,64,1,1,reduplicateRows (dst),ONLINE,12.190,0
+hi_small,aml,515088,5078345,64,1,1,unionWith (src),ONLINE,5.040,0
+hi_small,aml,515088,5078345,64,1,1,src branch (total),ONLINE,188.810,0
+hi_small,aml,515088,5078345,64,1,1,unionWith (dst),ONLINE,6.620,0
+hi_small,aml,515088,5078345,64,1,1,parallel_sort (dst),ONLINE,124.810,0
+hi_small,aml,515088,5078345,64,1,1,dst branch (total),ONLINE,316.030,0
+hi_small,aml,515088,5078345,64,1,1,parallel branches (wall),ONLINE,333.020,1
+hi_small,aml,515088,5078345,64,1,1,unionWith (final),ONLINE,5.530,1
+hi_small,aml,515088,5078345,64,1,1,CSV write,IO,2453.790,1
+hi_small,aml,515088,5078345,64,2,0,CSV read (account),IO,151.440,1
+hi_small,aml,515088,5078345,64,2,0,CSV read (txn),IO,4279.400,1
+hi_small,aml,515088,5078345,64,2,0,buildNodeIndex,OFFLINE,470.410,1
+hi_small,aml,515088,5078345,64,2,0,index copy (src),OFFLINE,84.800,1
+hi_small,aml,515088,5078345,64,2,0,initProbeSide (dst),OFFLINE,155.130,0
+hi_small,aml,515088,5078345,64,2,0,initProbeSide (src),OFFLINE,172.560,0
+hi_small,aml,515088,5078345,64,2,0,initProbeSide (wall),OFFLINE,173.290,1
+hi_small,aml,515088,5078345,64,2,0,deduplicateRows (src),ONLINE,5.700,0
+hi_small,aml,515088,5078345,64,2,0,deduplicateRows (dst),ONLINE,5.660,0
+hi_small,aml,515088,5078345,64,2,0,probe src,ONLINE,170.920,0
+hi_small,aml,515088,5078345,64,2,0,probe dst,ONLINE,171.010,0
+hi_small,aml,515088,5078345,64,2,0,reduplicateRows (src),ONLINE,12.690,0
+hi_small,aml,515088,5078345,64,2,0,reduplicateRows (dst),ONLINE,13.200,0
+hi_small,aml,515088,5078345,64,2,0,unionWith (src),ONLINE,7.100,0
+hi_small,aml,515088,5078345,64,2,0,src branch (total),ONLINE,196.420,0
+hi_small,aml,515088,5078345,64,2,0,unionWith (dst),ONLINE,6.710,0
+hi_small,aml,515088,5078345,64,2,0,parallel_sort (dst),ONLINE,131.850,0
+hi_small,aml,515088,5078345,64,2,0,dst branch (total),ONLINE,328.480,0
+hi_small,aml,515088,5078345,64,2,0,parallel branches (wall),ONLINE,344.290,1
+hi_small,aml,515088,5078345,64,2,0,unionWith (final),ONLINE,6.870,1
+hi_small,aml,515088,5078345,64,2,0,CSV write,IO,2467.600,1
+hi_small,aml,515088,5078345,64,3,0,CSV read (account),IO,155.620,1
+hi_small,aml,515088,5078345,64,3,0,CSV read (txn),IO,4283.610,1
+hi_small,aml,515088,5078345,64,3,0,buildNodeIndex,OFFLINE,476.230,1
+hi_small,aml,515088,5078345,64,3,0,index copy (src),OFFLINE,83.840,1
+hi_small,aml,515088,5078345,64,3,0,initProbeSide (dst),OFFLINE,165.710,0
+hi_small,aml,515088,5078345,64,3,0,initProbeSide (src),OFFLINE,175.720,0
+hi_small,aml,515088,5078345,64,3,0,initProbeSide (wall),OFFLINE,176.340,1
+hi_small,aml,515088,5078345,64,3,0,deduplicateRows (dst),ONLINE,4.990,0
+hi_small,aml,515088,5078345,64,3,0,deduplicateRows (src),ONLINE,6.070,0
+hi_small,aml,515088,5078345,64,3,0,probe dst,ONLINE,178.720,0
+hi_small,aml,515088,5078345,64,3,0,probe src,ONLINE,178.440,0
+hi_small,aml,515088,5078345,64,3,0,reduplicateRows (dst),ONLINE,11.290,0
+hi_small,aml,515088,5078345,64,3,0,reduplicateRows (src),ONLINE,12.460,0
+hi_small,aml,515088,5078345,64,3,0,unionWith (dst),ONLINE,4.350,0
+hi_small,aml,515088,5078345,64,3,0,unionWith (src),ONLINE,7.320,0
+hi_small,aml,515088,5078345,64,3,0,src branch (total),ONLINE,204.310,0
+hi_small,aml,515088,5078345,64,3,0,parallel_sort (dst),ONLINE,126.030,0
+hi_small,aml,515088,5078345,64,3,0,dst branch (total),ONLINE,325.420,0
+hi_small,aml,515088,5078345,64,3,0,parallel branches (wall),ONLINE,337.580,1
+hi_small,aml,515088,5078345,64,3,0,unionWith (final),ONLINE,5.210,1
+hi_small,aml,515088,5078345,64,3,0,CSV write,IO,2478.460,1
+hi_small,aml,515088,5078345,64,4,0,CSV read (account),IO,158.840,1
+hi_small,aml,515088,5078345,64,4,0,CSV read (txn),IO,4312.610,1
+hi_small,aml,515088,5078345,64,4,0,buildNodeIndex,OFFLINE,477.480,1
+hi_small,aml,515088,5078345,64,4,0,index copy (src),OFFLINE,86.740,1
+hi_small,aml,515088,5078345,64,4,0,initProbeSide (dst),OFFLINE,163.300,0
+hi_small,aml,515088,5078345,64,4,0,initProbeSide (src),OFFLINE,173.390,0
+hi_small,aml,515088,5078345,64,4,0,initProbeSide (wall),OFFLINE,174.090,1
+hi_small,aml,515088,5078345,64,4,0,deduplicateRows (dst),ONLINE,6.270,0
+hi_small,aml,515088,5078345,64,4,0,deduplicateRows (src),ONLINE,7.140,0
+hi_small,aml,515088,5078345,64,4,0,probe dst,ONLINE,173.890,0
+hi_small,aml,515088,5078345,64,4,0,probe src,ONLINE,175.380,0
+hi_small,aml,515088,5078345,64,4,0,reduplicateRows (dst),ONLINE,11.880,0
+hi_small,aml,515088,5078345,64,4,0,reduplicateRows (src),ONLINE,10.180,0
+hi_small,aml,515088,5078345,64,4,0,unionWith (dst),ONLINE,6.390,0
+hi_small,aml,515088,5078345,64,4,0,unionWith (src),ONLINE,6.950,0
+hi_small,aml,515088,5078345,64,4,0,src branch (total),ONLINE,199.680,0
+hi_small,aml,515088,5078345,64,4,0,parallel_sort (dst),ONLINE,124.090,0
+hi_small,aml,515088,5078345,64,4,0,dst branch (total),ONLINE,322.580,0
+hi_small,aml,515088,5078345,64,4,0,parallel branches (wall),ONLINE,338.940,1
+hi_small,aml,515088,5078345,64,4,0,unionWith (final),ONLINE,4.270,1
+hi_small,aml,515088,5078345,64,4,0,CSV write,IO,2466.220,1
+snb_sf30,snb,165430,12035314,64,1,1,CSV read (account),IO,67.440,1
+snb_sf30,snb,165430,12035314,64,1,1,CSV read (txn),IO,8913.580,1
+snb_sf30,snb,165430,12035314,64,1,1,buildNodeIndex,OFFLINE,234.280,1
+snb_sf30,snb,165430,12035314,64,1,1,index copy (src),OFFLINE,36.980,1
+snb_sf30,snb,165430,12035314,64,1,1,initProbeSide (dst),OFFLINE,396.300,0
+snb_sf30,snb,165430,12035314,64,1,1,initProbeSide (src),OFFLINE,404.180,0
+snb_sf30,snb,165430,12035314,64,1,1,initProbeSide (wall),OFFLINE,404.680,1
+snb_sf30,snb,165430,12035314,64,1,1,deduplicateRows (dst),ONLINE,11.660,0
+snb_sf30,snb,165430,12035314,64,1,1,deduplicateRows (src),ONLINE,12.030,0
+snb_sf30,snb,165430,12035314,64,1,1,probe src,ONLINE,444.890,0
+snb_sf30,snb,165430,12035314,64,1,1,probe dst,ONLINE,446.360,0
+snb_sf30,snb,165430,12035314,64,1,1,reduplicateRows (src),ONLINE,23.440,0
+snb_sf30,snb,165430,12035314,64,1,1,reduplicateRows (dst),ONLINE,27.440,0
+snb_sf30,snb,165430,12035314,64,1,1,unionWith (src),ONLINE,19.780,0
+snb_sf30,snb,165430,12035314,64,1,1,src branch (total),ONLINE,500.170,0
+snb_sf30,snb,165430,12035314,64,1,1,unionWith (dst),ONLINE,15.730,0
+snb_sf30,snb,165430,12035314,64,1,1,parallel_sort (dst),ONLINE,265.220,0
+snb_sf30,snb,165430,12035314,64,1,1,dst branch (total),ONLINE,766.460,0
+snb_sf30,snb,165430,12035314,64,1,1,parallel branches (wall),ONLINE,802.530,1
+snb_sf30,snb,165430,12035314,64,1,1,unionWith (final),ONLINE,21.820,1
+snb_sf30,snb,165430,12035314,64,1,1,CSV write,IO,5679.430,1
+snb_sf30,snb,165430,12035314,64,2,0,CSV read (account),IO,67.450,1
+snb_sf30,snb,165430,12035314,64,2,0,CSV read (txn),IO,8957.340,1
+snb_sf30,snb,165430,12035314,64,2,0,buildNodeIndex,OFFLINE,242.200,1
+snb_sf30,snb,165430,12035314,64,2,0,index copy (src),OFFLINE,37.660,1
+snb_sf30,snb,165430,12035314,64,2,0,initProbeSide (dst),OFFLINE,371.520,0
+snb_sf30,snb,165430,12035314,64,2,0,initProbeSide (src),OFFLINE,388.370,0
+snb_sf30,snb,165430,12035314,64,2,0,initProbeSide (wall),OFFLINE,389.000,1
+snb_sf30,snb,165430,12035314,64,2,0,deduplicateRows (src),ONLINE,10.670,0
+snb_sf30,snb,165430,12035314,64,2,0,deduplicateRows (dst),ONLINE,11.990,0
+snb_sf30,snb,165430,12035314,64,2,0,probe src,ONLINE,411.500,0
+snb_sf30,snb,165430,12035314,64,2,0,reduplicateRows (src),ONLINE,22.950,0
+snb_sf30,snb,165430,12035314,64,2,0,unionWith (src),ONLINE,14.740,0
+snb_sf30,snb,165430,12035314,64,2,0,src branch (total),ONLINE,459.890,0
+snb_sf30,snb,165430,12035314,64,2,0,probe dst,ONLINE,452.440,0
+snb_sf30,snb,165430,12035314,64,2,0,reduplicateRows (dst),ONLINE,22.090,0
+snb_sf30,snb,165430,12035314,64,2,0,unionWith (dst),ONLINE,9.030,0
+snb_sf30,snb,165430,12035314,64,2,0,parallel_sort (dst),ONLINE,282.780,0
+snb_sf30,snb,165430,12035314,64,2,0,dst branch (total),ONLINE,778.370,0
+snb_sf30,snb,165430,12035314,64,2,0,parallel branches (wall),ONLINE,819.590,1
+snb_sf30,snb,165430,12035314,64,2,0,unionWith (final),ONLINE,16.070,1
+snb_sf30,snb,165430,12035314,64,2,0,CSV write,IO,5646.840,1
+snb_sf30,snb,165430,12035314,64,3,0,CSV read (account),IO,66.400,1
+snb_sf30,snb,165430,12035314,64,3,0,CSV read (txn),IO,8883.980,1
+snb_sf30,snb,165430,12035314,64,3,0,buildNodeIndex,OFFLINE,233.250,1
+snb_sf30,snb,165430,12035314,64,3,0,index copy (src),OFFLINE,36.670,1
+snb_sf30,snb,165430,12035314,64,3,0,initProbeSide (dst),OFFLINE,367.150,0
+snb_sf30,snb,165430,12035314,64,3,0,initProbeSide (src),OFFLINE,376.410,0
+snb_sf30,snb,165430,12035314,64,3,0,initProbeSide (wall),OFFLINE,377.110,1
+snb_sf30,snb,165430,12035314,64,3,0,deduplicateRows (src),ONLINE,11.870,0
+snb_sf30,snb,165430,12035314,64,3,0,deduplicateRows (dst),ONLINE,12.220,0
+snb_sf30,snb,165430,12035314,64,3,0,probe dst,ONLINE,441.530,0
+snb_sf30,snb,165430,12035314,64,3,0,probe src,ONLINE,445.110,0
+snb_sf30,snb,165430,12035314,64,3,0,reduplicateRows (dst),ONLINE,20.730,0
+snb_sf30,snb,165430,12035314,64,3,0,reduplicateRows (src),ONLINE,23.520,0
+snb_sf30,snb,165430,12035314,64,3,0,unionWith (dst),ONLINE,13.150,0
+snb_sf30,snb,165430,12035314,64,3,0,unionWith (src),ONLINE,16.380,0
+snb_sf30,snb,165430,12035314,64,3,0,src branch (total),ONLINE,496.900,0
+snb_sf30,snb,165430,12035314,64,3,0,parallel_sort (dst),ONLINE,285.050,0
+snb_sf30,snb,165430,12035314,64,3,0,dst branch (total),ONLINE,772.760,0
+snb_sf30,snb,165430,12035314,64,3,0,parallel branches (wall),ONLINE,817.460,1
+snb_sf30,snb,165430,12035314,64,3,0,unionWith (final),ONLINE,15.470,1
+snb_sf30,snb,165430,12035314,64,3,0,CSV write,IO,5642.080,1
+snb_sf30,snb,165430,12035314,64,4,0,CSV read (account),IO,70.500,1
+snb_sf30,snb,165430,12035314,64,4,0,CSV read (txn),IO,8848.910,1
+snb_sf30,snb,165430,12035314,64,4,0,buildNodeIndex,OFFLINE,233.820,1
+snb_sf30,snb,165430,12035314,64,4,0,index copy (src),OFFLINE,42.170,1
+snb_sf30,snb,165430,12035314,64,4,0,initProbeSide (dst),OFFLINE,414.560,0
+snb_sf30,snb,165430,12035314,64,4,0,initProbeSide (src),OFFLINE,424.450,0
+snb_sf30,snb,165430,12035314,64,4,0,initProbeSide (wall),OFFLINE,425.140,1
+snb_sf30,snb,165430,12035314,64,4,0,deduplicateRows (src),ONLINE,10.060,0
+snb_sf30,snb,165430,12035314,64,4,0,deduplicateRows (dst),ONLINE,12.480,0
+snb_sf30,snb,165430,12035314,64,4,0,probe src,ONLINE,408.290,0
+snb_sf30,snb,165430,12035314,64,4,0,reduplicateRows (src),ONLINE,22.370,0
+snb_sf30,snb,165430,12035314,64,4,0,unionWith (src),ONLINE,16.020,0
+snb_sf30,snb,165430,12035314,64,4,0,src branch (total),ONLINE,456.760,0
+snb_sf30,snb,165430,12035314,64,4,0,probe dst,ONLINE,462.160,0
+snb_sf30,snb,165430,12035314,64,4,0,reduplicateRows (dst),ONLINE,16.180,0
+snb_sf30,snb,165430,12035314,64,4,0,unionWith (dst),ONLINE,9.230,0
+snb_sf30,snb,165430,12035314,64,4,0,parallel_sort (dst),ONLINE,267.500,0
+snb_sf30,snb,165430,12035314,64,4,0,dst branch (total),ONLINE,767.640,0
+snb_sf30,snb,165430,12035314,64,4,0,parallel branches (wall),ONLINE,802.070,1
+snb_sf30,snb,165430,12035314,64,4,0,unionWith (final),ONLINE,20.620,1
+snb_sf30,snb,165430,12035314,64,4,0,CSV write,IO,5664.060,1
+patents,snap,3774768,16518948,64,1,1,CSV read (account),IO,1352.690,1
+patents,snap,3774768,16518948,64,1,1,CSV read (txn),IO,13414.390,1
+patents,snap,3774768,16518948,64,1,1,buildNodeIndex,OFFLINE,4583.020,1
+patents,snap,3774768,16518948,64,1,1,index copy (src),OFFLINE,520.060,1
+patents,snap,3774768,16518948,64,1,1,initProbeSide (dst),OFFLINE,536.070,0
+patents,snap,3774768,16518948,64,1,1,initProbeSide (src),OFFLINE,541.580,0
+patents,snap,3774768,16518948,64,1,1,initProbeSide (wall),OFFLINE,542.320,1
+patents,snap,3774768,16518948,64,1,1,deduplicateRows (src),ONLINE,14.160,0
+patents,snap,3774768,16518948,64,1,1,deduplicateRows (dst),ONLINE,16.210,0
+patents,snap,3774768,16518948,64,1,1,probe src,ONLINE,1394.690,0
+patents,snap,3774768,16518948,64,1,1,reduplicateRows (src),ONLINE,30.380,0
+patents,snap,3774768,16518948,64,1,1,unionWith (src),ONLINE,21.590,0
+patents,snap,3774768,16518948,64,1,1,src branch (total),ONLINE,1460.840,0
+patents,snap,3774768,16518948,64,1,1,probe dst,ONLINE,1500.070,0
+patents,snap,3774768,16518948,64,1,1,reduplicateRows (dst),ONLINE,28.250,0
+patents,snap,3774768,16518948,64,1,1,unionWith (dst),ONLINE,12.530,0
+patents,snap,3774768,16518948,64,1,1,parallel_sort (dst),ONLINE,420.550,0
+patents,snap,3774768,16518948,64,1,1,dst branch (total),ONLINE,1977.660,0
+patents,snap,3774768,16518948,64,1,1,parallel branches (wall),ONLINE,2014.910,1
+patents,snap,3774768,16518948,64,1,1,unionWith (final),ONLINE,13.970,1
+patents,snap,3774768,16518948,64,1,1,CSV write,IO,6987.370,1
+patents,snap,3774768,16518948,64,2,0,CSV read (account),IO,1376.440,1
+patents,snap,3774768,16518948,64,2,0,CSV read (txn),IO,13394.260,1
+patents,snap,3774768,16518948,64,2,0,buildNodeIndex,OFFLINE,4367.510,1
+patents,snap,3774768,16518948,64,2,0,index copy (src),OFFLINE,533.680,1
+patents,snap,3774768,16518948,64,2,0,initProbeSide (dst),OFFLINE,548.280,0
+patents,snap,3774768,16518948,64,2,0,initProbeSide (src),OFFLINE,552.720,0
+patents,snap,3774768,16518948,64,2,0,initProbeSide (wall),OFFLINE,553.500,1
+patents,snap,3774768,16518948,64,2,0,deduplicateRows (src),ONLINE,14.880,0
+patents,snap,3774768,16518948,64,2,0,deduplicateRows (dst),ONLINE,15.610,0
+patents,snap,3774768,16518948,64,2,0,probe dst,ONLINE,1511.890,0
+patents,snap,3774768,16518948,64,2,0,probe src,ONLINE,1519.980,0
+patents,snap,3774768,16518948,64,2,0,reduplicateRows (dst),ONLINE,32.470,0
+patents,snap,3774768,16518948,64,2,0,reduplicateRows (src),ONLINE,34.070,0
+patents,snap,3774768,16518948,64,2,0,unionWith (dst),ONLINE,18.380,0
+patents,snap,3774768,16518948,64,2,0,unionWith (src),ONLINE,21.990,0
+patents,snap,3774768,16518948,64,2,0,src branch (total),ONLINE,1590.940,0
+patents,snap,3774768,16518948,64,2,0,parallel_sort (dst),ONLINE,404.430,0
+patents,snap,3774768,16518948,64,2,0,dst branch (total),ONLINE,1982.880,0
+patents,snap,3774768,16518948,64,2,0,parallel branches (wall),ONLINE,2020.700,1
+patents,snap,3774768,16518948,64,2,0,unionWith (final),ONLINE,13.790,1
+patents,snap,3774768,16518948,64,2,0,CSV write,IO,6993.090,1
+patents,snap,3774768,16518948,64,3,0,CSV read (account),IO,1380.000,1
+patents,snap,3774768,16518948,64,3,0,CSV read (txn),IO,13311.670,1
+patents,snap,3774768,16518948,64,3,0,buildNodeIndex,OFFLINE,4506.790,1
+patents,snap,3774768,16518948,64,3,0,index copy (src),OFFLINE,523.720,1
+patents,snap,3774768,16518948,64,3,0,initProbeSide (dst),OFFLINE,529.280,0
+patents,snap,3774768,16518948,64,3,0,initProbeSide (src),OFFLINE,540.620,0
+patents,snap,3774768,16518948,64,3,0,initProbeSide (wall),OFFLINE,541.300,1
+patents,snap,3774768,16518948,64,3,0,deduplicateRows (dst),ONLINE,15.570,0
+patents,snap,3774768,16518948,64,3,0,deduplicateRows (src),ONLINE,15.650,0
+patents,snap,3774768,16518948,64,3,0,probe dst,ONLINE,1501.600,0
+patents,snap,3774768,16518948,64,3,0,probe src,ONLINE,1507.720,0
+patents,snap,3774768,16518948,64,3,0,reduplicateRows (dst),ONLINE,32.240,0
+patents,snap,3774768,16518948,64,3,0,reduplicateRows (src),ONLINE,35.190,0
+patents,snap,3774768,16518948,64,3,0,unionWith (dst),ONLINE,19.360,0
+patents,snap,3774768,16518948,64,3,0,unionWith (src),ONLINE,26.380,0
+patents,snap,3774768,16518948,64,3,0,src branch (total),ONLINE,1584.960,0
+patents,snap,3774768,16518948,64,3,0,parallel_sort (dst),ONLINE,407.620,0
+patents,snap,3774768,16518948,64,3,0,dst branch (total),ONLINE,1976.450,0
+patents,snap,3774768,16518948,64,3,0,parallel branches (wall),ONLINE,2020.360,1
+patents,snap,3774768,16518948,64,3,0,unionWith (final),ONLINE,22.040,1
+patents,snap,3774768,16518948,64,3,0,CSV write,IO,6998.740,1
+patents,snap,3774768,16518948,64,4,0,CSV read (account),IO,1372.090,1
+patents,snap,3774768,16518948,64,4,0,CSV read (txn),IO,13471.630,1
+patents,snap,3774768,16518948,64,4,0,buildNodeIndex,OFFLINE,4242.850,1
+patents,snap,3774768,16518948,64,4,0,index copy (src),OFFLINE,515.350,1
+patents,snap,3774768,16518948,64,4,0,initProbeSide (dst),OFFLINE,552.190,0
+patents,snap,3774768,16518948,64,4,0,initProbeSide (src),OFFLINE,562.630,0
+patents,snap,3774768,16518948,64,4,0,initProbeSide (wall),OFFLINE,563.400,1
+patents,snap,3774768,16518948,64,4,0,deduplicateRows (src),ONLINE,13.790,0
+patents,snap,3774768,16518948,64,4,0,deduplicateRows (dst),ONLINE,16.550,0
+patents,snap,3774768,16518948,64,4,0,probe src,ONLINE,1467.270,0
+patents,snap,3774768,16518948,64,4,0,probe dst,ONLINE,1466.260,0
+patents,snap,3774768,16518948,64,4,0,reduplicateRows (dst),ONLINE,36.920,0
+patents,snap,3774768,16518948,64,4,0,reduplicateRows (src),ONLINE,39.800,0
+patents,snap,3774768,16518948,64,4,0,unionWith (dst),ONLINE,13.230,0
+patents,snap,3774768,16518948,64,4,0,unionWith (src),ONLINE,24.150,0
+patents,snap,3774768,16518948,64,4,0,src branch (total),ONLINE,1545.060,0
+patents,snap,3774768,16518948,64,4,0,parallel_sort (dst),ONLINE,424.580,0
+patents,snap,3774768,16518948,64,4,0,dst branch (total),ONLINE,1957.590,0
+patents,snap,3774768,16518948,64,4,0,parallel branches (wall),ONLINE,1993.050,1
+patents,snap,3774768,16518948,64,4,0,unionWith (final),ONLINE,24.190,1
+patents,snap,3774768,16518948,64,4,0,CSV write,IO,7030.600,1
+hi_medium,aml,2077023,31898238,64,1,1,CSV read (account),IO,620.430,1
+hi_medium,aml,2077023,31898238,64,1,1,CSV read (txn),IO,27764.870,1
+hi_medium,aml,2077023,31898238,64,1,1,buildNodeIndex,OFFLINE,2230.810,1
+hi_medium,aml,2077023,31898238,64,1,1,index copy (src),OFFLINE,286.680,1
+hi_medium,aml,2077023,31898238,64,1,1,initProbeSide (dst),OFFLINE,1037.520,0
+hi_medium,aml,2077023,31898238,64,1,1,initProbeSide (src),OFFLINE,1040.460,0
+hi_medium,aml,2077023,31898238,64,1,1,initProbeSide (wall),OFFLINE,1041.130,1
+hi_medium,aml,2077023,31898238,64,1,1,deduplicateRows (dst),ONLINE,28.970,0
+hi_medium,aml,2077023,31898238,64,1,1,deduplicateRows (src),ONLINE,32.990,0
+hi_medium,aml,2077023,31898238,64,1,1,probe src,ONLINE,2002.270,0
+hi_medium,aml,2077023,31898238,64,1,1,probe dst,ONLINE,2030.650,0
+hi_medium,aml,2077023,31898238,64,1,1,reduplicateRows (src),ONLINE,52.980,0
+hi_medium,aml,2077023,31898238,64,1,1,unionWith (src),ONLINE,36.640,0
+hi_medium,aml,2077023,31898238,64,1,1,src branch (total),ONLINE,2124.900,0
+hi_medium,aml,2077023,31898238,64,1,1,reduplicateRows (dst),ONLINE,67.050,0
+hi_medium,aml,2077023,31898238,64,1,1,unionWith (dst),ONLINE,22.970,0
+hi_medium,aml,2077023,31898238,64,1,1,parallel_sort (dst),ONLINE,910.630,0
+hi_medium,aml,2077023,31898238,64,1,1,dst branch (total),ONLINE,3060.390,0
+hi_medium,aml,2077023,31898238,64,1,1,parallel branches (wall),ONLINE,3150.590,1
+hi_medium,aml,2077023,31898238,64,1,1,unionWith (final),ONLINE,38.400,1
+hi_medium,aml,2077023,31898238,64,1,1,CSV write,IO,15556.230,1
+hi_medium,aml,2077023,31898238,64,2,0,CSV read (account),IO,624.670,1
+hi_medium,aml,2077023,31898238,64,2,0,CSV read (txn),IO,27720.760,1
+hi_medium,aml,2077023,31898238,64,2,0,buildNodeIndex,OFFLINE,2245.810,1
+hi_medium,aml,2077023,31898238,64,2,0,index copy (src),OFFLINE,281.520,1
+hi_medium,aml,2077023,31898238,64,2,0,initProbeSide (dst),OFFLINE,1045.380,0
+hi_medium,aml,2077023,31898238,64,2,0,initProbeSide (src),OFFLINE,1048.230,0
+hi_medium,aml,2077023,31898238,64,2,0,initProbeSide (wall),OFFLINE,1048.960,1
+hi_medium,aml,2077023,31898238,64,2,0,deduplicateRows (dst),ONLINE,30.730,0
+hi_medium,aml,2077023,31898238,64,2,0,deduplicateRows (src),ONLINE,31.640,0
+hi_medium,aml,2077023,31898238,64,2,0,probe dst,ONLINE,1914.810,0
+hi_medium,aml,2077023,31898238,64,2,0,reduplicateRows (dst),ONLINE,45.070,0
+hi_medium,aml,2077023,31898238,64,2,0,unionWith (dst),ONLINE,26.300,0
+hi_medium,aml,2077023,31898238,64,2,0,probe src,ONLINE,2420.390,0
+hi_medium,aml,2077023,31898238,64,2,0,reduplicateRows (src),ONLINE,63.970,0
+hi_medium,aml,2077023,31898238,64,2,0,unionWith (src),ONLINE,54.270,0
+hi_medium,aml,2077023,31898238,64,2,0,src branch (total),ONLINE,2570.310,0
+hi_medium,aml,2077023,31898238,64,2,0,parallel_sort (dst),ONLINE,985.480,0
+hi_medium,aml,2077023,31898238,64,2,0,dst branch (total),ONLINE,3002.470,0
+hi_medium,aml,2077023,31898238,64,2,0,parallel branches (wall),ONLINE,3094.510,1
+hi_medium,aml,2077023,31898238,64,2,0,unionWith (final),ONLINE,37.130,1
+hi_medium,aml,2077023,31898238,64,2,0,CSV write,IO,15684.340,1
+hi_medium,aml,2077023,31898238,64,3,0,CSV read (account),IO,621.670,1
+hi_medium,aml,2077023,31898238,64,3,0,CSV read (txn),IO,27808.750,1
+hi_medium,aml,2077023,31898238,64,3,0,buildNodeIndex,OFFLINE,2335.840,1
+hi_medium,aml,2077023,31898238,64,3,0,index copy (src),OFFLINE,290.390,1
+hi_medium,aml,2077023,31898238,64,3,0,initProbeSide (src),OFFLINE,1041.340,0
+hi_medium,aml,2077023,31898238,64,3,0,initProbeSide (dst),OFFLINE,1046.440,0
+hi_medium,aml,2077023,31898238,64,3,0,initProbeSide (wall),OFFLINE,1046.570,1
+hi_medium,aml,2077023,31898238,64,3,0,deduplicateRows (dst),ONLINE,29.890,0
+hi_medium,aml,2077023,31898238,64,3,0,deduplicateRows (src),ONLINE,31.480,0
+hi_medium,aml,2077023,31898238,64,3,0,probe dst,ONLINE,1927.600,0
+hi_medium,aml,2077023,31898238,64,3,0,probe src,ONLINE,1963.070,0
+hi_medium,aml,2077023,31898238,64,3,0,reduplicateRows (dst),ONLINE,46.050,0
+hi_medium,aml,2077023,31898238,64,3,0,unionWith (dst),ONLINE,28.300,0
+hi_medium,aml,2077023,31898238,64,3,0,reduplicateRows (src),ONLINE,53.590,0
+hi_medium,aml,2077023,31898238,64,3,0,unionWith (src),ONLINE,260.060,0
+hi_medium,aml,2077023,31898238,64,3,0,src branch (total),ONLINE,2308.230,0
+hi_medium,aml,2077023,31898238,64,3,0,parallel_sort (dst),ONLINE,934.760,0
+hi_medium,aml,2077023,31898238,64,3,0,dst branch (total),ONLINE,2966.700,0
+hi_medium,aml,2077023,31898238,64,3,0,parallel branches (wall),ONLINE,3059.320,1
+hi_medium,aml,2077023,31898238,64,3,0,unionWith (final),ONLINE,37.260,1
+hi_medium,aml,2077023,31898238,64,3,0,CSV write,IO,15648.790,1
+hi_medium,aml,2077023,31898238,64,4,0,CSV read (account),IO,627.960,1
+hi_medium,aml,2077023,31898238,64,4,0,CSV read (txn),IO,27618.730,1
+hi_medium,aml,2077023,31898238,64,4,0,buildNodeIndex,OFFLINE,2200.670,1
+hi_medium,aml,2077023,31898238,64,4,0,index copy (src),OFFLINE,285.360,1
+hi_medium,aml,2077023,31898238,64,4,0,initProbeSide (dst),OFFLINE,1050.860,0
+hi_medium,aml,2077023,31898238,64,4,0,initProbeSide (src),OFFLINE,1061.980,0
+hi_medium,aml,2077023,31898238,64,4,0,initProbeSide (wall),OFFLINE,1062.770,1
+hi_medium,aml,2077023,31898238,64,4,0,deduplicateRows (src),ONLINE,29.030,0
+hi_medium,aml,2077023,31898238,64,4,0,deduplicateRows (dst),ONLINE,32.770,0
+hi_medium,aml,2077023,31898238,64,4,0,probe src,ONLINE,1924.230,0
+hi_medium,aml,2077023,31898238,64,4,0,reduplicateRows (src),ONLINE,45.610,0
+hi_medium,aml,2077023,31898238,64,4,0,unionWith (src),ONLINE,35.170,0
+hi_medium,aml,2077023,31898238,64,4,0,src branch (total),ONLINE,2034.060,0
+hi_medium,aml,2077023,31898238,64,4,0,probe dst,ONLINE,2082.220,0
+hi_medium,aml,2077023,31898238,64,4,0,reduplicateRows (dst),ONLINE,41.460,0
+hi_medium,aml,2077023,31898238,64,4,0,unionWith (dst),ONLINE,24.160,0
+hi_medium,aml,2077023,31898238,64,4,0,parallel_sort (dst),ONLINE,911.090,0
+hi_medium,aml,2077023,31898238,64,4,0,dst branch (total),ONLINE,3091.770,0
+hi_medium,aml,2077023,31898238,64,4,0,parallel branches (wall),ONLINE,3163.180,1
+hi_medium,aml,2077023,31898238,64,4,0,unionWith (final),ONLINE,39.010,1
+hi_medium,aml,2077023,31898238,64,4,0,CSV write,IO,15672.840,1
+hi_large,aml,2116168,179702229,64,1,1,CSV read (account),IO,682.100,1
+hi_large,aml,2116168,179702229,64,1,1,CSV read (txn),IO,141730.430,1
+hi_large,aml,2116168,179702229,64,1,1,buildNodeIndex,OFFLINE,4470.390,1
+hi_large,aml,2116168,179702229,64,1,1,index copy (src),OFFLINE,558.190,1
+hi_large,aml,2116168,179702229,64,1,1,initProbeSide (src),OFFLINE,5797.310,0
+hi_large,aml,2116168,179702229,64,1,1,initProbeSide (dst),OFFLINE,5809.430,0
+hi_large,aml,2116168,179702229,64,1,1,initProbeSide (wall),OFFLINE,5809.530,1
+hi_large,aml,2116168,179702229,64,1,1,deduplicateRows (src),ONLINE,164.380,0
+hi_large,aml,2116168,179702229,64,1,1,deduplicateRows (dst),ONLINE,203.490,0
+hi_large,aml,2116168,179702229,64,1,1,probe src,ONLINE,14874.130,0
+hi_large,aml,2116168,179702229,64,1,1,probe dst,ONLINE,15022.380,0
+hi_large,aml,2116168,179702229,64,1,1,reduplicateRows (src),ONLINE,239.320,0
+hi_large,aml,2116168,179702229,64,1,1,unionWith (src),ONLINE,221.010,0
+hi_large,aml,2116168,179702229,64,1,1,src branch (total),ONLINE,15498.870,0
+hi_large,aml,2116168,179702229,64,1,1,reduplicateRows (dst),ONLINE,314.040,0
+hi_large,aml,2116168,179702229,64,1,1,unionWith (dst),ONLINE,137.950,0
+hi_large,aml,2116168,179702229,64,1,1,parallel_sort (dst),ONLINE,7278.840,0
+hi_large,aml,2116168,179702229,64,1,1,dst branch (total),ONLINE,22956.780,0
+hi_large,aml,2116168,179702229,64,1,1,parallel branches (wall),ONLINE,23271.380,1
+hi_large,aml,2116168,179702229,64,1,1,unionWith (final),ONLINE,158.190,1
+hi_large,aml,2116168,179702229,64,1,1,CSV write,IO,57733.730,1
+hi_large,aml,2116168,179702229,64,2,0,CSV read (account),IO,684.210,1
+hi_large,aml,2116168,179702229,64,2,0,CSV read (txn),IO,141660.520,1
+hi_large,aml,2116168,179702229,64,2,0,buildNodeIndex,OFFLINE,4634.010,1
+hi_large,aml,2116168,179702229,64,2,0,index copy (src),OFFLINE,533.620,1
+hi_large,aml,2116168,179702229,64,2,0,initProbeSide (src),OFFLINE,6021.020,0
+hi_large,aml,2116168,179702229,64,2,0,initProbeSide (dst),OFFLINE,6028.500,0
+hi_large,aml,2116168,179702229,64,2,0,initProbeSide (wall),OFFLINE,6028.600,1
+hi_large,aml,2116168,179702229,64,2,0,deduplicateRows (dst),ONLINE,167.030,0
+hi_large,aml,2116168,179702229,64,2,0,deduplicateRows (src),ONLINE,201.140,0
+hi_large,aml,2116168,179702229,64,2,0,probe dst,ONLINE,14129.960,0
+hi_large,aml,2116168,179702229,64,2,0,probe src,ONLINE,14343.100,0
+hi_large,aml,2116168,179702229,64,2,0,reduplicateRows (dst),ONLINE,257.850,0
+hi_large,aml,2116168,179702229,64,2,0,unionWith (dst),ONLINE,211.850,0
+hi_large,aml,2116168,179702229,64,2,0,reduplicateRows (src),ONLINE,293.790,0
+hi_large,aml,2116168,179702229,64,2,0,unionWith (src),ONLINE,2369.740,0
+hi_large,aml,2116168,179702229,64,2,0,src branch (total),ONLINE,17207.820,0
+hi_large,aml,2116168,179702229,64,2,0,parallel_sort (dst),ONLINE,7318.000,0
+hi_large,aml,2116168,179702229,64,2,0,dst branch (total),ONLINE,22084.770,0
+hi_large,aml,2116168,179702229,64,2,0,parallel branches (wall),ONLINE,22425.950,1
+hi_large,aml,2116168,179702229,64,2,0,unionWith (final),ONLINE,131.690,1
+hi_large,aml,2116168,179702229,64,2,0,CSV write,IO,57449.250,1
+hi_large,aml,2116168,179702229,64,3,0,CSV read (account),IO,690.450,1
+hi_large,aml,2116168,179702229,64,3,0,CSV read (txn),IO,141531.160,1
+hi_large,aml,2116168,179702229,64,3,0,buildNodeIndex,OFFLINE,4615.350,1
+hi_large,aml,2116168,179702229,64,3,0,index copy (src),OFFLINE,527.690,1
+hi_large,aml,2116168,179702229,64,3,0,initProbeSide (dst),OFFLINE,5903.340,0
+hi_large,aml,2116168,179702229,64,3,0,initProbeSide (src),OFFLINE,5903.030,0
+hi_large,aml,2116168,179702229,64,3,0,initProbeSide (wall),OFFLINE,5903.750,1
+hi_large,aml,2116168,179702229,64,3,0,deduplicateRows (src),ONLINE,165.010,0
+hi_large,aml,2116168,179702229,64,3,0,deduplicateRows (dst),ONLINE,205.710,0
+hi_large,aml,2116168,179702229,64,3,0,probe dst,ONLINE,14364.670,0
+hi_large,aml,2116168,179702229,64,3,0,probe src,ONLINE,14441.530,0
+hi_large,aml,2116168,179702229,64,3,0,reduplicateRows (dst),ONLINE,244.760,0
+hi_large,aml,2116168,179702229,64,3,0,reduplicateRows (src),ONLINE,316.000,0
+hi_large,aml,2116168,179702229,64,3,0,unionWith (dst),ONLINE,220.320,0
+hi_large,aml,2116168,179702229,64,3,0,unionWith (src),ONLINE,229.860,0
+hi_large,aml,2116168,179702229,64,3,0,src branch (total),ONLINE,15152.410,0
+hi_large,aml,2116168,179702229,64,3,0,parallel_sort (dst),ONLINE,7286.950,0
+hi_large,aml,2116168,179702229,64,3,0,dst branch (total),ONLINE,22322.580,0
+hi_large,aml,2116168,179702229,64,3,0,parallel branches (wall),ONLINE,22670.180,1
+hi_large,aml,2116168,179702229,64,3,0,unionWith (final),ONLINE,164.060,1
+hi_large,aml,2116168,179702229,64,3,0,CSV write,IO,57457.210,1
+hi_large,aml,2116168,179702229,64,4,0,CSV read (account),IO,685.590,1
+hi_large,aml,2116168,179702229,64,4,0,CSV read (txn),IO,141481.220,1
+hi_large,aml,2116168,179702229,64,4,0,buildNodeIndex,OFFLINE,4608.320,1
+hi_large,aml,2116168,179702229,64,4,0,index copy (src),OFFLINE,555.110,1
+hi_large,aml,2116168,179702229,64,4,0,initProbeSide (src),OFFLINE,5624.990,0
+hi_large,aml,2116168,179702229,64,4,0,initProbeSide (dst),OFFLINE,5757.070,0
+hi_large,aml,2116168,179702229,64,4,0,initProbeSide (wall),OFFLINE,5757.170,1
+hi_large,aml,2116168,179702229,64,4,0,deduplicateRows (src),ONLINE,170.900,0
+hi_large,aml,2116168,179702229,64,4,0,deduplicateRows (dst),ONLINE,202.240,0
+hi_large,aml,2116168,179702229,64,4,0,probe dst,ONLINE,14525.650,0
+hi_large,aml,2116168,179702229,64,4,0,probe src,ONLINE,14748.010,0
+hi_large,aml,2116168,179702229,64,4,0,reduplicateRows (dst),ONLINE,240.000,0
+hi_large,aml,2116168,179702229,64,4,0,unionWith (dst),ONLINE,150.440,0
+hi_large,aml,2116168,179702229,64,4,0,reduplicateRows (src),ONLINE,288.700,0
+hi_large,aml,2116168,179702229,64,4,0,unionWith (src),ONLINE,2326.980,0
+hi_large,aml,2116168,179702229,64,4,0,src branch (total),ONLINE,17534.610,0
+hi_large,aml,2116168,179702229,64,4,0,parallel_sort (dst),ONLINE,7376.840,0
+hi_large,aml,2116168,179702229,64,4,0,dst branch (total),ONLINE,22495.300,0
+hi_large,aml,2116168,179702229,64,4,0,parallel branches (wall),ONLINE,22893.740,1
+hi_large,aml,2116168,179702229,64,4,0,unionWith (final),ONLINE,134.590,1
+hi_large,aml,2116168,179702229,64,4,0,CSV write,IO,57533.280,1

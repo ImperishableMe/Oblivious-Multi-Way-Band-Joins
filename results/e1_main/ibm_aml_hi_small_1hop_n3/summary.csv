@@ -1,0 +1,4 @@
+system,query,dataset,n_runs,median_ms,mean_ms,min_ms,max_ms,stddev_ms,output_rows
+full_mwj_no_filter,aml_1hop,ibm_aml_hi_small,3,97387.461,98008.69733333333,97077.413,99561.218,1353.429996673757,5078345
+nebuladb,aml_1hop,ibm_aml_hi_small,3,340.189,335.8516666666667,325.815,341.551,8.71864492529277,5078345
+obliviator_chained,aml_1hop,ibm_aml_hi_small,3,422.252,419.49133333333333,364.736,471.486,53.42851846470509,5078345

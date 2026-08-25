@@ -1,0 +1,13 @@
+system,query,dataset,run_id,is_warmup,total_ms,onehop_ms,mwj_ms,output_rows
+nebuladb,aml_1hop,ibm_aml_hi_small,0,1,339.054,339.054,,5078345
+full_mwj_no_filter,aml_1hop,ibm_aml_hi_small,0,1,99911.232,,99911.232,5078345
+obliviator_chained,aml_1hop,ibm_aml_hi_small,0,1,419.253,,,5078345
+nebuladb,aml_1hop,ibm_aml_hi_small,1,0,325.815,325.815,,5078345
+full_mwj_no_filter,aml_1hop,ibm_aml_hi_small,1,0,99561.218,,99561.218,5078345
+obliviator_chained,aml_1hop,ibm_aml_hi_small,1,0,471.486,,,5078345
+nebuladb,aml_1hop,ibm_aml_hi_small,2,0,341.551,341.551,,5078345
+full_mwj_no_filter,aml_1hop,ibm_aml_hi_small,2,0,97387.461,,97387.461,5078345
+obliviator_chained,aml_1hop,ibm_aml_hi_small,2,0,364.736,,,5078345
+nebuladb,aml_1hop,ibm_aml_hi_small,3,0,340.189,340.189,,5078345
+full_mwj_no_filter,aml_1hop,ibm_aml_hi_small,3,0,97077.413,,97077.413,5078345
+obliviator_chained,aml_1hop,ibm_aml_hi_small,3,0,422.252,,,5078345

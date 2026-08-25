@@ -1,0 +1,37 @@
+{
+  "started_at": "2026-08-25T12:14:00+0000",
+  "git_commit": "e176c78431d956ebcd52595ea8b0e3f60ca01f72",
+  "git_branch": "main",
+  "hostname": "tdx-guest",
+  "nproc": 120,
+  "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "workload": "aml",
+  "args": {
+    "workload": "aml",
+    "dataset": "ibm_aml_hi_small",
+    "queries": "aml_1hop",
+    "systems": "nebuladb,full_mwj_no_filter,obliviator_chained",
+    "measurement_runs": 3,
+    "warmup_runs": 1,
+    "onehop_threads": 64,
+    "mwj_threads": 64,
+    "obliviator_threads": 64,
+    "cell_timeout": 0,
+    "obliviator_timeout": null,
+    "skip_build": true,
+    "output_dir": "results/e1_main/ibm_aml_hi_small_1hop_n3"
+  },
+  "mwj_env": {
+    "OBL_MWJ_SORT_THREADS": "64"
+  },
+  "binaries": {
+    "sgx_app": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/sgx_app",
+    "onehop": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obligraph/build/ibm_aml_onehop",
+    "obliviator_1hop_chained": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obl-radix/baselines/obliviatorFK-TDX/obliviator_1hop_chained",
+    "obliviator_khop_chained": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obl-radix/baselines/obliviatorNFK-TDX/obliviator_khop_chained",
+    "obliviator_converter": "/home/tdx/bishwajit/Oblivious-Multi-Way-Band-Joins/obl-radix/baselines/obliviatorFK-TDX/convert_aml_1hop.py"
+  },
+  "note": "one-hop runs once per repetition (not per cell); its result is reused for all >=2-hop NebulaDB cells in that rep and reported as the latency of the 1-hop NebulaDB cell. obliviator src.txt is generated once per dataset and reused across all reps and queries (deterministic). full_mwj_no_filter runs sgx_app with --no-filter (no WHERE-clause selection pushdown), computing the full unfiltered multi-way join; like obliviator_chained it computes the unfiltered chain join and explodes with hop count. Any binary OOM/crash is caught per cell (recorded as output_rows=OOM, total_ms empty) and never aborts the sweep; once a system fails at hop K its higher hops are recorded SKIPPED.",
+  "ended_at": "2026-08-25T12:22:25+0000"
+}

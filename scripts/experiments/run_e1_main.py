@@ -47,7 +47,7 @@ Correctness is checked separately by `tests/test_e1_chain_correctness.py`.
 
 Outputs (under results/e1_main/):
   raw_runs.csv          every run, including warm-ups
-  summary.csv           measurement runs only, per cell: n, median, min, max, stddev, output_rows
+  summary.csv           measurement runs only, per cell: n, median, mean, min, max, stddev, output_rows
   run_metadata.json     commit, host, nproc, build flags, settings
   binary_stdout.log     full stdout from every invocation
 
@@ -688,7 +688,7 @@ def main():
     with open(summary_csv_path, "w", newline="") as f:
         sw = csv.DictWriter(f, fieldnames=[
             "system", "query", "dataset", "n_runs",
-            "median_ms", "min_ms", "max_ms", "stddev_ms", "output_rows",
+            "median_ms", "mean_ms", "min_ms", "max_ms", "stddev_ms", "output_rows",
         ])
         sw.writeheader()
         for (system, query, dataset), cell in sorted(by_cell.items()):
@@ -700,7 +700,8 @@ def main():
                 sw.writerow({
                     "system": system, "query": query, "dataset": dataset,
                     "n_runs": 0,
-                    "median_ms": "", "min_ms": "", "max_ms": "", "stddev_ms": "",
+                    "median_ms": "", "mean_ms": "", "min_ms": "", "max_ms": "",
+                    "stddev_ms": "",
                     "output_rows": cell[0]["output_rows"],
                 })
                 continue
@@ -708,6 +709,7 @@ def main():
                 "system": system, "query": query, "dataset": dataset,
                 "n_runs": n,
                 "median_ms": statistics.median(totals),
+                "mean_ms": statistics.fmean(totals),
                 "min_ms": min(totals),
                 "max_ms": max(totals),
                 "stddev_ms": statistics.stdev(totals) if n >= 2 else 0.0,

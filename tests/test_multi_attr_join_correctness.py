@@ -17,6 +17,10 @@ Queries the engine must refuse (two ranges on different column pairs, a
 predicate that closes a cycle in the join graph, '<>' between tables, ...)
 are checked for a clean non-zero exit instead of a silently wrong answer.
 
+The cases cover every join-tree shape: two tables, chains, a root with several
+children, and nodes that have both a parent and two or more children (which
+the align-concat phase handles with rank-based alignment keys).
+
 Usage:
     python3 tests/test_multi_attr_join_correctness.py <sgx_app_binary> [banking_data_dir]
 
@@ -48,6 +52,8 @@ SYNTHETIC_SCHEMAS = {
     "rel_r": ["rid", "a", "b", "t", "v"],
     "rel_s": ["sid", "a", "b", "t", "w"],
     "rel_u": ["uid", "a", "b", "t", "x"],
+    # No id column and only 12 possible rows, so most rows occur several times.
+    "rel_d": ["a", "b", "t"],
 }
 ROWS_PER_TABLE = 40
 
@@ -58,6 +64,13 @@ def make_synthetic_rows(seed: int, t_base: int) -> dict:
     for name in SYNTHETIC_SCHEMAS:
         rows = []
         for i in range(ROWS_PER_TABLE):
+            if name == "rel_d":
+                rows.append([
+                    rng.randint(0, 2),               # a
+                    rng.randint(0, 1),               # b
+                    t_base + rng.randint(0, 1),      # t
+                ])
+                continue
             rows.append([
                 i + 1,                           # id
                 rng.randint(0, 4),               # a
@@ -74,6 +87,8 @@ def make_synthetic_rows(seed: int, t_base: int) -> dict:
 # The first table in FROM is the root of the engine's join tree.
 # ---------------------------------------------------------------------------
 R, S, U = ("rel_r", "r"), ("rel_s", "s"), ("rel_u", "u")
+R2, S2, U2 = ("rel_r", "r2"), ("rel_s", "s2"), ("rel_u", "u2")
+D = ("rel_d", "d")
 
 SYNTHETIC_CASES = [
     # --- two tables -------------------------------------------------------
@@ -111,6 +126,32 @@ SYNTHETIC_CASES = [
     ("star_composite_different_keys", [R, S, U],
      ["r.a = s.a", "s.t >= r.t", "s.t <= r.t + 2",
       "r.b = u.b", "u.t >= r.t - 1", "u.t <= r.t + 1"]),
+    # --- a node with a parent AND two or more children ----------------------
+    # s is joined to its parent r and to its children u and r2 (r2, s2, u2 are
+    # further aliases of the same tables). The filters keep the results small.
+    ("inner_two_children_same_column", [R, S, U, R2],
+     ["r.a = s.a", "s.a = u.a", "s.a = r2.a", "u.x < 50", "r2.v < 50"]),
+    ("inner_two_children_different_columns", [R, S, U, R2],
+     ["r.a = s.a", "s.b = u.b", "s.a = r2.a", "u.x < 30", "r2.v < 30"]),
+    ("inner_two_children_composite", [R, S, U, R2],
+     ["r.a = s.a", "s.t >= r.t", "s.t <= r.t + 1",
+      "s.b = u.b", "u.t = s.t",
+      "s.a = r2.a", "r2.b = s.b", "r2.t > s.t"]),
+    ("inner_three_children", [R, S, U, R2, S2],
+     ["r.a = s.a", "s.a = u.a", "s.b = r2.b", "s.a = s2.a",
+      "u.x < 20", "r2.v < 20", "s2.w < 20"]),
+    ("two_levels_of_branching", [R, S, U, R2, S2, U2],
+     ["r.a = s.a", "s.a = u.a", "s.b = r2.b", "u.b = s2.b", "u.a = u2.a",
+      "r.v < 50", "u.x < 50", "r2.v < 20", "s2.w < 15", "u2.x < 15"]),
+    # --- tables with repeated rows -------------------------------------------
+    ("repeated_rows_leaf", [R, D], ["r.a = d.a"]),
+    ("chain_through_repeated_rows", [R, D, U], ["r.a = d.a", "d.b = u.b", "u.x < 30"]),
+    ("chain_repeated_rows_then_two_more", [R, D, S, U],
+     ["r.a = d.a", "d.b = s.b", "s.a = u.a", "s.w < 30", "u.x < 30"]),
+    ("root_with_repeated_rows", [D, U, R2],
+     ["d.b = u.b", "d.a = r2.a", "u.x < 20", "r2.v < 30"]),
+    ("inner_repeated_rows_two_children", [R, D, U, R2],
+     ["r.a = d.a", "d.b = u.b", "d.a = r2.a", "u.x < 20", "r2.v < 30"]),
 ]
 
 # Queries that must be refused with a non-zero exit code.

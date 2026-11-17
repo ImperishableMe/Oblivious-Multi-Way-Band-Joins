@@ -55,8 +55,14 @@ Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root) {
         DEBUG_INFO("Setting child result join key to: %s", constraint.get_source_column().c_str());
         JoinAttributeSetter::SetSourceJoinKey(child_result, constraint);
         
-        // Align and concatenate with accumulator
-        accumulator = AlignAndConcatenate(accumulator, child_result);
+        // Align and concatenate with accumulator. A child with two or more
+        // children of its own has been re-sorted once per child, so its rows
+        // are no longer arranged in repeating blocks; its alignment keys must
+        // then come from duplicate ranks (see ComputeAlignmentKeysByRank).
+        // The number of children is part of the query's join tree, so this
+        // choice is public.
+        const bool child_rows_regrouped = child->num_children() >= 2;
+        accumulator = AlignAndConcatenate(accumulator, child_result, child_rows_regrouped);
         
         DEBUG_INFO("Accumulator size after adding %s: %zu",
                    child->get_table_name().c_str(), accumulator.size());
@@ -66,7 +72,8 @@ Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root) {
 }
 
 Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
-                                       const Table& child) {
+                                       const Table& child,
+                                       bool child_rows_regrouped) {
     static int concat_iteration = 0;
     concat_iteration++;
     
@@ -91,16 +98,19 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     double acc_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
     DEBUG_INFO("Accumulator sort: %.6fs", acc_sort_time);
     
-    // Step 2: Compute copy indices for child table
-    DEBUG_INFO("Step 2: Computing copy indices");
-    DEBUG_INFO("Child size before ComputeCopyIndices: %zu rows", child.size());
-    Table indexed_child = ComputeCopyIndices(child);
-    DEBUG_INFO("Child size after ComputeCopyIndices: %zu rows", indexed_child.size());
-
-    // Step 3: Compute alignment keys
-    DEBUG_INFO("Step 3: Computing alignment keys");
-    Table aligned_child = ComputeAlignmentKeys(indexed_child);
-    DEBUG_INFO("Child size after ComputeAlignmentKeys: %zu rows", aligned_child.size());
+    // Steps 2-3: Compute copy indices and alignment keys for the child table.
+    // Normally the copies of each child tuple form repeating blocks of
+    // local_mult rows, and copy_index / local_mult picks the parent group.
+    // A child that was itself re-sorted for several children needs the
+    // rank-based keys instead (one extra sort, timed with the child sort).
+    DEBUG_INFO("Steps 2-3: Computing copy indices and alignment keys (%s)",
+               child_rows_regrouped ? "by duplicate rank" : "by copy index");
+    DEBUG_INFO("Child size before alignment keys: %zu rows", child.size());
+    double rank_sort_time = 0.0;
+    Table aligned_child = child_rows_regrouped
+        ? ComputeAlignmentKeysByRank(child, rank_sort_time)
+        : ComputeAlignmentKeys(ComputeCopyIndices(child));
+    DEBUG_INFO("Child size after alignment keys: %zu rows", aligned_child.size());
     
     // Step 4: Sort child by alignment key
     DEBUG_INFO("Step 4: Sorting child by alignment key");
@@ -113,7 +123,8 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
 
     DEBUG_INFO("Child size after sort: %zu rows", aligned_child.size());
 
-    double child_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
+    double child_sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count()
+                             + rank_sort_time;
     DEBUG_INFO("Child sort: %.6fs", child_sort_time);
     
     // Update global sorting metrics
@@ -258,6 +269,29 @@ Table AlignConcat::ComputeAlignmentKeys(const Table& table) {
     
     DEBUG_DEBUG("Alignment keys computed");
     
+    return result;
+}
+
+Table AlignConcat::ComputeAlignmentKeysByRank(const Table& table, double& sort_time) {
+    DEBUG_DEBUG("Computing rank-based alignment keys for %zu entries", table.size());
+
+    // Start every rank at 0
+    Table result = table.map(OP_ECALL_TRANSFORM_INIT_COPY_INDEX);
+
+    // Bring identical rows (same join key, same attributes) together
+    using Clock = std::chrono::high_resolution_clock;
+    auto sort_start = Clock::now();
+    result.shuffle_merge_sort(OP_ECALL_COMPARATOR_JOIN_THEN_OTHER);
+    sort_time = std::chrono::duration<double>(Clock::now() - sort_start).count();
+
+    // copy_index = rank of each row among its identical rows
+    result.linear_pass(OP_ECALL_WINDOW_UPDATE_DUPLICATE_RANK);
+
+    // alignment_key = foreign_sum + rank mod (final_mult / local_mult)
+    result.map_inplace(OP_ECALL_TRANSFORM_COMPUTE_RANK_ALIGNMENT_KEY);
+
+    DEBUG_DEBUG("Rank-based alignment keys computed");
+
     return result;
 }
 

@@ -306,6 +306,22 @@ void window_update_copy_index(entry_t* e1, entry_t* e2) {
 }
 
 /**
+ * Rank each row among its identical rows (same attributes).
+ * Run over a table sorted so that identical rows are adjacent: the first row
+ * of a run gets copy_index 0, the next 1, and so on.
+ * Compares all MAX_ATTRIBUTES attributes, branch-free.
+ */
+void window_update_duplicate_rank_op(entry_t* e1, entry_t* e2) {
+    int32_t is_same = 1;
+    for (int i = 0; i < MAX_ATTRIBUTES; i++) {
+        is_same &= (e1->attributes[i] == e2->attributes[i]);
+    }
+
+    // If identical, continue the run; otherwise start a new run at 0
+    e2->copy_index = is_same * (e1->copy_index + 1);
+}
+
+/**
  * Concatenate attributes from right entry into left entry
  * This adds all attributes from right to left, preserving left's existing attributes
  */

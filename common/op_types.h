@@ -51,7 +51,12 @@ typedef enum {
     OP_ECALL_UPDATE_TARGET_FINAL_MULTIPLICITY,
 
     // Concat operations
-    OP_ECALL_CONCAT_ATTRIBUTES
+    OP_ECALL_CONCAT_ATTRIBUTES,
+
+    // Align-concat for a child that has two or more children of its own
+    // (appended here so the numeric values of the operations above stay put)
+    OP_ECALL_WINDOW_UPDATE_DUPLICATE_RANK,
+    OP_ECALL_TRANSFORM_COMPUTE_RANK_ALIGNMENT_KEY
 } OpEcall;
 
 #endif // OP_TYPES_H

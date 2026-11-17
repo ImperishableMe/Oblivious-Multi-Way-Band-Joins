@@ -231,6 +231,8 @@ static single_op_fn get_single_op_function(OpEcall op_type) {
             return transform_init_copy_index_op;
         case OP_ECALL_TRANSFORM_COMPUTE_ALIGNMENT_KEY:
             return transform_compute_alignment_key_op;
+        case OP_ECALL_TRANSFORM_COMPUTE_RANK_ALIGNMENT_KEY:
+            return transform_compute_rank_alignment_key_op;
         default:
             return nullptr;
     }
@@ -276,6 +278,8 @@ static dual_entry_op_fn get_dual_entry_op_function(OpEcall op_type) {
             return window_expand_copy_op;
         case OP_ECALL_WINDOW_UPDATE_COPY_INDEX:
             return window_update_copy_index_op;
+        case OP_ECALL_WINDOW_UPDATE_DUPLICATE_RANK:
+            return window_update_duplicate_rank_op;
         // Update operations
         case OP_ECALL_UPDATE_TARGET_MULTIPLICITY:
             return update_target_multiplicity_op;

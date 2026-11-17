@@ -218,7 +218,8 @@ void comparator_end_first(entry_t* e1, entry_t* e2) {
 
 /**
  * Core operation for comparator by join key then all attributes (Algorithm 697)
- * Primary: composite join key, Secondary: all attributes in sequence
+ * Primary: composite join key, Secondary: all attributes in sequence,
+ * Last: original index
  */
 void comparator_join_then_other_op(entry_t* e1, entry_t* e2) {
     // Compare the composite join keys
@@ -238,8 +239,15 @@ void comparator_join_then_other_op(entry_t* e1, entry_t* e2) {
         attr_cmp = attr_cmp + is_first_diff * curr_cmp;
     }
     
-    // Combine: use join_attr comparison if not equal, else use attributes comparison
-    int32_t normal_result = join_not_equal * cmp + (1 - join_not_equal) * attr_cmp;
+    // Last tie-break: original index, so that copies of one tuple stay
+    // together even when the table contains repeated rows (see
+    // compare_join_then_other in merge_comparators.c)
+    int32_t idx_cmp = oblivious_sign(e1->original_index - e2->original_index);
+    int32_t attr_equal = (attr_cmp == 0);
+    int32_t attr_then_idx = (1 - attr_equal) * attr_cmp + attr_equal * idx_cmp;
+
+    // Combine: use the join key comparison if not equal, else attributes, then original index
+    int32_t normal_result = join_not_equal * cmp + (1 - join_not_equal) * attr_then_idx;
     
     // Adjust for SORT_PADDING entries
     int32_t result = adjust_for_padding(e1, e2, normal_result);

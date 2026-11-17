@@ -314,6 +314,24 @@ void transform_compute_alignment_key(entry_t* entry) {
 }
 
 /**
+ * Compute alignment key = foreign_sum + (rank mod groups), where rank is the
+ * row's rank among its identical rows (in copy_index, see
+ * window_update_duplicate_rank_op) and groups = final_mult / local_mult is the
+ * number of parent groups the tuple is spread over.
+ *
+ * Every distinct sub-result of a tuple occurs a multiple of `groups` times, so
+ * rank mod groups hands each parent group exactly its share of every
+ * sub-result, whatever order the rows were in.
+ */
+void transform_compute_rank_alignment_key_op(entry_t* entry) {
+    // Avoid division by zero obliviously
+    int32_t safe_local_mult = entry->local_mult + (entry->local_mult == 0);
+    int32_t groups = entry->final_mult / safe_local_mult;
+    int32_t safe_groups = groups + (groups == 0);
+    entry->alignment_key = entry->foreign_sum + (entry->copy_index % safe_groups);
+}
+
+/**
  * Set the composite join key from the entry's own columns (Algorithm 999,
  * extended to several join columns).
  *

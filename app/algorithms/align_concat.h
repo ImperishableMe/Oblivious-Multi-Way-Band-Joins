@@ -73,10 +73,14 @@ private:
      *
      * @param accumulator Current accumulated result (parent)
      * @param child Child table to align and add
+     * @param child_rows_regrouped True if the child is the result of a node
+     *        with two or more children: its rows were re-sorted once per
+     *        child, so steps 2-3 use ComputeAlignmentKeysByRank instead
      * @return Concatenated result table
      */
     static Table AlignAndConcatenate(const Table& accumulator,
-                                     const Table& child);
+                                     const Table& child,
+                                     bool child_rows_regrouped);
     
     /**
      * Pre-order traversal of join tree
@@ -108,6 +112,35 @@ private:
      * @return Table with alignment keys computed
      */
     static Table ComputeAlignmentKeys(const Table& table);
+
+    /**
+     * Compute alignment keys for a child whose rows are not arranged in
+     * repeating blocks.
+     *
+     * The copy-index formula above relies on the copies of one child tuple
+     * cycling through that tuple's sub-results (its combinations with its own
+     * subtree) every local_mult rows. That holds for a leaf and for a node
+     * with one child. A node with two or more children is re-sorted by
+     * (join key, all attributes) for each child after the first, which groups
+     * equal sub-results together; copy_index / local_mult would then hand one
+     * parent group several copies of the same sub-result and none of another.
+     *
+     * Instead: sort so identical rows are adjacent, rank each row among its
+     * identical rows, and use
+     *   alignment_key = foreign_sum + rank mod (final_mult / local_mult).
+     * A tuple is spread over final_mult / local_mult parent groups and each of
+     * its sub-results occurs a multiple of that many times, so every parent
+     * group receives each sub-result exactly as often as it should - whatever
+     * order the rows arrive in, and also when tuples are duplicated.
+     *
+     * Costs one extra oblivious sort of the child table. Whether it runs
+     * depends only on the shape of the join tree.
+     *
+     * @param table Child result with its join key set
+     * @param sort_time Receives the time spent in the extra sort (seconds)
+     * @return Table with alignment keys computed
+     */
+    static Table ComputeAlignmentKeysByRank(const Table& table, double& sort_time);
 };
 
 #endif // ALIGN_CONCAT_H

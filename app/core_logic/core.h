@@ -113,6 +113,10 @@ void transform_compute_alignment_key(entry_t* entry);
 void transform_compute_alignment_key_op(entry_t* entry);  // Raw operation without decrypt/encrypt
 void window_update_copy_index(entry_t* e1, entry_t* e2);
 void window_update_copy_index_op(entry_t* e1, entry_t* e2);  // Raw operation without decrypt/encrypt
+// Alignment of a child that has two or more children of its own:
+// rank rows among identical rows, then key = foreign_sum + rank mod (final_mult / local_mult)
+void window_update_duplicate_rank_op(entry_t* e1, entry_t* e2);
+void transform_compute_rank_alignment_key_op(entry_t* entry);
 // concat_attributes wrapper removed - we call concat_attributes_op directly with parameters
 void concat_attributes_op(entry_t* left, entry_t* right, int32_t left_attr_count, int32_t right_attr_count);  // Raw operation without decrypt/encrypt
 

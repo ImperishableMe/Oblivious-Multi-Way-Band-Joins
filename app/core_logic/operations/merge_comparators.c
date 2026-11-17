@@ -168,7 +168,7 @@ int compare_end_first(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Compare by join key then other attributes
+ * Compare by join key, then other attributes, then original index
  * Used for final output sorting in align phase
  */
 int compare_join_then_other(entry_t* e1, entry_t* e2) {
@@ -188,9 +188,19 @@ int compare_join_then_other(entry_t* e1, entry_t* e2) {
         found_diff = found_diff | (this_cmp != 0);
     }
     
-    // Use the join key if different, else use attributes
+    // Last tie-break: original index. Rows that agree on the join key and on
+    // every attribute can still be copies of different tuples when a table
+    // contains repeated rows. Keeping each tuple's copies together lets the
+    // copy-index pass of the next alignment see them as one run. For tables
+    // without repeated rows such ties only occur between copies of the same
+    // tuple, so this changes nothing.
+    int32_t idx_cmp = oblivious_sign(e1->original_index - e2->original_index);
+    int32_t attr_equal = (attr_cmp == 0);
+    int32_t attr_then_idx = (1 - attr_equal) * attr_cmp + attr_equal * idx_cmp;
+
+    // Use the join key if different, else use attributes (then original index)
     int32_t join_equal = (join_cmp == 0);
-    int32_t normal_result = (1 - join_equal) * join_cmp + join_equal * attr_cmp;
+    int32_t normal_result = (1 - join_equal) * join_cmp + join_equal * attr_then_idx;
     
     // Adjust for SORT_PADDING entries
     int32_t result = adjust_for_padding(e1, e2, normal_result);

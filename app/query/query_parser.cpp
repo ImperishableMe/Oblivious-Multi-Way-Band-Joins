@@ -2,7 +2,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iostream>
-#include <set>
+#include <utility>
 
 ParsedQuery QueryParser::parse(const std::string& sql_query) {
     reset();
@@ -130,7 +130,7 @@ void QueryParser::parse_where(ParsedQuery& query) {
         }
     }
     
-    // Merge join conditions on same column pairs
+    // Combine the join conditions of each table pair into one constraint
     merge_join_conditions(all_join_conditions);
     query.join_conditions = std::move(all_join_conditions);
 }
@@ -159,53 +159,147 @@ std::string QueryParser::parse_single_condition() {
     return condition_str.str();
 }
 
-void QueryParser::merge_join_conditions(std::vector<JoinConstraint>& conditions) {
-    // Group conditions by column pairs
-    std::map<std::string, std::vector<size_t>> condition_groups;
-    
-    for (size_t i = 0; i < conditions.size(); i++) {
-        const auto& cond = conditions[i];
-        // Create a key for the column pair
-        std::string key = cond.get_source_table() + "." + cond.get_source_column() + 
-                         "~" + cond.get_target_table() + "." + cond.get_target_column();
-        condition_groups[key].push_back(i);
-    }
-    
-    // Merge conditions in each group
-    std::vector<JoinConstraint> merged_conditions;
-    std::set<size_t> processed_indices;
-    
-    for (const auto& pair : condition_groups) {
-        const auto& key = pair.first;
-        const auto& indices = pair.second;
-        if (indices.size() == 1) {
-            // Single condition, no merge needed
-            merged_conditions.push_back(conditions[indices[0]]);
-            processed_indices.insert(indices[0]);
-        } else {
-            // Multiple conditions on same columns, merge them
-            JoinConstraint merged = conditions[indices[0]];
-            processed_indices.insert(indices[0]);
-            
-            for (size_t i = 1; i < indices.size(); i++) {
-                JoinConstraint merge_result;
-                bool can_merge = ConditionMerger::merge(merged, conditions[indices[i]], merge_result);
-                if (can_merge) {
-                    merged = merge_result;
-                    processed_indices.insert(indices[i]);
-                } else {
-                    // Can't merge (conflicting conditions), keep separate
-                    // This shouldn't happen in valid queries
-                    std::cerr << "Warning: Could not merge conditions on " << key << std::endl;
-                }
+// Sort key of a (possibly composite) constraint: its main column pair. For a
+// table pair joined on a single column pair this is exactly the key the
+// constraints have always been ordered by, so join-tree shape and output
+// column order of such queries do not change.
+static std::string constraint_order_key(const JoinConstraint& c) {
+    return c.get_source_table() + "." + c.get_source_column() +
+           "~" + c.get_target_table() + "." + c.get_target_column();
+}
+
+// Human-readable name of a constraint's main column pair, for error messages.
+static std::string column_pair_name(const JoinConstraint& c) {
+    return c.get_source_table() + "." + c.get_source_column() +
+           " / " + c.get_target_table() + "." + c.get_target_column();
+}
+
+// Combine all conditions between one pair of tables (already oriented the
+// same way) into a single composite constraint.
+static JoinConstraint combine_table_pair_conditions(
+    const std::vector<JoinConstraint>& pair_conditions) {
+
+    // Step 1: intersect conditions on the same column pair (e.g. a lower and
+    // an upper bound of one band), keeping first-seen order.
+    std::vector<JoinConstraint> per_column_pair;
+    for (const auto& cond : pair_conditions) {
+        bool merged = false;
+        for (auto& existing : per_column_pair) {
+            if (!ConditionMerger::can_merge(existing, cond)) {
+                continue;
             }
-            
-            merged_conditions.push_back(merged);
+            JoinConstraint intersection;
+            if (!ConditionMerger::merge(existing, cond, intersection)) {
+                throw ParseException(
+                    "Contradictory join conditions on " + column_pair_name(cond) +
+                    ": no value satisfies all of them");
+            }
+            existing = intersection;
+            merged = true;
+            break;
+        }
+        if (!merged) {
+            per_column_pair.push_back(cond);
         }
     }
-    
-    // Replace with merged conditions
-    conditions = std::move(merged_conditions);
+
+    // Step 2: separate equalities (possibly with a constant offset) from ranges.
+    std::vector<JoinConstraint> equalities;
+    std::vector<JoinConstraint> ranges;
+    for (const auto& cond : per_column_pair) {
+        if (cond.is_point()) {
+            equalities.push_back(cond);
+        } else {
+            ranges.push_back(cond);
+        }
+    }
+
+    // Under the composite key (equality columns, range column) the rows
+    // matching a given row form one contiguous interval only if at most one
+    // column pair carries a range. Two ranges describe a rectangle, which no
+    // single sort order turns into an interval.
+    if (ranges.size() > 1) {
+        throw ParseException(
+            "Unsupported join between tables '" + ranges[0].get_source_table() +
+            "' and '" + ranges[0].get_target_table() +
+            "': range conditions on more than one column pair (" +
+            column_pair_name(ranges[0]) + " and " + column_pair_name(ranges[1]) +
+            "). A table pair may be joined on any number of equalities plus at most one range.");
+    }
+
+    // Step 3: the range - or, without one, the last equality - becomes the
+    // main condition; every other equality is carried alongside it.
+    JoinConstraint combined;
+    if (!ranges.empty()) {
+        combined = ranges[0];
+    } else {
+        combined = equalities.back();
+        equalities.pop_back();
+    }
+
+    if (equalities.size() > MAX_JOIN_EQ) {
+        throw ParseException(
+            "Unsupported join between tables '" + combined.get_source_table() +
+            "' and '" + combined.get_target_table() + "': " +
+            std::to_string(equalities.size() + 1) + " join conditions on distinct column pairs, "
+            "but at most " + std::to_string(MAX_JOIN_EQ + 1) +
+            " are supported (rebuild with a larger MAX_JOIN_EQ to raise the limit).");
+    }
+
+    for (const auto& eq : equalities) {
+        combined.add_equality(eq.get_source_column(), eq.get_target_column(), eq.get_deviation1());
+    }
+    return combined;
+}
+
+void QueryParser::merge_join_conditions(std::vector<JoinConstraint>& conditions) {
+    // Group the conditions by table pair. Every condition of a pair is
+    // oriented the way the pair's first condition was written, so that
+    // "a.x <= b.y + 5" and "b.y <= a.x + 3" land on the same column pair.
+    typedef std::pair<std::string, std::string> TablePair;
+    std::vector<TablePair> pair_order;
+    std::map<TablePair, std::vector<JoinConstraint>> conditions_by_pair;
+
+    for (const auto& cond : conditions) {
+        if (cond.get_source_table() == cond.get_target_table()) {
+            throw ParseException(
+                "Unsupported condition on " + column_pair_name(cond) +
+                ": it compares two columns of the same table '" + cond.get_source_table() +
+                "'. Only comparisons between two different tables (joins) or between "
+                "a column and a constant (filters) are supported.");
+        }
+        if (!cond.is_valid()) {
+            throw ParseException(
+                "Unsupported join condition on " + column_pair_name(cond) +
+                ": it does not describe a single non-empty range "
+                "('<>' / '!=' between tables is not supported).");
+        }
+
+        TablePair as_written(cond.get_source_table(), cond.get_target_table());
+        TablePair flipped(cond.get_target_table(), cond.get_source_table());
+        if (conditions_by_pair.count(as_written)) {
+            conditions_by_pair[as_written].push_back(cond);
+        } else if (conditions_by_pair.count(flipped)) {
+            conditions_by_pair[flipped].push_back(cond.reverse());
+        } else {
+            pair_order.push_back(as_written);
+            conditions_by_pair[as_written].push_back(cond);
+        }
+    }
+
+    // One (possibly composite) constraint per table pair.
+    std::vector<JoinConstraint> combined_conditions;
+    for (const auto& tables : pair_order) {
+        combined_conditions.push_back(combine_table_pair_conditions(conditions_by_pair[tables]));
+    }
+
+    std::stable_sort(combined_conditions.begin(), combined_conditions.end(),
+                     [](const JoinConstraint& a, const JoinConstraint& b) {
+                         return constraint_order_key(a) < constraint_order_key(b);
+                     });
+
+    // Replace with the combined conditions
+    conditions = std::move(combined_conditions);
 }
 
 const Token& QueryParser::current() const {

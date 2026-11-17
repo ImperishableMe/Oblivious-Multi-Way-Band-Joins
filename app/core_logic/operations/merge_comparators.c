@@ -1,6 +1,7 @@
 #include "enclave_types.h"
 #include "op_types.h"
 #include "comparator_convention.h"
+#include "join_key_ops.h"
 #include <stdint.h>
 
 /**
@@ -69,14 +70,14 @@ static inline int32_t adjust_for_padding(entry_t* e1, entry_t* e2, int32_t norma
 }
 
 /**
- * Compare by join attribute
+ * Compare by join key (equality components, then the range component),
+ * breaking ties by entry-type precedence.
  * Returns 1 if e1 < e2, 0 otherwise
  */
 int compare_join_attr(entry_t* e1, entry_t* e2) {
-    // Compare join attributes obliviously
-    int32_t diff = e1->join_attr - e2->join_attr;
-    int32_t cmp = oblivious_sign(diff);
-    
+    // Compare the composite join keys obliviously
+    int32_t cmp = join_key_cmp(e1, e2);
+
     // Check if equal (without branching)
     int32_t is_equal = (cmp == 0);
     
@@ -85,12 +86,12 @@ int compare_join_attr(entry_t* e1, entry_t* e2) {
     int32_t p2 = get_precedence(e2->field_type, e2->equality_type);
     int32_t prec_cmp = oblivious_sign(p1 - p2);
     
-    // Combine: use join_attr comparison if not equal, else use precedence
+    // Combine: use the join key comparison if not equal, else use precedence
     int32_t normal_result = (1 - is_equal) * cmp + is_equal * prec_cmp;
-    
+
     // Adjust for SORT_PADDING entries
     int32_t result = adjust_for_padding(e1, e2, normal_result);
-    
+
     // Return 1 if e1 < e2, 0 otherwise
     // Note: result > 0 means e1 > e2 (should swap) in the compare-and-swap logic
     // So we return 1 when result < 0 (e1 < e2)
@@ -167,13 +168,13 @@ int compare_end_first(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Compare by join attr then other attributes
+ * Compare by join key then other attributes
  * Used for final output sorting in align phase
  */
 int compare_join_then_other(entry_t* e1, entry_t* e2) {
-    // Primary: join_attr comparison
-    int32_t join_cmp = oblivious_sign(e1->join_attr - e2->join_attr);
-    
+    // Primary: composite join key comparison
+    int32_t join_cmp = join_key_cmp(e1, e2);
+
     // Secondary: Compare attributes lexicographically
     // We need to compare all attributes obliviously
     int32_t attr_cmp = 0;
@@ -187,7 +188,7 @@ int compare_join_then_other(entry_t* e1, entry_t* e2) {
         found_diff = found_diff | (this_cmp != 0);
     }
     
-    // Use join_attr if different, else use attributes
+    // Use the join key if different, else use attributes
     int32_t join_equal = (join_cmp == 0);
     int32_t normal_result = (1 - join_equal) * join_cmp + join_equal * attr_cmp;
     

@@ -74,8 +74,16 @@ private:
     std::string parse_single_condition();
     
     /**
-     * Merge conditions that operate on the same column pairs
-     * This handles band joins that are expressed as multiple conditions
+     * Combine all join conditions between each pair of tables into one
+     * constraint.
+     *
+     * Conditions on the same column pair are intersected (a band join written
+     * as a lower and an upper bound). Conditions on different column pairs
+     * become a composite constraint: any number of equalities plus at most one
+     * range. Throws ParseException for combinations the join cannot evaluate
+     * (two ranges on different column pairs, contradictory bounds, '<>',
+     * more equalities than MAX_JOIN_EQ allows, a column compared with another
+     * column of the same table).
      */
     void merge_join_conditions(std::vector<JoinConstraint>& conditions);
     

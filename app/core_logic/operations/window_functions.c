@@ -1,5 +1,6 @@
 #include "enclave_types.h"
 #include "debug_util.h"
+#include "join_key_ops.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -63,11 +64,11 @@ void window_compute_local_sum_op(entry_t* e1, entry_t* e2) {
     int32_t is_source = (e2->field_type == SOURCE);
     
     // Check if e1 is START with NEQ (open boundary)
-    // If so, SOURCE at the same join_attr should NOT be counted
+    // If so, SOURCE at the same join key should NOT be counted
     int32_t is_start_neq = (e1->field_type == START) & (e1->equality_type == NEQ);
-    int32_t same_join_attr = (e1->join_attr == e2->join_attr);
+    int32_t same_join_attr = join_key_equal(e1, e2);
     int32_t skip_source = is_start_neq & same_join_attr & is_source;
-    
+
     // Add local_mult only if SOURCE and not skipped
     uint32_t old_cumsum __attribute__((unused)) = (uint32_t)e2->local_cumsum;
     e2->local_cumsum = e1->local_cumsum + (is_source * (1 - skip_source) * e2->local_mult);
@@ -133,11 +134,11 @@ void window_compute_foreign_sum_op(entry_t* e1, entry_t* e2) {
     // Note: mult_to_use removed as it's not used in the oblivious computation
     
     // Check if e1 is START with NEQ (open boundary)
-    // If so, SOURCE at the same join_attr should NOT be counted
+    // If so, SOURCE at the same join key should NOT be counted
     int32_t is_start_neq = (e1->field_type == START) & (e1->equality_type == NEQ);
-    int32_t same_join_attr = (e1->join_attr == e2->join_attr);
+    int32_t same_join_attr = join_key_equal(e1, e2);
     int32_t skip_source = is_start_neq & same_join_attr & is_source;
-    
+
     // Calculate weight delta: START adds, END subtracts, SOURCE no change
     int32_t weight_delta = (is_start * e2->local_mult) - 
                           (is_end * e2->local_mult);

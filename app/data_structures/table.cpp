@@ -299,14 +299,17 @@ static void apply_single_op_range(entry_t* data, size_t begin, size_t end,
         } else {
             for (size_t i = begin; i < end; i++) transform_to_end_op(&data[i], deviation, equality);
         }
+    } else if (op_type == OP_ECALL_TRANSFORM_SET_JOIN_ATTR) {
+        // params is a JOIN_KEY_PARAM_COUNT-long key description (constants.h).
+        if (!params) {
+            throw std::runtime_error("OP_ECALL_TRANSFORM_SET_JOIN_ATTR requires join key parameters");
+        }
+        for (size_t i = begin; i < end; i++) transform_set_join_key_op(&data[i], params);
     } else if (op_type == OP_ECALL_TRANSFORM_SET_INDEX ||
-               op_type == OP_ECALL_TRANSFORM_SET_JOIN_ATTR ||
                op_type == OP_ECALL_INIT_METADATA_NULL) {
         const int32_t param = params ? params[0] : 0;
         if (op_type == OP_ECALL_TRANSFORM_SET_INDEX) {
             for (size_t i = begin; i < end; i++) transform_set_index_op(&data[i], (uint32_t)param);
-        } else if (op_type == OP_ECALL_TRANSFORM_SET_JOIN_ATTR) {
-            for (size_t i = begin; i < end; i++) transform_set_join_attr_op(&data[i], param);
         } else {
             for (size_t i = begin; i < end; i++) transform_init_metadata_null_op(&data[i], (uint32_t)param);
         }

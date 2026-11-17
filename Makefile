@@ -26,6 +26,11 @@ endif
 # The slim build sets this to shrink the per-entry footprint.
 MAX_ATTRIBUTES ?=
 
+# Optional compile-time override of MAX_JOIN_EQ (the number of extra equality
+# columns a composite join key can hold, see common/constants.h). Empty => use
+# the default (2). Each unit adds 4 bytes to every entry.
+MAX_JOIN_EQ ?=
+
 # Common compiler flags
 COMMON_FLAGS := -Wall -Wextra -Wno-attributes -mavx2 -DUSE_AVX2
 
@@ -39,6 +44,11 @@ endif
 # Apply the MAX_ATTRIBUTES override (if any) to every translation unit.
 ifneq ($(MAX_ATTRIBUTES),)
 	COMMON_FLAGS += -DMAX_ATTRIBUTES=$(MAX_ATTRIBUTES)
+endif
+
+# Apply the MAX_JOIN_EQ override (if any) to every translation unit.
+ifneq ($(MAX_JOIN_EQ),)
+	COMMON_FLAGS += -DMAX_JOIN_EQ=$(MAX_JOIN_EQ)
 endif
 
 ######## App Settings ########

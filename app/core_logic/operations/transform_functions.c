@@ -314,32 +314,40 @@ void transform_compute_alignment_key(entry_t* entry) {
 }
 
 /**
- * Set join_attr from a specific column (Algorithm 999)
- * Extract the value from attributes[column_index] and set as join_attr
+ * Set the composite join key from the entry's own columns (Algorithm 999,
+ * extended to several join columns).
+ *
+ * key_params uses the JOIN_KEY_PARAM_* layout from constants.h:
+ *   - the range column is copied into join_attr;
+ *   - the first num_eq equality columns, each plus its constant offset, are
+ *     copied into join_eq; the remaining join_eq slots are set to 0 so they
+ *     never influence the key order.
+ *
+ * Which columns form the key, and how many, is fixed by the query, so the
+ * branches on key_params are public; nothing here branches on row values.
+ * The caller validates every column index against the table schema.
  */
-void transform_set_join_attr_op(entry_t* entry, int32_t column_index) {
-    // Validate column index
-    if (column_index >= 0 && column_index < MAX_ATTRIBUTES) {
-        entry->join_attr = entry->attributes[column_index];
-        
-        // Debug: Check if the join_attr is within design constraints
-        if (entry->join_attr < INT32_MIN/2 || entry->join_attr > INT32_MAX/2) {
-            DEBUG_WARN("set_join_attr: value %d from attributes[%d] is outside design range [%d, %d]", 
-                       entry->join_attr, column_index, INT32_MIN/2, INT32_MAX/2);
-        }
-        DEBUG_TRACE("set_join_attr: column_index=%d, value=%d", column_index, entry->join_attr);
-    } else {
-        // Invalid index, set to 0 as default
-        entry->join_attr = 0;
-        DEBUG_WARN("set_join_attr: invalid column_index=%d", column_index);
+void transform_set_join_key_op(entry_t* entry, const int32_t* key_params) {
+    const int32_t range_column = key_params[JOIN_KEY_PARAM_RANGE_COLUMN];
+    const int32_t num_eq = key_params[JOIN_KEY_PARAM_NUM_EQ];
+
+    entry->join_attr = entry->attributes[range_column];
+
+    // Debug: Check if the join_attr is within design constraints
+    if (entry->join_attr < INT32_MIN/2 || entry->join_attr > INT32_MAX/2) {
+        DEBUG_WARN("set_join_key: value %d from attributes[%d] is outside design range [%d, %d]",
+                   entry->join_attr, range_column, INT32_MIN/2, INT32_MAX/2);
     }
-}
+    DEBUG_TRACE("set_join_key: range_column=%d, value=%d", range_column, entry->join_attr);
 
-void transform_set_join_attr(entry_t* entry, int32_t column_index) {
-    if (!entry) return;
-
-    // TDX: Direct call, no encryption wrapper needed
-    transform_set_join_attr_op(entry, column_index);
+    for (int32_t i = 0; i < MAX_JOIN_EQ; i++) {
+        int32_t value = 0;
+        if (i < num_eq) {
+            value = entry->attributes[key_params[JOIN_KEY_PARAM_EQ_COLUMNS + i]]
+                  + key_params[JOIN_KEY_PARAM_EQ_OFFSETS + i];
+        }
+        entry->join_eq[i] = value;
+    }
 }
 
 /**

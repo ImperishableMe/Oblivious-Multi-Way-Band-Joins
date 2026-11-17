@@ -38,6 +38,16 @@ std::string JoinConstraint::to_string() const {
             oss << ")";
         }
     }
-    
+
+    // Additional equalities of a composite constraint
+    for (size_t i = 0; i < source_eq_columns.size(); i++) {
+        oss << " AND " << source_table << "." << source_eq_columns[i]
+            << " = "
+            << target_table << "." << target_eq_columns[i];
+        if (eq_offsets[i] != 0) {
+            oss << std::showpos << eq_offsets[i] << std::noshowpos;
+        }
+    }
+
     return oss.str();
 }

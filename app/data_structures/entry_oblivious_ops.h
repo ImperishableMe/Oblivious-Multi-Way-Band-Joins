@@ -12,10 +12,13 @@ namespace obligraph {
 
 // Specialized in-place oblivious conditional swap for entry_t.
 //
-// entry_t = 13 int32_t metadata + 64 int32_t attributes = 308 bytes.
-// 308 = 9 * 32 + 1 * 16 + 1 * 4 (no 2 B / 1 B tail). With AVX2 the loop
-// does a single vpblendvb per 32 B chunk, writing back to both halves
-// in one pass — no temporary entry_t, no return-by-value copies.
+// entry_t is made of int32_t fields only (metadata, the composite join key,
+// and MAX_ATTRIBUTES attributes), so its size is a multiple of 4 bytes: with
+// the default MAX_ATTRIBUTES=64 and MAX_JOIN_EQ=2 it is 324 bytes
+// = 10 * 32 + 1 * 4 (no 2 B / 1 B tail). With AVX2 the loop does a single
+// vpblendvb per 32 B chunk, writing back to both halves in one pass — no
+// temporary entry_t, no return-by-value copies. The 16 B and 4 B steps below
+// cover whatever tail the configured size leaves.
 //
 // Obliviousness: the loads, blends, and stores are issued in the same
 // order at the same addresses regardless of `cond`. The cond bit only

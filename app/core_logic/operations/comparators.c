@@ -1,4 +1,5 @@
 #include "enclave_types.h"
+#include "join_key_ops.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -101,14 +102,14 @@ void oblivious_swap(entry_t* e1, entry_t* e2, int should_swap) {
 }
 
 /**
- * Core operation for comparator by join attribute (Algorithm 399)
- * Primary: join_attr, Secondary: entry type precedence
+ * Core operation for comparator by join key (Algorithm 399)
+ * Primary: composite join key (equality components, then the range
+ * component), Secondary: entry type precedence
  */
 void comparator_join_attr_op(entry_t* e1, entry_t* e2) {
-    // Compare join attributes (both are int32_t)
-    int32_t diff = e1->join_attr - e2->join_attr;
-    int32_t cmp = oblivious_sign(diff);
-    
+    // Compare the composite join keys
+    int32_t cmp = join_key_cmp(e1, e2);
+
     // Check if equal
     int32_t is_equal = (cmp == 0);
     
@@ -216,15 +217,14 @@ void comparator_end_first(entry_t* e1, entry_t* e2) {
 }
 
 /**
- * Core operation for comparator by join attribute then all attributes (Algorithm 697)
- * Primary: join_attr, Secondary: all attributes in sequence
+ * Core operation for comparator by join key then all attributes (Algorithm 697)
+ * Primary: composite join key, Secondary: all attributes in sequence
  */
 void comparator_join_then_other_op(entry_t* e1, entry_t* e2) {
-    // Compare join attributes (both are int32_t)
-    int32_t diff = e1->join_attr - e2->join_attr;
-    int32_t cmp = oblivious_sign(diff);
-    
-    // If join attributes are not equal, use that comparison
+    // Compare the composite join keys
+    int32_t cmp = join_key_cmp(e1, e2);
+
+    // If the join keys are not equal, use that comparison
     int32_t join_not_equal = (cmp != 0);
     
     // If join attributes are equal, compare all attributes
@@ -291,10 +291,10 @@ void comparator_alignment_key_op(entry_t* e1, entry_t* e2) {
     // Check if alignment keys are equal
     int32_t align_equal = (align_cmp == 0);
     
-    // Tie-breaker 1: Compare join attributes
-    int32_t join_cmp = oblivious_sign(e1->join_attr - e2->join_attr);
-    
-    // Check if join attributes are also equal
+    // Tie-breaker 1: Compare the composite join keys
+    int32_t join_cmp = join_key_cmp(e1, e2);
+
+    // Check if the join keys are also equal
     int32_t join_equal = (join_cmp == 0);
     
     // Tie-breaker 2: Compare copy indices

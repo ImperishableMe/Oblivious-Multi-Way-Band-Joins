@@ -40,17 +40,20 @@ Table AlignConcat::ConstructJoinResult(JoinTreeNodePtr root) {
         // Get the child's join constraint with its parent
         const JoinConstraint& constraint = child->get_constraint_with_parent();
         
-        // Set join_attr for accumulator to the child's join column with parent
-        // This ensures proper alignment during concatenation
-        DEBUG_INFO("Setting accumulator join_attr to: %s", constraint.get_target_column().c_str());
-        JoinAttributeSetter::SetJoinAttributesForTable(accumulator, constraint.get_target_column());
-        
+        // Set the accumulator's join key to the columns this child joins its
+        // parent on. This ensures proper alignment during concatenation: the
+        // accumulator must be ordered by the same key the top-down phase used
+        // for this child. After the first child the accumulator's columns are
+        // named "alias.column"; the setter resolves either form.
+        DEBUG_INFO("Setting accumulator join key to: %s", constraint.get_target_column().c_str());
+        JoinAttributeSetter::SetTargetJoinKey(accumulator, constraint);
+
         // Recursively get the result for the child subtree
         Table child_result = ConstructJoinResult(child);
-        
-        // Set join_attr for child result to its join column with parent
-        DEBUG_INFO("Setting child result join_attr to: %s", constraint.get_source_column().c_str());
-        JoinAttributeSetter::SetJoinAttributesForTable(child_result, constraint.get_source_column());
+
+        // Set the child result's join key to its join columns with parent
+        DEBUG_INFO("Setting child result join key to: %s", constraint.get_source_column().c_str());
+        JoinAttributeSetter::SetSourceJoinKey(child_result, constraint);
         
         // Align and concatenate with accumulator
         accumulator = AlignAndConcatenate(accumulator, child_result);
@@ -93,7 +96,7 @@ Table AlignConcat::AlignAndConcatenate(const Table& accumulator,
     DEBUG_INFO("Child size before ComputeCopyIndices: %zu rows", child.size());
     Table indexed_child = ComputeCopyIndices(child);
     DEBUG_INFO("Child size after ComputeCopyIndices: %zu rows", indexed_child.size());
-    
+
     // Step 3: Compute alignment keys
     DEBUG_INFO("Step 3: Computing alignment keys");
     Table aligned_child = ComputeAlignmentKeys(indexed_child);

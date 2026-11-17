@@ -117,10 +117,10 @@ void window_update_copy_index_op(entry_t* e1, entry_t* e2);  // Raw operation wi
 void concat_attributes_op(entry_t* left, entry_t* right, int32_t left_attr_count, int32_t right_attr_count);  // Raw operation without decrypt/encrypt
 
 /**
- * Join attribute setting
+ * Join key setting: copies the join columns named by key_params
+ * (JOIN_KEY_PARAM_* layout, see constants.h) into join_attr / join_eq
  */
-void transform_set_join_attr(entry_t* entry, int32_t column_index);
-void transform_set_join_attr_op(entry_t* entry, int32_t column_index);  // Raw operation without decrypt/encrypt
+void transform_set_join_key_op(entry_t* entry, const int32_t* key_params);
 
 /**
  * Initialize metadata fields to NULL_VALUE based on field mask

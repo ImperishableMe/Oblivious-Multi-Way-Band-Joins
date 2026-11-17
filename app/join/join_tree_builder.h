@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <set>
+#include <utility>
 #include "../query/parsed_query.h"
 #include "join_tree_node.h"
 #include "../data_structures/data_structures.h"
@@ -50,7 +51,14 @@ private:
     std::vector<std::string> get_connected_tables(
         const std::string& table,
         const std::vector<JoinConstraint>& constraints);
-    
+
+    /**
+     * Collect the (parent, child) table-name pairs of every edge in the tree
+     */
+    void collect_tree_edges(
+        JoinTreeNodePtr node,
+        std::set<std::pair<std::string, std::string>>& edges);
+
 public:
     /**
      * Build join tree from parsed query and table data

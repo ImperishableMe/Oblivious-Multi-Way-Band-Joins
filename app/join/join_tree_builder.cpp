@@ -35,7 +35,26 @@ JoinTreeNodePtr JoinTreeBuilder::build_from_query_with_root(
     
     // Build tree recursively
     build_tree_recursive(root, visited, query.tables, query.join_conditions, tables);
-    
+
+    // Every join condition must sit on an edge of the tree, because the
+    // algorithm only evaluates conditions between a node and its parent. A
+    // condition between two tables that are not adjacent in the tree (it would
+    // close a cycle in the join graph) cannot be evaluated; refuse the query
+    // rather than silently returning the result without that condition.
+    std::set<std::pair<std::string, std::string>> tree_edges;
+    collect_tree_edges(root, tree_edges);
+    for (const auto& constraint : query.join_conditions) {
+        const std::string& a = constraint.get_source_table();
+        const std::string& b = constraint.get_target_table();
+        if (tree_edges.count(std::make_pair(a, b)) == 0 &&
+            tree_edges.count(std::make_pair(b, a)) == 0) {
+            throw std::runtime_error(
+                "Unsupported join condition [" + constraint.to_string() + "]: tables '" + a +
+                "' and '" + b + "' are not adjacent in the join tree (the condition closes a "
+                "cycle in the join graph). Conditions between non-adjacent tables are not supported.");
+        }
+    }
+
     // Validate that all tables are in the tree
     if (visited.size() != query.tables.size()) {
         std::cerr << "Warning: Not all tables connected in join tree. ";
@@ -112,6 +131,16 @@ void JoinTreeBuilder::build_tree_recursive(
         
         // Recursively build subtree
         build_tree_recursive(child, visited_tables, all_tables, constraints, table_map);
+    }
+}
+
+void JoinTreeBuilder::collect_tree_edges(
+    JoinTreeNodePtr node,
+    std::set<std::pair<std::string, std::string>>& edges) {
+
+    for (const auto& child : node->get_children()) {
+        edges.insert(std::make_pair(node->get_table_name(), child->get_table_name()));
+        collect_tree_edges(child, edges);
     }
 }
 

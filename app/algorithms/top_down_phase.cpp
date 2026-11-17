@@ -109,12 +109,12 @@ void TopDownPhase::ComputeForeignMultiplicities(
     Table& child,
     const JoinConstraint& constraint) {
     
-    // Step 0: Set join_attr for both parent and child based on their join columns
-    DEBUG_INFO("Setting join_attr for parent using column: %s", constraint.get_target_column().c_str());
-    JoinAttributeSetter::SetJoinAttributesForTable(parent, constraint.get_target_column());
-    
-    DEBUG_INFO("Setting join_attr for child using column: %s", constraint.get_source_column().c_str());
-    JoinAttributeSetter::SetJoinAttributesForTable(child, constraint.get_source_column());
+    // Step 0: Set the join key for both parent and child based on their join columns
+    DEBUG_INFO("Setting join key for parent using column: %s", constraint.get_target_column().c_str());
+    JoinAttributeSetter::SetTargetJoinKey(parent, constraint);
+
+    DEBUG_INFO("Setting join key for child using column: %s", constraint.get_source_column().c_str());
+    JoinAttributeSetter::SetSourceJoinKey(child, constraint);
     
     // Step 1: Create combined table for foreign computation
     DEBUG_INFO("Creating combined table for foreign computation");

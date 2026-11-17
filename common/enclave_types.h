@@ -54,9 +54,16 @@ typedef struct {
     int32_t field_type;           // SORT_PADDING, SOURCE, START, END, TARGET, DIST_PADDING
     int32_t equality_type;        // EQ, NEQ, NONE
 
-    // Join attribute (using int32_t for signed arithmetic)
-    int32_t join_attr;
-    
+    // Join key. A join between two tables may combine several conditions:
+    // equalities plus at most one range. The key is the tuple
+    //   (join_eq[0], ..., join_eq[MAX_JOIN_EQ-1], join_attr)
+    // compared lexicographically - equality columns first, the range column
+    // (join_attr, the one band deviations are added to) last. Components a
+    // join does not use are 0 on every entry, so a single-column join behaves
+    // exactly as if join_attr were the whole key.
+    int32_t join_attr;            // Range component (int32_t for signed arithmetic)
+    int32_t join_eq[MAX_JOIN_EQ]; // Equality components, most significant first
+
     // Persistent metadata (persists across phases)
     int32_t original_index;      // Original position in table
     int32_t local_mult;          // Local multiplicity

@@ -126,6 +126,16 @@ SYNTHETIC_CASES = [
     ("star_composite_different_keys", [R, S, U],
      ["r.a = s.a", "s.t >= r.t", "s.t <= r.t + 2",
       "r.b = u.b", "u.t >= r.t - 1", "u.t <= r.t + 1"]),
+    # --- conditions that close a cycle but add nothing -----------------------
+    # Three tables sharing one attribute: the third equality (or a range that
+    # the equalities already satisfy) follows from the other two and must be
+    # accepted, not mistaken for a real cycle.
+    ("shared_attribute_redundant_equality", [R, S, U],
+     ["r.a = s.a", "s.a = u.a", "r.a = u.a", "s.w < 30", "u.x < 30"]),
+    ("shared_attribute_redundant_range", [R, S, U],
+     ["r.a = s.a", "s.a = u.a", "u.a >= r.a", "s.w < 30", "u.x < 30"]),
+    ("redundant_equality_through_offsets", [R, S, U],
+     ["s.b = r.b + 1", "u.b = s.b - 1", "u.b = r.b", "s.w < 30", "u.x < 30"]),
     # --- a node with a parent AND two or more children ----------------------
     # s is joined to its parent r and to its children u and r2 (r2, s2, u2 are
     # further aliases of the same tables). The filters keep the results small.
@@ -163,6 +173,12 @@ REJECT_CASES = [
     ("reject_not_equal", [R, S], ["r.a = s.a", "r.b <> s.b"]),
     ("reject_contradictory_range", [R, S], ["r.a = s.a", "s.t >= r.t + 5", "s.t <= r.t + 1"]),
     ("reject_same_table_comparison", [R, S], ["r.a = s.a", "r.t < r.v"]),
+    # closes a cycle and contradicts what the other equalities force (u.a = r.a)
+    ("reject_cycle_contradicting_equalities", [R, S, U],
+     ["r.a = s.a", "s.a = u.a", "u.a > r.a"]),
+    # the equality part is redundant, the range part is a real new condition
+    ("reject_cycle_partly_redundant", [R, S, U],
+     ["r.a = s.a", "s.a = u.a", "r.a = u.a", "u.t >= r.t"]),
 ]
 
 # Hop-table cases (banking data): the shape Graphite's residual query has.
